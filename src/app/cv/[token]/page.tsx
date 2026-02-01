@@ -44,6 +44,8 @@ export default function CvPage() {
         }
     }
 
+    const [copied, setCopied] = useState(false);
+
     return (
         <main className="min-h-screen px-6 py-16">
             <div className="mx-auto max-w-xl">
@@ -58,6 +60,28 @@ export default function CvPage() {
                         If information is not present, the system will say so.
                     </p>
                 </section>
+
+
+                <div className="mt-8 mb-16">
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href)
+                            setCopied(true)
+                            setTimeout(() => setCopied(false), 1600)
+                        }}
+                        className={`
+                            w-full rounded-md px-7 py-4 font-medium
+                            border transition-all
+                          ${copied
+                            ? "bg-green-600 border-green-600 text-white"
+                            : "bg-white border-gray-300 text-gray-800 hover:border-black"}
+                              `}
+                    >
+                        {copied ? "Link copied ✓" : "Copy share link"}
+                    </button>
+                </div>
+
+
 
                 <section className="mb-20">
           <textarea
