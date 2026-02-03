@@ -12,6 +12,7 @@ model Cv {
   data       Json
   createdAt DateTime @default(now())
 
+  meta           CvMeta?
   references     ReferenceDocument[]
   certificates   Certificate[]
   additionalText AdditionalText[]
@@ -41,6 +42,22 @@ model AdditionalText {
   cvToken   String
   content   String
   createdAt DateTime @default(now())
+
+  cv Cv @relation(fields: [cvToken], references: [token], onDelete: Cascade)
+}
+
+model CvMeta {
+  id        String   @id @default(cuid())
+  cvToken   String   @unique
+
+  name      String
+  position  String
+  summary   String
+
+  imageUrl  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   cv Cv @relation(fields: [cvToken], references: [token], onDelete: Cascade)
 }

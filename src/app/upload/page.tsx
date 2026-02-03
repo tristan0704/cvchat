@@ -15,6 +15,9 @@ export default function UploadPage() {
     const [certificateFiles, setCertificateFiles] = useState<File[]>([])
     const [additionalText, setAdditionalText] = useState("")
 
+    const imageInputRef = useRef<HTMLInputElement | null>(null)
+    const [imageFile, setImageFile] = useState<File | null>(null)
+
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
@@ -37,6 +40,10 @@ export default function UploadPage() {
         certificateFiles.forEach((file) => {
             formData.append("certificates", file)
         })
+
+        if (imageFile) {
+            formData.append("image", imageFile)
+        }
 
         if (additionalText.trim()) {
             formData.append("additionalText", additionalText)
@@ -157,6 +164,33 @@ export default function UploadPage() {
               </span>
                         )}
                     </button>
+
+
+                    {/* Image */}
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                        className="hidden"
+                    />
+
+                    <button
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="mt-6 w-full rounded-md border border-gray-300 px-4 py-4 text-left hover:border-black transition"
+                    >
+                        {imageFile ? (
+                            <span className="text-gray-800">
+                    Selected profile image: <strong>{imageFile.name}</strong>
+                        </span>
+                                  ) : (
+                                <span className="text-gray-500">
+                                    Add profile image (optional)
+                                    </span>
+                        )}
+                    </button>
+
 
                     {/* Additional Text */}
                     <textarea
