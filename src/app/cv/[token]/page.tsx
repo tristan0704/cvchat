@@ -14,7 +14,7 @@ export default function CvPage() {
     const params = useParams()
     const token = params.token as string
 
-    // ---- meta ----
+    // -- meta --
     const [meta, setMeta] = useState<CvMeta | null>(null)
 
     // ---- chat ----
