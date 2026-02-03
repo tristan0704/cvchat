@@ -1,3 +1,5 @@
+export const runtime = "nodejs"
+
 import { supabase } from "@/lib/supabase"
 
 export async function uploadProfileImage(
@@ -18,7 +20,7 @@ export async function uploadProfileImage(
 
         if (error) {
             console.error("Supabase upload failed:", error)
-            return null // ⬅️ WICHTIG
+            return null
         }
 
         const { data } = supabase.storage
@@ -27,7 +29,7 @@ export async function uploadProfileImage(
 
         return data?.publicUrl ?? null
     } catch (err) {
-        console.error("Unexpected image upload error:", err)
+        console.error("Unexpected upload error:", err)
         return null
     }
 }
