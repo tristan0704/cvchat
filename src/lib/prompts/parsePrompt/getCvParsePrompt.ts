@@ -1,8 +1,8 @@
-export function getParsePrompt(text: string) {
+export function getCvParsePrompt(text: string) {
     return `
 You are extracting structured CV data.
 
-Convert the following resume text into a JSON object that strictly follows this schema:
+Convert the following resume text into a JSON object that STRICTLY follows this schema:
 
 {
   "person": {
@@ -23,15 +23,15 @@ Convert the following resume text into a JSON object that strictly follows this 
     }
   ],
   "education": [],
-  "certificates": [],
   "languages": []
 }
 
 Rules:
 - Only include information explicitly present in the text.
+- Do NOT infer, normalize, or guess.
 - If information is missing, leave fields empty.
-- Do not invent or infer data.
 - Output ONLY valid JSON.
+- No explanations, no markdown.
 
 RESUME TEXT:
 ${text}

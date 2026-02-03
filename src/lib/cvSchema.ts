@@ -29,12 +29,6 @@ export type Cv = {
         end?: string
     }[]
 
-    certificates: {
-        name: string
-        issuer?: string
-        year?: string
-    }[]
-
     languages: {
         language: string
         level?: string

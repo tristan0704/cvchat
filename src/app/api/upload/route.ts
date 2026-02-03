@@ -1,36 +1,48 @@
 export const runtime = "nodejs"
 
 import { prisma } from "@/lib/prisma"
-import { getParsePrompt } from "@/lib/prompts/parsePrompt"
+import { getCvParsePrompt } from "@/lib/prompts/parsePrompt/getCvParsePrompt"
+import { getCertificateParsePrompt } from "@/lib/prompts/parsePrompt/getCertificateParsePrompt"
 import { randomUUID } from "crypto"
 
 export async function POST(req: Request) {
     try {
         const formData = await req.formData()
-        const file = formData.get("file")
 
-        if (!file || !(file instanceof File)) {
-            return Response.json({ error: "No file received" }, { status: 400 })
+        const cvFile = formData.get("cv")
+        const referenceFiles = formData.getAll("references")
+        const certificateFiles = formData.getAll("certificates")
+        const additionalText = formData.get("additionalText")
+
+        if (!cvFile || !(cvFile instanceof File)) {
+            return Response.json({ error: "CV file is required" }, { status: 400 })
         }
 
-        if (file.type !== "application/pdf") {
-            return Response.json({ error: "Only PDF files allowed" }, { status: 400 })
+        if (cvFile.type !== "application/pdf") {
+            return Response.json({ error: "CV must be a PDF file" }, { status: 400 })
         }
 
-        // wichtig: nur direkt pdf-parse verwenden, nicht die ganze pdf-parse-lib
         const pdfParse = require("pdf-parse/lib/pdf-parse")
 
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const parsed = await pdfParse(buffer)
+        async function parsePdfText(file: File): Promise<string> {
+            const buffer = Buffer.from(await file.arrayBuffer())
+            const parsed = await pdfParse(buffer)
+            return parsed.text?.trim() ?? ""
+        }
 
-        if (!parsed.text || parsed.text.length < 100) {
+        // --------------------
+        // CV PARSING
+        // --------------------
+        const cvText = await parsePdfText(cvFile)
+
+        if (cvText.length < 100) {
             return Response.json(
-                { error: "No readable text found in this PDF. Please upload a text-based (not scanned) resume." },
+                { error: "CV PDF contains no readable text (scanned PDFs not supported)" },
                 { status: 400 }
             )
         }
 
-        const parsePrompt = getParsePrompt(parsed.text)
+        const cvPrompt = getCvParsePrompt(cvText)
 
         const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
@@ -40,17 +52,41 @@ export async function POST(req: Request) {
             },
             body: JSON.stringify({
                 model: "gpt-4o-mini",
-                messages: [{ role: "system", content: parsePrompt }],
+                messages: [{ role: "system", content: cvPrompt }],
                 temperature: 0,
             }),
         })
 
         const aiData = await aiResponse.json()
-        const cvData = JSON.parse(aiData.choices[0].message.content)
+
+// guard for invalid responses of the ai
+        if (!aiData.choices || !aiData.choices[0]?.message?.content) {
+            console.error("OpenAI returned invalid response:", aiData)
+            return Response.json(
+                { error: "AI parsing failed" },
+                { status: 500 }
+            )
+        }
+
+        let cvData
+
+        try {
+            cvData = JSON.parse(aiData.choices[0].message.content)
+        } catch (err) {
+            console.error("Failed to parse CV JSON:", err)
+            return Response.json(
+                { error: "AI parsing failed" },
+                { status: 500 }
+            )
+        }
+
 
         const token = randomUUID()
 
-        await prisma.cv.create({
+        // --------------------
+        // CREATE CV (token = PK)
+        // --------------------
+        const profile = await prisma.cv.create({
             data: {
                 token,
                 data: {
@@ -62,6 +98,69 @@ export async function POST(req: Request) {
                 },
             },
         })
+
+        // --------------------
+        // REFERENCES (TEXT ONLY)
+        // --------------------
+        for (const file of referenceFiles) {
+            if (file instanceof File && file.type === "application/pdf") {
+                const text = await parsePdfText(file)
+
+                await prisma.referenceDocument.create({
+                    data: {
+                        cvToken: profile.token,
+                        rawText: text,
+                    },
+                })
+            }
+        }
+
+        // --------------------
+        // CERTIFICATES (LIGHT PARSE)
+        // --------------------
+        for (const file of certificateFiles) {
+            if (file instanceof File && file.type === "application/pdf") {
+                const text = await parsePdfText(file)
+
+                const certPrompt = getCertificateParsePrompt(text)
+
+                const certResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                    },
+                    body: JSON.stringify({
+                        model: "gpt-4o-mini",
+                        messages: [{ role: "system", content: certPrompt }],
+                        temperature: 0,
+                    }),
+                })
+
+                const certData = await certResponse.json()
+                const parsedCert = JSON.parse(certData.choices[0].message.content)
+
+                await prisma.certificate.create({
+                    data: {
+                        cvToken: profile.token,
+                        data: parsedCert,
+                        rawText: text,
+                    },
+                })
+            }
+        }
+
+        // --------------------
+        // ADDITIONAL TEXT
+        // --------------------
+        if (typeof additionalText === "string" && additionalText.trim()) {
+            await prisma.additionalText.create({
+                data: {
+                    cvToken: profile.token,
+                    content: additionalText.trim(),
+                },
+            })
+        }
 
         return Response.json({ token })
     } catch (err) {

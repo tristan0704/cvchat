@@ -11,19 +11,50 @@ export async function POST(req: Request) {
         )
     }
 
-    const record = await prisma.cv.findUnique({
+    // --------------------
+    // CV
+    // --------------------
+    const cvRecord = await prisma.cv.findUnique({
         where: { token },
     })
 
-    if (!record) {
+    if (!cvRecord) {
         return Response.json(
             { error: "CV not found" },
             { status: 404 }
         )
     }
 
-    const prompt = getChatPrompt(record.data)
+    // --------------------
+    // Additional documents
+    // --------------------
+    const [certificates, references, additionalTexts] = await Promise.all([
+        prisma.certificate.findMany({
+            where: { cvToken: token },
+        }),
+        prisma.referenceDocument.findMany({
+            where: { cvToken: token },
+        }),
+        prisma.additionalText.findMany({
+            where: { cvToken: token },
+        }),
+    ])
 
+    // --------------------
+    // COMMON CONTEXT
+    // --------------------
+    const context = {
+        cv: cvRecord.data,
+        certificates: certificates.map(c => c.data),
+        references: references.map(r => r.rawText),
+        additionalText: additionalTexts.map(a => a.content),
+    }
+
+    const prompt = getChatPrompt(context)
+
+    // --------------------
+    // OpenAI call
+    // --------------------
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -44,7 +75,7 @@ export async function POST(req: Request) {
 
     const answer =
         data.choices?.[0]?.message?.content ??
-        "Diese Information ist im Lebenslauf nicht enthalten."
+        "Diese Information ist in den Unterlagen nicht enthalten."
 
     return Response.json({ answer })
 }

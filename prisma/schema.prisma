@@ -11,4 +11,36 @@ model Cv {
   token      String   @id
   data       Json
   createdAt DateTime @default(now())
+
+  references     ReferenceDocument[]
+  certificates   Certificate[]
+  additionalText AdditionalText[]
+}
+
+model ReferenceDocument {
+  id        String   @id @default(cuid())
+  cvToken   String
+  rawText   String
+  createdAt DateTime @default(now())
+
+  cv Cv @relation(fields: [cvToken], references: [token], onDelete: Cascade)
+}
+
+model Certificate {
+  id        String   @id @default(cuid())
+  cvToken   String
+  data      Json
+  rawText   String
+  createdAt DateTime @default(now())
+
+  cv Cv @relation(fields: [cvToken], references: [token], onDelete: Cascade)
+}
+
+model AdditionalText {
+  id        String   @id @default(cuid())
+  cvToken   String
+  content   String
+  createdAt DateTime @default(now())
+
+  cv Cv @relation(fields: [cvToken], references: [token], onDelete: Cascade)
 }
