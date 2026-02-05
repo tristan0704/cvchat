@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
 
 type CvMeta = {
@@ -10,25 +10,31 @@ type CvMeta = {
     imageUrl?: string | null
 }
 
+type Message = {
+    role: "user" | "assistant"
+    content: string
+}
+
 export default function CvPage() {
     const params = useParams()
     const token = params.token as string
 
-    // -- meta --
+    // meta
     const [meta, setMeta] = useState<CvMeta | null>(null)
 
-    // ---- chat ----
+    // chat
+    const [messages, setMessages] = useState<Message[]>([])
     const [question, setQuestion] = useState("")
-    const [answer, setAnswer] = useState("")
-    const [loading, setLoading] = useState(false)
+    const [isTyping, setIsTyping] = useState(false)
     const [error, setError] = useState("")
 
-    // ---- share ----
+    // share
     const [copied, setCopied] = useState(false)
 
-    // --------------------
-    // LOAD CV META
-    // --------------------
+    // scroll
+    const bottomRef = useRef<HTMLDivElement | null>(null)
+
+    // load meta
     useEffect(() => {
         async function loadMeta() {
             try {
@@ -37,184 +43,186 @@ export default function CvPage() {
                     const data = await res.json()
                     setMeta(data)
                 }
-            } catch {
-                // silent fail (page still usable)
-            }
+            } catch {}
         }
-
         loadMeta()
     }, [token])
 
-    // --------------------
-    // ASK QUESTION
-    // --------------------
+    // auto scroll
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    }, [messages, isTyping])
+
+    // send question
     async function askQuestion() {
         if (!question.trim()) return
 
-        setLoading(true)
+        const currentQuestion = question
+
+        setMessages((prev) => [
+            ...prev,
+            { role: "user", content: currentQuestion },
+        ])
+
+        setQuestion("")
+        setIsTyping(true)
         setError("")
-        setAnswer("")
 
         try {
             const res = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    token,
-                    question,
-                }),
+                body: JSON.stringify({ token, question: currentQuestion }),
             })
 
             const data = await res.json()
 
             if (!res.ok) {
                 setError(data.error || "Something went wrong")
+                setIsTyping(false)
                 return
             }
 
-            setAnswer(data.answer)
+            await new Promise((r) => setTimeout(r, 500))
+
+            setMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: data.answer },
+            ])
         } catch {
             setError("Server not reachable")
         } finally {
-            setLoading(false)
+            setIsTyping(false)
         }
     }
 
     return (
-        <main className="min-h-screen px-6 py-16">
-            <div className="mx-auto max-w-xl">
+        <main className="min-h-screen flex flex-col bg-white">
 
-                {/* -------------------- */}
-                {/* META HEADER */}
-                {/* -------------------- */}
-                {meta && (
-                    <div className="flex items-start gap-4 mb-12">
+            {/* header */}
+            {meta && (
+                <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
+                    <div className="mx-auto max-w-3xl px-6 py-5 flex gap-4 items-start">
                         {meta.imageUrl ? (
                             <img
                                 src={meta.imageUrl}
                                 alt={meta.name}
-                                className="h-14 w-14 rounded-full object-cover"
+                                className="h-14 w-14 rounded-full object-cover flex-shrink-0"
                             />
                         ) : (
-                            <div className="h-14 w-14 rounded-full bg-gray-300 flex items-center justify-center">
-        <span className="text-sm font-medium text-gray-700">
-          {meta.name?.[0] ?? "?"}
-        </span>
+                            <div className="h-14 w-14 rounded-full bg-gray-200 flex items-center justify-center">
+                <span className="text-sm font-medium text-gray-700">
+                  {meta.name?.[0] ?? "?"}
+                </span>
                             </div>
                         )}
 
-                        <div>
-                            <p className="font-medium text-gray-900">
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900">
                                 {meta.name}
                             </p>
                             <p className="text-sm text-gray-500 mb-2">
                                 {meta.position}
                             </p>
-                            <p className="text-sm text-gray-700 leading-relaxed">
+                            <div className="text-sm text-gray-700 leading-relaxed max-h-32 overflow-y-auto pr-2">
                                 {meta.summary}
-                            </p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(window.location.href)
+                                setCopied(true)
+                                setTimeout(() => setCopied(false), 1600)
+                            }}
+                            className={`
+                h-fit rounded-md px-4 py-2 text-sm font-medium border transition
+                ${
+                                copied
+                                    ? "bg-green-600 border-green-600 text-white"
+                                    : "bg-white border-gray-300 text-gray-800 hover:border-black"
+                            }
+              `}
+                        >
+                            {copied ? "Copied ✓" : "Share"}
+                        </button>
+                    </div>
+                </header>
+            )}
+
+            {/* chat */}
+            <section className="flex-1 overflow-y-auto mx-auto w-full max-w-3xl px-6 py-10 space-y-6">
+                {messages.map((m, i) => (
+                    <div
+                        key={i}
+                        className={`flex ${
+                            m.role === "user" ? "justify-end" : "justify-start"
+                        }`}
+                    >
+                        <div
+                            className={`
+                max-w-[85%]
+                rounded-2xl px-4 py-3 text-sm leading-relaxed
+                ${
+                                m.role === "user"
+                                    ? "bg-black text-white rounded-br-md"
+                                    : "bg-gray-100 border border-gray-200 text-gray-800 rounded-bl-md"
+                            }
+              `}
+                        >
+                            {m.content}
+                        </div>
+                    </div>
+                ))}
+
+                {isTyping && (
+                    <div className="flex justify-start">
+                        <div className="rounded-2xl rounded-bl-md bg-gray-100 border border-gray-200 px-4 py-3 text-sm text-gray-500 animate-pulse">
+                            Typing…
                         </div>
                     </div>
                 )}
 
-
-                {/* -------------------- */}
-                {/* INTRO */}
-                {/* -------------------- */}
-                <section className="mb-12">
-                    <h1 className="text-3xl font-semibold mb-4">
-                        Chat with this CV
-                    </h1>
-
-                    <p className="text-sm text-gray-500 leading-relaxed">
-                        Answers are generated strictly from the uploaded CV.
-                        If information is not present, the system will say so.
+                {error && (
+                    <p className="text-sm text-red-600">
+                        {error}
                     </p>
-                </section>
+                )}
 
-                {/* -------------------- */}
-                {/* SHARE LINK */}
-                {/* -------------------- */}
-                <div className="mb-16">
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href)
-                            setCopied(true)
-                            setTimeout(() => setCopied(false), 1600)
-                        }}
-                        className={`
-              w-full rounded-md px-7 py-4 font-medium
-              border transition-all
-              ${
-                            copied
-                                ? "bg-green-600 border-green-600 text-white"
-                                : "bg-white border-gray-300 text-gray-800 hover:border-black"
-                        }
-            `}
-                    >
-                        {copied ? "Link copied ✓" : "Copy share link"}
-                    </button>
-                </div>
+                <div ref={bottomRef} />
+            </section>
 
-                {/* -------------------- */}
-                {/* QUESTION INPUT */}
-                {/* -------------------- */}
-                <section className="mb-20">
+            {/* sticky input */}
+            <footer className="sticky bottom-0 z-20 border-t border-gray-200 bg-white">
+                <div className="mx-auto max-w-3xl px-6 py-4 flex gap-3 items-end">
           <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask something about the candidate’s experience…"
-              rows={4}
+              placeholder="Ask about experience, projects, skills…"
+              rows={2}
               className="
-              w-full rounded-md border border-gray-300 p-4 mb-8
+              flex-1 resize-none
+              rounded-md border border-gray-300
+              px-4 py-3 text-sm
+              min-h-[56px] max-h-40
               focus:outline-none focus:ring-2 focus:ring-black
             "
           />
 
                     <button
                         onClick={askQuestion}
-                        disabled={loading}
+                        disabled={isTyping}
                         className="
-              w-full rounded-md bg-black px-7 py-4 text-white font-medium
+              rounded-md bg-black px-6 py-3
+              text-sm font-medium text-white
               disabled:opacity-50 disabled:cursor-not-allowed
             "
                     >
-                        {loading ? "Thinking…" : "Ask question"}
+                        Ask
                     </button>
+                </div>
+            </footer>
 
-                    {error && (
-                        <p className="mt-6 text-sm text-red-600">
-                            {error}
-                        </p>
-                    )}
-                </section>
-
-                {/* -------------------- */}
-                {/* ANSWER */}
-                {/* -------------------- */}
-                {answer && (
-                    <section className="mb-20">
-                        <div className="rounded-md border border-gray-200 bg-gray-50 p-6">
-                            <p className="text-sm font-medium mb-3 text-gray-700">
-                                Answer
-                            </p>
-                            <p className="text-gray-800 whitespace-pre-line leading-relaxed">
-                                {answer}
-                            </p>
-                        </div>
-                    </section>
-                )}
-
-                {/* -------------------- */}
-                {/* FOOTER */}
-                {/* -------------------- */}
-                <section>
-                    <p className="text-xs text-gray-400">
-                        Private link · Token-based access
-                    </p>
-                </section>
-
-            </div>
         </main>
     )
 }

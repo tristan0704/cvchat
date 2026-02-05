@@ -6,21 +6,23 @@ import { useRouter } from "next/navigation"
 export default function UploadPage() {
     const router = useRouter()
 
+    // file inputs
     const cvInputRef = useRef<HTMLInputElement | null>(null)
     const referenceInputRef = useRef<HTMLInputElement | null>(null)
     const certificateInputRef = useRef<HTMLInputElement | null>(null)
+    const imageInputRef = useRef<HTMLInputElement | null>(null)
 
+    // state
     const [cvFile, setCvFile] = useState<File | null>(null)
     const [referenceFiles, setReferenceFiles] = useState<File[]>([])
     const [certificateFiles, setCertificateFiles] = useState<File[]>([])
-    const [additionalText, setAdditionalText] = useState("")
-
-    const imageInputRef = useRef<HTMLInputElement | null>(null)
     const [imageFile, setImageFile] = useState<File | null>(null)
-
+    const [additionalText, setAdditionalText] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
+    const [loadingStep, setLoadingStep] = useState<string | null>(null)
 
+    // upload
     async function handleUpload() {
         if (!cvFile) {
             setError("Please select a CV PDF file.")
@@ -29,6 +31,7 @@ export default function UploadPage() {
 
         setLoading(true)
         setError("")
+        setLoadingStep("Uploading documents…")
 
         const formData = new FormData()
         formData.append("cv", cvFile)
@@ -55,36 +58,48 @@ export default function UploadPage() {
                 body: formData,
             })
 
+            setLoadingStep("Analyzing content…")
+
             const data = await res.json()
 
             if (!res.ok) {
                 setError(data.error || "Upload failed")
+                setLoading(false)
+                setLoadingStep(null)
                 return
             }
 
-            router.push(`/cv/${data.token}`)
+            setLoadingStep("Building AI knowledge context…")
+
+            setTimeout(() => {
+                router.push(`/cv/${data.token}`)
+            }, 600)
         } catch {
             setError("Server not reachable")
-        } finally {
             setLoading(false)
+            setLoadingStep(null)
         }
     }
 
     return (
-        <main className="min-h-screen px-6 py-16">
-            <div className="mx-auto max-w-xl">
+        <main className="min-h-screen bg-white px-6 py-20">
+            <div className="mx-auto max-w-2xl">
 
-                <section className="mb-20">
-                    <h1 className="text-3xl font-semibold mb-6">
-                        Upload your application documents
+                {/* header */}
+                <section className="mb-14">
+                    <h1 className="text-3xl font-semibold mb-4">
+                        Upload application material
                     </h1>
-
-                    <p className="text-gray-600 leading-relaxed mb-12">
-                        Upload your CV and optionally add references, certificates,
-                        or additional information.
+                    <p className="text-gray-500 leading-relaxed">
+                        Upload your CV and supporting documents. All files will be processed
+                        together as one application context.
                     </p>
+                </section>
 
-                    {/* CV Upload */}
+                {/* form */}
+                <section className="space-y-6">
+
+                    {/* CV */}
                     <input
                         ref={cvInputRef}
                         type="file"
@@ -96,11 +111,11 @@ export default function UploadPage() {
                     <button
                         type="button"
                         onClick={() => cvInputRef.current?.click()}
-                        className="w-full rounded-md border border-gray-300 px-4 py-4 text-left hover:border-black transition"
+                        className="w-full rounded-md border border-gray-300 px-5 py-4 text-left hover:border-black transition"
                     >
                         {cvFile ? (
                             <span className="text-gray-800">
-                Selected CV: <strong>{cvFile.name}</strong>
+                CV selected · <strong>{cvFile.name}</strong>
               </span>
                         ) : (
                             <span className="text-gray-500">
@@ -109,7 +124,7 @@ export default function UploadPage() {
                         )}
                     </button>
 
-                    {/* References */}
+                    {/* references */}
                     <input
                         ref={referenceInputRef}
                         type="file"
@@ -124,20 +139,20 @@ export default function UploadPage() {
                     <button
                         type="button"
                         onClick={() => referenceInputRef.current?.click()}
-                        className="mt-6 w-full rounded-md border border-gray-300 px-4 py-4 text-left hover:border-black transition"
+                        className="w-full rounded-md border border-gray-300 px-5 py-4 text-left hover:border-black transition"
                     >
                         {referenceFiles.length > 0 ? (
                             <span className="text-gray-800">
-                {referenceFiles.length} reference file(s) selected
+                {referenceFiles.length} reference file(s) added
               </span>
                         ) : (
                             <span className="text-gray-500">
-                Add reference / testimonial PDFs (optional)
+                Add references or testimonials (optional)
               </span>
                         )}
                     </button>
 
-                    {/* Certificates */}
+                    {/* certificates */}
                     <input
                         ref={certificateInputRef}
                         type="file"
@@ -152,21 +167,20 @@ export default function UploadPage() {
                     <button
                         type="button"
                         onClick={() => certificateInputRef.current?.click()}
-                        className="mt-6 w-full rounded-md border border-gray-300 px-4 py-4 text-left hover:border-black transition"
+                        className="w-full rounded-md border border-gray-300 px-5 py-4 text-left hover:border-black transition"
                     >
                         {certificateFiles.length > 0 ? (
                             <span className="text-gray-800">
-                {certificateFiles.length} certificate file(s) selected
+                {certificateFiles.length} certificate file(s) added
               </span>
                         ) : (
                             <span className="text-gray-500">
-                Add certificate PDFs (optional)
+                Add certificates or additional documents
               </span>
                         )}
                     </button>
 
-
-                    {/* Image */}
+                    {/* image */}
                     <input
                         ref={imageInputRef}
                         type="file"
@@ -178,48 +192,56 @@ export default function UploadPage() {
                     <button
                         type="button"
                         onClick={() => imageInputRef.current?.click()}
-                        className="mt-6 w-full rounded-md border border-gray-300 px-4 py-4 text-left hover:border-black transition"
+                        className="w-full rounded-md border border-gray-300 px-5 py-4 text-left hover:border-black transition"
                     >
                         {imageFile ? (
                             <span className="text-gray-800">
-                    Selected profile image: <strong>{imageFile.name}</strong>
-                        </span>
-                                  ) : (
-                                <span className="text-gray-500">
-                                    Add profile image (optional)
-                                    </span>
+                Profile image selected · <strong>{imageFile.name}</strong>
+              </span>
+                        ) : (
+                            <span className="text-gray-500">
+                Add profile image (optional)
+              </span>
                         )}
                     </button>
 
-
-                    {/* Additional Text */}
+                    {/* additional text */}
                     <textarea
                         value={additionalText}
                         onChange={(e) => setAdditionalText(e.target.value)}
-                        placeholder="Additional information (optional)"
-                        rows={5}
-                        className="mt-8 w-full rounded-md border border-gray-300 px-4 py-3 text-sm"
+                        placeholder="Additional notes or context (optional)"
+                        rows={4}
+                        className="w-full rounded-md border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
                     />
 
-                    {/* Submit */}
+                    {/* submit */}
                     <button
                         onClick={handleUpload}
                         disabled={loading}
-                        className="mt-10 w-full rounded-md bg-black px-7 py-4 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full rounded-md bg-black px-7 py-4 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? "Uploading…" : "Upload documents"}
+                        {loading ? "Processing application…" : "Create CV chat"}
                     </button>
 
+                    {/* loading state */}
+                    {loading && loadingStep && (
+                        <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <span className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-black animate-spin" />
+                            {loadingStep}
+                        </div>
+                    )}
+
                     {error && (
-                        <p className="mt-6 text-sm text-red-600">
+                        <p className="text-sm text-red-600">
                             {error}
                         </p>
                     )}
                 </section>
 
-                <section>
+                {/* footer */}
+                <section className="mt-14">
                     <p className="text-sm text-gray-500">
-                        Only text-based PDFs are supported. Scanned documents are not processed.
+                        Only text-based PDFs are supported. All uploaded files are processed together.
                     </p>
                 </section>
 
