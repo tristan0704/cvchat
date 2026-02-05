@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 type CvMeta = {
     name: string
@@ -170,7 +172,21 @@ export default function CvPage() {
                             }
               `}
                         >
-                            {m.content}
+                            {m.role === "assistant" ? (
+                                <div
+                                    className="
+                    prose prose-sm prose-neutral
+                    prose-p:my-2 prose-ul:my-2 prose-li:my-1
+                    max-w-none
+                  "
+                                >
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {m.content}
+                                    </ReactMarkdown>
+                                </div>
+                            ) : (
+                                m.content
+                            )}
                         </div>
                     </div>
                 ))}
