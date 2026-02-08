@@ -1,4 +1,4 @@
-# howtoreplai (CVChat)
+# CVChat
 
 Kurze Beschreibung: Dieses Projekt verwandelt eine komplette Bewerbung in einen privaten, teilbaren Chat. Nutzer laden CV, Zeugnisse, Referenzen und Notizen hoch; Recruiter stellen Fragen und erhalten Antworten, die ausschließlich auf den hochgeladenen Unterlagen basieren.
 
