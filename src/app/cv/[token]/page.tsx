@@ -99,12 +99,12 @@ export default function CvPage() {
     }
 
     return (
-        <main className="min-h-screen flex flex-col bg-white">
+        <main className="h-screen flex flex-col bg-white overflow-hidden">
 
             {/* header */}
             {meta && (
                 <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
-                    <div className="mx-auto max-w-3xl px-6 py-5 flex gap-4 items-start">
+                    <div className="mx-auto max-w-3xl px-6 py-3 flex gap-4 items-start">
                         {meta.imageUrl ? (
                             <img
                                 src={meta.imageUrl}
@@ -153,7 +153,7 @@ export default function CvPage() {
             )}
 
             {/* chat */}
-            <section className="flex-1 overflow-y-auto mx-auto w-full max-w-3xl px-6 py-10 space-y-6">
+            <section className="flex-1 overflow-y-auto mx-auto w-full max-w-3xl px-6 py-4 space-y-4">
                 {messages.map((m, i) => (
                     <div
                         key={i}
@@ -210,7 +210,7 @@ export default function CvPage() {
 
             {/* sticky input */}
             <footer className="sticky bottom-0 z-20 border-t border-gray-200 bg-white">
-                <div className="mx-auto max-w-3xl px-6 py-4 flex gap-3 items-end">
+                <div className="mx-auto max-w-3xl px-6 py-3 flex gap-3 items-end">
           <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
@@ -219,8 +219,8 @@ export default function CvPage() {
               className="
               flex-1 resize-none
               rounded-md border border-gray-300
-              px-4 py-3 text-sm
-              min-h-[56px] max-h-40
+              px-4 py-2 text-sm
+              min-h-[56px] max-h-24
               focus:outline-none focus:ring-2 focus:ring-black
             "
           />
