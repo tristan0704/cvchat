@@ -1,6 +1,7 @@
 export const runtime = "nodejs"
 
 import { prisma } from "@/lib/prisma"
+import { getSessionUser } from "@/lib/auth"
 import { getCvParsePrompt } from "@/lib/prompts/parsePrompt/getCvParsePrompt"
 import { getCertificateParsePrompt } from "@/lib/prompts/parsePrompt/getCertificateParsePrompt"
 import { randomUUID } from "crypto"
@@ -8,6 +9,7 @@ import { uploadProfileImage } from "@/lib/uploadProfileImage"
 
 export async function POST(req: Request) {
     try {
+        const sessionUser = await getSessionUser()
         const formData = await req.formData()
 
         const cvFile = formData.get("cv")
@@ -116,6 +118,7 @@ export async function POST(req: Request) {
         const profile = await prisma.cv.create({
             data: {
                 token,
+                userId: sessionUser?.id ?? null,
                 data: cvData,
 
                 meta: {

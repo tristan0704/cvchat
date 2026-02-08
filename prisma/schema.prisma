@@ -9,9 +9,11 @@ generator client {
 
 model Cv {
   token      String   @id
+  userId     String?
   data       Json
   createdAt DateTime @default(now())
 
+  user           User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
   meta           CvMeta?
   references     ReferenceDocument[]
   certificates   Certificate[]
@@ -60,4 +62,25 @@ model CvMeta {
   updatedAt DateTime @updatedAt
 
   cv Cv @relation(fields: [cvToken], references: [token], onDelete: Cascade)
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime  @default(now())
+
+  cvs      Cv[]
+  sessions Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
