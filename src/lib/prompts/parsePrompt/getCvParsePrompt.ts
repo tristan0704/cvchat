@@ -2,7 +2,7 @@ export function getCvParsePrompt(text: string) {
     return `
 You are extracting structured CV data.
 
-Convert the following resume text into a JSON object that STRICTLY follows this schema:
+Convert the resume text into ONE JSON object that follows this schema exactly:
 
 {
   "person": {
@@ -27,9 +27,14 @@ Convert the following resume text into a JSON object that STRICTLY follows this 
 }
 
 Rules:
-- Only include information explicitly present in the text.
-- Do NOT infer, normalize, or guess.
-- If information is missing, leave fields empty.
+- Include only information explicitly present in the text.
+- Do not guess missing facts.
+- Keep the response concise and clean.
+- If information is missing, use empty strings ("") or empty arrays ([]).
+- "skills" should contain short skill labels only.
+- "experience[].tasks" should contain short bullet-like task statements.
+- "experience[].keywords" should contain short technology/domain keywords from that role.
+- Keep original wording where possible; light cleanup for readability is fine.
 - Output ONLY valid JSON.
 - No explanations, no markdown.
 

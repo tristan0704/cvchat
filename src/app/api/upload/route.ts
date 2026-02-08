@@ -6,6 +6,7 @@ import { getCvParsePrompt } from "@/lib/prompts/parsePrompt/getCvParsePrompt"
 import { getCertificateParsePrompt } from "@/lib/prompts/parsePrompt/getCertificateParsePrompt"
 import { randomUUID } from "crypto"
 import { uploadProfileImage } from "@/lib/uploadProfileImage"
+import { captureServerError, trackEvent } from "@/lib/observability"
 
 export async function POST(req: Request) {
     try {
@@ -198,9 +199,20 @@ export async function POST(req: Request) {
             })
         }
 
+        await trackEvent({
+            type: "upload_completed",
+            cvToken: token,
+            context: {
+                hasReferences: referenceFiles.length > 0,
+                hasCertificates: certificateFiles.length > 0,
+                hasImage: !!imageFile,
+                hasAdditionalText: typeof additionalText === "string" && !!additionalText.trim(),
+            },
+        })
+
         return Response.json({ token })
     } catch (err) {
-        console.error("Upload API error:", err)
+        await captureServerError("api/upload", err)
         return Response.json({ error: "Internal server error" }, { status: 500 })
     }
 }

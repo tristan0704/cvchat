@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 
 type AuthUser = {
@@ -77,57 +78,71 @@ function AuthPageContent() {
     }
 
     return (
-        <main className="min-h-screen bg-white px-6 py-20">
-            <div className="mx-auto max-w-md">
-                <h1 className="text-3xl font-semibold mb-3">
-                    {mode === "login" ? "Login" : "Register"}
-                </h1>
-                <p className="text-gray-600 mb-8">
-                    {mode === "login"
-                        ? "Log in and continue to your CV."
-                        : "Create your account and continue to your CV."}
-                </p>
-
-                <div className="space-y-3">
-                    {mode === "register" && (
-                        <input
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="Name (optional)"
-                            className="w-full rounded-md border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                        />
-                    )}
-
-                    <input
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email"
-                        type="email"
-                        className="w-full rounded-md border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                    />
-
-                    <input
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password"
-                        type="password"
-                        className="w-full rounded-md border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                    />
-
-                    <button
-                        onClick={submit}
-                        disabled={loading}
-                        className="w-full rounded-md bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50"
+        <main className="min-h-screen bg-gradient-to-b from-white to-gray-50 px-4 py-8 sm:px-6 sm:py-12">
+            <div className="mx-auto w-full max-w-md">
+                <header className="mb-8 flex items-center justify-between">
+                    <Link href="/home" className="text-lg font-semibold tracking-tight text-gray-900">
+                        HowToReplAI
+                    </Link>
+                    <Link
+                        href="/home"
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800"
                     >
-                        {loading
-                            ? "Please wait..."
-                            : mode === "login"
-                              ? "Login"
-                              : "Register"}
-                    </button>
+                        Back
+                    </Link>
+                </header>
 
-                    {error && <p className="text-sm text-red-600">{error}</p>}
-                </div>
+                <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
+                    <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+                        {mode === "login" ? "Welcome back" : "Create your account"}
+                    </h1>
+                    <p className="mt-2 text-sm text-gray-600">
+                        {mode === "login"
+                            ? "Sign in to manage and revisit your CV chat."
+                            : "Sign up to save your CV chat and manage sharing."}
+                    </p>
+
+                    <div className="mt-6 space-y-3">
+                        {mode === "register" && (
+                            <input
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Name (optional)"
+                                className="w-full rounded-lg border border-gray-300 px-4 py-3"
+                            />
+                        )}
+
+                        <input
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Email"
+                            type="email"
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3"
+                        />
+
+                        <input
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Password"
+                            type="password"
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3"
+                        />
+
+                        <button
+                            onClick={submit}
+                            disabled={loading}
+                            className="w-full rounded-lg bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50"
+                        >
+                            {loading
+                                ? "Please wait..."
+                                : mode === "login"
+                                  ? "Log in"
+                                  : "Create account"}
+                        </button>
+
+                        {error && <p className="text-sm text-red-600">{error}</p>}
+                    </div>
+                </section>
             </div>
         </main>
     )
@@ -135,7 +150,7 @@ function AuthPageContent() {
 
 export default function AuthPage() {
     return (
-        <Suspense fallback={<main className="min-h-screen bg-white px-6 py-20" />}>
+        <Suspense fallback={<main className="min-h-screen bg-gradient-to-b from-white to-gray-50 px-4 py-8 sm:px-6 sm:py-12" />}>
             <AuthPageContent />
         </Suspense>
     )

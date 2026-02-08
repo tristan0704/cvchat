@@ -11,11 +11,9 @@ Return ONLY a JSON object following this schema:
 }
 
 Rules:
-- Extract only what is explicitly stated.
-- If a field is not present, leave it as "".
-- Keep values short and clean (no extra commentary).
-- If multiple certificate names appear, use the main/canonical title in "title".
-- Do not invent missing details.
+- Only extract what is explicitly stated.
+- If a field is not present, leave it empty.
+- Do not infer or guess.
 - Output ONLY valid JSON.
 
 CERTIFICATE TEXT:
