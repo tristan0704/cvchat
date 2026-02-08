@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import ReactMarkdown from "react-markdown"
@@ -19,10 +19,11 @@ type Message = {
 }
 
 const QUICK_PROMPTS = [
-    "What projects are most relevant for this role?",
-    "Which results are clearly measurable?",
-    "What technologies does this candidate use in practice?",
-    "What follow-up interview questions would you recommend?",
+    "Which experiences are most relevant for this role?",
+    "What measurable outcomes are documented?",
+    "Which technologies are used in real projects?",
+    "What are the strongest indicators of ownership and impact?",
+    "What are good follow-up interview questions?",
 ]
 
 export default function PublicCvPage() {
@@ -36,9 +37,18 @@ export default function PublicCvPage() {
     const [question, setQuestion] = useState("")
     const [isTyping, setIsTyping] = useState(false)
     const [error, setError] = useState("")
+    const [queuedQuestions, setQueuedQuestions] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
     const [toast, setToast] = useState("")
     const bottomRef = useRef<HTMLDivElement | null>(null)
+
+    const smartPrompts = useMemo(() => {
+        if (!meta?.position?.trim()) return QUICK_PROMPTS
+        return [
+            `How well does this profile match a ${meta.position} role?`,
+            ...QUICK_PROMPTS.slice(1),
+        ]
+    }, [meta?.position])
 
     function showToast(message: string) {
         setToast(message)
@@ -124,6 +134,21 @@ export default function PublicCvPage() {
         }
     }
 
+    function enqueueQuestion(raw?: string) {
+        const nextQuestion = (raw ?? question).trim()
+        if (!nextQuestion) return
+        setQueuedQuestions((prev) => [...prev, nextQuestion])
+        if (!raw) setQuestion("")
+    }
+
+    useEffect(() => {
+        if (isTyping) return
+        if (queuedQuestions.length === 0) return
+        const [next, ...rest] = queuedQuestions
+        setQueuedQuestions(rest)
+        askQuestion(next)
+    }, [queuedQuestions, isTyping])
+
     return (
         <main className="h-[100dvh] flex flex-col bg-gradient-to-b from-white to-gray-50 overflow-hidden">
             {meta && (
@@ -131,7 +156,7 @@ export default function PublicCvPage() {
                     <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">
                         <div className="mb-3 flex items-center justify-between">
                             <Link href="/home" className="text-sm font-semibold tracking-tight text-gray-900">
-                                HowToReplAI
+                                CVChat
                             </Link>
                             <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-600">
                                 Recruiter View
@@ -184,22 +209,20 @@ export default function PublicCvPage() {
 
                 {loading && <p className="text-sm text-gray-500">Loading profile...</p>}
 
-                {messages.length === 0 && !loading && !error && (
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                        <p className="text-sm font-medium text-gray-900">Suggested questions</p>
-                        <div className="mt-3 grid gap-2">
-                            {QUICK_PROMPTS.map((prompt) => (
-                                <button
-                                    key={prompt}
-                                    onClick={() => askQuestion(prompt)}
-                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-700 hover:border-gray-500"
-                                >
-                                    {prompt}
-                                </button>
-                            ))}
-                        </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-medium text-gray-900">Smart question ideas</p>
+                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                        {smartPrompts.map((prompt) => (
+                            <button
+                                key={prompt}
+                                onClick={() => enqueueQuestion(prompt)}
+                                className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:border-gray-500"
+                            >
+                                {prompt}
+                            </button>
+                        ))}
                     </div>
-                )}
+                </div>
 
                 {messages.map((m, i) => (
                     <div
@@ -239,7 +262,7 @@ export default function PublicCvPage() {
             </section>
 
             <footer className="sticky bottom-0 z-20 border-t border-gray-200 bg-white">
-                <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">
+                <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                         <textarea
                             aria-label="Ask a question"
@@ -251,7 +274,7 @@ export default function PublicCvPage() {
                         />
                         <button
                             aria-label="Send question"
-                            onClick={() => askQuestion()}
+                            onClick={() => enqueueQuestion()}
                             disabled={isTyping || !meta}
                             className="rounded-lg bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -262,7 +285,7 @@ export default function PublicCvPage() {
             </footer>
 
             {toast && (
-                <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
+                <div className="pointer-events-none fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
                     {toast}
                 </div>
             )}

@@ -37,11 +37,12 @@ type CvResponse = {
     status: CvStatus
 }
 
-const QUICK_PROMPTS = [
-    "What are the candidate's strongest skills for this role?",
-    "Summarize relevant project experience in 5 bullets.",
+const DEFAULT_QUICK_PROMPTS = [
+    "What are the strongest skills for this role?",
+    "Summarize role-relevant project experience in 5 bullets.",
     "Which achievements are measurable in the documents?",
-    "What questions should I ask in the interview?",
+    "Where are potential gaps and how can they be addressed?",
+    "Which interview questions should I ask next?",
 ]
 
 export default function CvPage() {
@@ -59,6 +60,7 @@ export default function CvPage() {
     const [question, setQuestion] = useState("")
     const [isTyping, setIsTyping] = useState(false)
     const [chatError, setChatError] = useState("")
+    const [queuedQuestions, setQueuedQuestions] = useState<string[]>([])
 
     const [authUser, setAuthUser] = useState<AuthUser | null>(null)
     const [authMode, setAuthMode] = useState<"login" | "register">("login")
@@ -82,6 +84,14 @@ export default function CvPage() {
         if (!status?.shareToken || typeof window === "undefined") return null
         return `${window.location.origin}/cv/share/${status.shareToken}`
     }, [status?.shareToken])
+
+    const quickPrompts = useMemo(() => {
+        if (!meta?.position?.trim()) return DEFAULT_QUICK_PROMPTS
+        return [
+            `How well does the candidate fit a ${meta.position} role?`,
+            ...DEFAULT_QUICK_PROMPTS.slice(1),
+        ]
+    }, [meta?.position])
 
     async function track(type: string, context?: unknown) {
         try {
@@ -196,6 +206,21 @@ export default function CvPage() {
             setIsTyping(false)
         }
     }
+
+    function enqueueQuestion(raw?: string) {
+        const nextQuestion = (raw ?? question).trim()
+        if (!nextQuestion) return
+        setQueuedQuestions((prev) => [...prev, nextQuestion])
+        if (!raw) setQuestion("")
+    }
+
+    useEffect(() => {
+        if (isTyping) return
+        if (queuedQuestions.length === 0) return
+        const [next, ...rest] = queuedQuestions
+        setQueuedQuestions(rest)
+        askQuestion(next)
+    }, [queuedQuestions, isTyping])
 
     async function updateSharedVersion() {
         await runAction("updateSharedVersion", async () => {
@@ -544,22 +569,20 @@ export default function CvPage() {
                     </div>
                 )}
 
-                {messages.length === 0 && !isTyping && !chatError && (
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                        <p className="text-sm font-medium text-gray-900">Start with a recruiter-style question:</p>
-                        <div className="mt-3 grid gap-2">
-                            {QUICK_PROMPTS.map((prompt) => (
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-medium text-gray-900">Smart question ideas</p>
+                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                            {quickPrompts.map((prompt) => (
                                 <button
                                     key={prompt}
-                                    onClick={() => askQuestion(prompt)}
-                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-700 hover:border-gray-500"
+                                    onClick={() => enqueueQuestion(prompt)}
+                                    className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:border-gray-500"
                                 >
                                     {prompt}
-                                </button>
-                            ))}
-                        </div>
+                            </button>
+                        ))}
                     </div>
-                )}
+                </div>
 
                 {messages.map((m, i) => (
                     <div
@@ -600,7 +623,7 @@ export default function CvPage() {
             </section>
 
             <footer className="sticky bottom-0 z-20 border-t border-gray-200 bg-white">
-                <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">
+                <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                         <textarea
                             aria-label="Ask a question"
@@ -612,7 +635,7 @@ export default function CvPage() {
                         />
                         <button
                             aria-label="Send question"
-                            onClick={() => askQuestion()}
+                            onClick={() => enqueueQuestion()}
                             disabled={isTyping}
                             className="rounded-lg bg-black px-6 py-3 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -669,7 +692,7 @@ export default function CvPage() {
             )}
 
             {toast && (
-                <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
+                <div className="pointer-events-none fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
                     {toast}
                 </div>
             )}

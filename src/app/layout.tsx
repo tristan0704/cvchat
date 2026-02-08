@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HowToReplAI - Interactive CV Chat",
+  title: "CVChat - Interactive CV Chat",
   description: "Turn your CV into a shareable AI conversation for recruiters.",
 };
 

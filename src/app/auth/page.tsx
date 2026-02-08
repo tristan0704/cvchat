@@ -82,7 +82,7 @@ function AuthPageContent() {
             <div className="mx-auto w-full max-w-md">
                 <header className="mb-8 flex items-center justify-between">
                     <Link href="/home" className="text-lg font-semibold tracking-tight text-gray-900">
-                        HowToReplAI
+                        CVChat
                     </Link>
                     <Link
                         href="/home"

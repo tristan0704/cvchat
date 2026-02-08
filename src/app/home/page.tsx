@@ -34,7 +34,7 @@ export default function HomePage() {
             <div className="mx-auto w-full max-w-5xl">
                 <header className="mb-12 flex items-center justify-between gap-3">
                     <Link href="/home" className="text-lg font-semibold tracking-tight text-gray-900">
-                        HowToReplAI
+                        CVChat
                     </Link>
 
                     {!user ? (
@@ -62,13 +62,13 @@ export default function HomePage() {
                 <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
                         <p className="mb-4 inline-flex rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
-                            Recruiter-ready CV experience
+                            Modern recruiting workflow
                         </p>
                         <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                            Let recruiters chat with your CV instead of scanning PDFs
+                            Let recruiters talk to your CV instead of scanning PDFs
                         </h1>
                         <p className="mt-5 max-w-2xl text-base text-gray-600 sm:text-lg">
-                            Upload your application documents once. Share a public link. Recruiters ask questions and get clear answers grounded only in your material.
+                            Upload your application once, share one public link, and let recruiters get instant, source-grounded answers.
                         </p>
 
                         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -82,13 +82,13 @@ export default function HomePage() {
                                 href="/upload"
                                 className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-800"
                             >
-                                Upload documents
+                                Upload now
                             </Link>
                         </div>
                     </div>
 
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-                        <h2 className="text-lg font-semibold text-gray-900">How it works</h2>
+                        <h2 className="text-lg font-semibold text-gray-900">How CVChat works</h2>
                         <ol className="mt-4 space-y-3 text-sm text-gray-600">
                             <li>1. Upload CV, references, certificates, and optional notes.</li>
                             <li>2. We build a structured profile and a private chat context.</li>
