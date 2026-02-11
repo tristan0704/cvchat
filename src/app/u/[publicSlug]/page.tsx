@@ -172,11 +172,11 @@ export default function PublicPortfolioPage() {
         <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
             <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
                 <header className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8">
-                    <div className="mb-5 flex items-center justify-between">
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <Link href="/home" className="text-sm font-semibold tracking-tight text-slate-900">
                             CVChat
                         </Link>
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                        <span className="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
                             Recruiter Portfolio
                         </span>
                     </div>

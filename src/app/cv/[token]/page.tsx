@@ -137,11 +137,11 @@ export default function CvPage() {
             <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
                 {meta && status && (
                     <header className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8">
-                        <div className="mb-5 flex items-center justify-between">
+                        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-sm font-semibold tracking-tight text-slate-900">CVChat</p>
-                            <div className="flex items-center gap-2">
+                            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                                 <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">Owner View</span>
-                                <button onClick={() => setIsSettingsOpen(true)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800">Open settings</button>
+                                <button onClick={() => setIsSettingsOpen(true)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 sm:w-auto">Open settings</button>
                             </div>
                         </div>
                         <div className="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-start">
@@ -185,8 +185,8 @@ export default function CvPage() {
             </div>
 
             {isSettingsOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 px-4 py-8 sm:px-6" onClick={() => setIsSettingsOpen(false)}>
-                    <div className="mx-auto w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:p-6" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6 sm:px-6 sm:py-8" onClick={() => setIsSettingsOpen(false)}>
+                    <div className="mx-auto w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:p-6 max-h-[calc(100dvh-3rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between"><h2 className="text-base font-semibold text-slate-900">Owner settings</h2><button onClick={() => setIsSettingsOpen(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700">Close</button></div>
                         <section className="mt-4 rounded-xl border border-slate-200 p-4">
                             <h3 className="text-sm font-semibold text-slate-900">Public share</h3>
