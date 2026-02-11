@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { createSession, hashPassword, setSessionCookie } from "@/lib/auth"
+import { ensureUserPublicSlug } from "@/lib/publicSlug"
 
 type RegisterBody = {
     email?: string
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
             passwordHash,
         },
     })
+    const publicSlug = await ensureUserPublicSlug(user.id, name || email.split("@")[0])
 
     const session = await createSession(user.id)
     await setSessionCookie(session.token, session.expiresAt)
@@ -54,6 +56,6 @@ export async function POST(req: Request) {
     }
 
     return Response.json({
-        user: { id: user.id, email: user.email, name: user.name },
+        user: { id: user.id, email: user.email, name: user.name, publicSlug },
     })
 }

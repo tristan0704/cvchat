@@ -1,5 +1,6 @@
 import { getSessionUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { buildProfileFromCvData } from "@/lib/profileContext"
 
 export async function GET(
     _req: Request,
@@ -44,6 +45,12 @@ export async function GET(
             summary: cv.meta.summary,
             imageUrl: cv.meta.imageUrl,
         },
+        profile: buildProfileFromCvData(cv.data, {
+            name: cv.meta.name,
+            position: cv.meta.position,
+            summary: cv.meta.summary,
+            imageUrl: cv.meta.imageUrl,
+        }),
         status: {
             isPublished: cv.isPublished,
             shareEnabled: cv.shareEnabled,

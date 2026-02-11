@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { createSession, setSessionCookie, verifyPassword } from "@/lib/auth"
+import { ensureUserPublicSlug } from "@/lib/publicSlug"
 
 type LoginBody = {
     email?: string
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
 
     const session = await createSession(user.id)
     await setSessionCookie(session.token, session.expiresAt)
+    const publicSlug = await ensureUserPublicSlug(user.id, user.name || email.split("@")[0])
 
     if (token) {
         await prisma.cv.updateMany({
@@ -44,6 +46,6 @@ export async function POST(req: Request) {
     }
 
     return Response.json({
-        user: { id: user.id, email: user.email, name: user.name },
+        user: { id: user.id, email: user.email, name: user.name, publicSlug },
     })
 }

@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma"
 import { getChatPrompt } from "@/lib/prompts/chatPrompt"
 import { PublishedSnapshot } from "@/lib/cvPublishing"
+import { buildStructuredChatContext } from "@/lib/profileContext"
 import { captureServerError, trackEvent } from "@/lib/observability"
 
 type PublicChatBody = {
+    publicSlug?: string
     shareToken?: string
     question?: string
 }
@@ -11,37 +13,63 @@ type PublicChatBody = {
 export async function POST(req: Request) {
     try {
         const body = (await req.json().catch(() => ({}))) as PublicChatBody
+        const publicSlug = body.publicSlug?.trim().toLowerCase()
         const shareToken = body.shareToken?.trim()
         const question = body.question?.trim()
 
-        if (!shareToken || !question) {
+        if ((!publicSlug && !shareToken) || !question) {
             return Response.json(
-                { error: "Missing shareToken or question" },
+                { error: "Missing publicSlug/shareToken or question" },
                 { status: 400 }
             )
         }
 
-        const cv = await prisma.cv.findUnique({
-            where: { shareToken },
-            select: {
-                token: true,
-                isPublished: true,
-                shareEnabled: true,
-                publishedData: true,
-            },
-        })
+        let cv: {
+            token: string
+            isPublished: boolean
+            shareEnabled: boolean
+            publishedData: unknown
+        } | null = null
+
+        if (publicSlug) {
+            const user = await prisma.user.findUnique({
+                where: { publicSlug },
+                select: {
+                    cvs: {
+                        where: {
+                            isPublished: true,
+                            shareEnabled: true,
+                        },
+                        orderBy: { publishedAt: "desc" },
+                        take: 1,
+                        select: {
+                            token: true,
+                            isPublished: true,
+                            shareEnabled: true,
+                            publishedData: true,
+                        },
+                    },
+                },
+            })
+            cv = user?.cvs[0] ?? null
+        } else if (shareToken) {
+            cv = await prisma.cv.findUnique({
+                where: { shareToken },
+                select: {
+                    token: true,
+                    isPublished: true,
+                    shareEnabled: true,
+                    publishedData: true,
+                },
+            })
+        }
 
         if (!cv || !cv.isPublished || !cv.shareEnabled || !cv.publishedData) {
             return Response.json({ error: "CV not found" }, { status: 404 })
         }
 
         const snapshot = cv.publishedData as PublishedSnapshot
-        const context = {
-            cv: snapshot.cv,
-            certificates: snapshot.certificates,
-            references: snapshot.references,
-            additionalText: snapshot.additionalText,
-        }
+        const context = buildStructuredChatContext(snapshot)
         const prompt = getChatPrompt(context)
 
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
