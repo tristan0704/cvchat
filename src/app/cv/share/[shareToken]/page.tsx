@@ -106,15 +106,6 @@ export default function PublicCvPage() {
         bottomRef.current?.scrollIntoView({ behavior: "auto" })
     }, [messages.length, isTyping])
 
-    useEffect(() => {
-        if (!window.matchMedia("(max-width: 1023px)").matches) return
-        const previousOverscroll = document.body.style.overscrollBehaviorY
-        document.body.style.overscrollBehaviorY = "none"
-        return () => {
-            document.body.style.overscrollBehaviorY = previousOverscroll
-        }
-    }, [])
-
     async function askQuestion(raw?: string) {
         const nextQuestion = (raw ?? question).trim()
         if (!nextQuestion) return
@@ -211,7 +202,7 @@ export default function PublicCvPage() {
                 </header>
             )}
 
-            <section className="flex-1 overflow-y-auto mx-auto w-full max-w-3xl px-4 py-4 space-y-4 [overflow-anchor:none] sm:px-6">
+            <section className="flex-1 mx-auto w-full max-w-3xl px-4 py-4 space-y-4 sm:px-6">
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
                     Responses are generated only from uploaded application documents.
                 </div>
@@ -220,7 +211,7 @@ export default function PublicCvPage() {
 
                 <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <p className="text-sm font-medium text-gray-900">Smart question ideas</p>
-                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    <div className="mt-3 flex flex-wrap gap-2">
                         {smartPrompts.map((prompt) => (
                             <button
                                 key={prompt}

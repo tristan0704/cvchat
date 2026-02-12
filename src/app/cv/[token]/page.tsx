@@ -159,7 +159,7 @@ export default function CvPage() {
     function ChatBody() {
         return (
             <>
-                <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                <div className="mt-4 flex flex-wrap gap-2">
                     {QUICK_PROMPTS.map((prompt) => (
                         <button
                             key={prompt}
@@ -170,7 +170,7 @@ export default function CvPage() {
                         </button>
                     ))}
                 </div>
-                <div className="mt-4 h-[360px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 [overflow-anchor:none] sm:h-[420px]">
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div className="space-y-3">
                         {messages.map((m, i) => (
                             <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -182,7 +182,7 @@ export default function CvPage() {
                                     }`}
                                 >
                                     {m.role === "assistant" ? (
-                                        <div className="prose prose-sm prose-neutral max-w-none overflow-x-auto prose-p:my-1.5 prose-pre:overflow-x-auto">
+                                        <div className="prose prose-sm prose-neutral max-w-none prose-p:my-1.5">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
                                         </div>
                                     ) : (
@@ -261,7 +261,7 @@ export default function CvPage() {
 
                 {profile && (
                     <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1.3fr_1fr]">
-                        <div className="min-w-0 space-y-6">
+                        <div className="order-2 min-w-0 space-y-6 lg:order-1">
                             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Skills</h2>
                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -308,7 +308,7 @@ export default function CvPage() {
                             </article>
                         </div>
 
-                        <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <aside className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:order-2">
                             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
                             <ChatBody />
                         </aside>
