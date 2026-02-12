@@ -279,7 +279,7 @@ export default function PublicCvPage() {
                             onChange={(e) => setQuestion(e.target.value)}
                             placeholder="Ask about experience, projects, skills..."
                             rows={2}
-                            className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2 min-h-[56px] max-h-24"
+                            className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2 text-base sm:text-sm min-h-[56px] max-h-24"
                         />
                         <button
                             aria-label="Send question"

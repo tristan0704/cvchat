@@ -218,7 +218,7 @@ export default function CvPage() {
                         onChange={(e) => setQuestion(e.target.value)}
                         placeholder="Ask about skills, experience, projects..."
                         rows={3}
-                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm"
                     />
                     <button
                         onClick={() => enqueueQuestion()}
@@ -285,7 +285,7 @@ export default function CvPage() {
                         onChange={(e) => setQuestion(e.target.value)}
                         placeholder="Ask about skills, experience, projects..."
                         rows={2}
-                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm"
                     />
                     <button
                         onClick={() => enqueueQuestion()}

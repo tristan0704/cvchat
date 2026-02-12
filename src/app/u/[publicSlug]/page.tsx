@@ -234,7 +234,7 @@ export default function PublicPortfolioPage() {
                         onChange={(e) => setQuestion(e.target.value)}
                         placeholder="Frage zu Skills, Erfahrung, Projekten..."
                         rows={3}
-                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm"
                     />
                     <button
                         onClick={() => enqueueQuestion()}
@@ -306,7 +306,7 @@ export default function PublicPortfolioPage() {
                         onChange={(e) => setQuestion(e.target.value)}
                         placeholder="Frage zu Skills, Erfahrung, Projekten..."
                         rows={2}
-                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm"
                     />
                     <button
                         onClick={() => enqueueQuestion()}
