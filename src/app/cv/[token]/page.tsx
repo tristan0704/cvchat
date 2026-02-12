@@ -207,9 +207,13 @@ export default function CvPage() {
                     <div className="mt-4 lg:hidden">
                         <button
                             onClick={isMobileChatOpen ? () => setIsMobileChatOpen(false) : openAndJumpToChat}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800"
+                            className={`w-full rounded-xl px-4 py-3 text-sm font-semibold shadow-lg transition ${
+                                isMobileChatOpen
+                                    ? "border border-slate-300 bg-white text-slate-800"
+                                    : "border border-emerald-700 bg-gradient-to-r from-emerald-500 to-teal-500 text-white ring-2 ring-emerald-200"
+                            }`}
                         >
-                            {isMobileChatOpen ? "Hide chat" : "Open chat"}
+                            {isMobileChatOpen ? "Hide chat" : "Frag mich"}
                         </button>
                     </div>
                 )}
