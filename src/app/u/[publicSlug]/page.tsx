@@ -79,7 +79,9 @@ export default function PublicPortfolioPage() {
     const [isTyping, setIsTyping] = useState(false)
     const [error, setError] = useState("")
     const [queuedQuestions, setQueuedQuestions] = useState<string[]>([])
+    const [isMobileChatOpen, setIsMobileChatOpen] = useState(false)
     const bottomRef = useRef<HTMLDivElement | null>(null)
+    const chatSectionRef = useRef<HTMLElement | null>(null)
 
     const smartPrompts = useMemo(() => {
         const role = profile?.meta.position?.trim()
@@ -168,6 +170,13 @@ export default function PublicPortfolioPage() {
         askQuestion(next)
     }, [isTyping, queuedQuestions])
 
+    function openAndJumpToChat() {
+        setIsMobileChatOpen(true)
+        window.setTimeout(() => {
+            chatSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }, 50)
+    }
+
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
             <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -202,6 +211,16 @@ export default function PublicPortfolioPage() {
 
                 {loading && <p className="mt-6 text-sm text-slate-500">Profil wird geladen...</p>}
                 {error && !profile && <p className="mt-6 text-sm text-red-600">{error}</p>}
+                {profile && (
+                    <div className="mt-4 lg:hidden">
+                        <button
+                            onClick={isMobileChatOpen ? () => setIsMobileChatOpen(false) : openAndJumpToChat}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800"
+                        >
+                            {isMobileChatOpen ? "Chat ausblenden" : "Chat oeffnen"}
+                        </button>
+                    </div>
+                )}
 
                 {profile && (
                     <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -262,7 +281,10 @@ export default function PublicPortfolioPage() {
                             </article>
                         </div>
 
-                        <aside className="order-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <aside
+                            ref={chatSectionRef}
+                            className={`order-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${isMobileChatOpen ? "block" : "hidden"} lg:block`}
+                        >
                             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
                             <p className="mt-2 text-xs leading-relaxed text-slate-600">
                                 CareerIndex hilft Recruitern, dein Profil schneller und praeziser zu verstehen.

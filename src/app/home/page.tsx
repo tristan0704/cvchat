@@ -65,7 +65,7 @@ export default function HomePage() {
                             Career profile platform
                         </p>
                         <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                            Turn your CV into recruiter momentum
+                            Turn your CV into recruiter momentum with CareerIndex🚀
                         </h1>
                         <p className="mt-5 max-w-2xl text-base text-gray-600 sm:text-lg">
                             CareerIndex macht aus deinem Lebenslauf eine interaktive Wissensbasis, damit Recruiter dein Profil schneller verstehen, dich hochwertiger einordnen und dich oefter zum Interview einladen.
