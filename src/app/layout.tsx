@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CVChat - Interactive CV Chat",
-  description: "Turn your CV into a shareable AI conversation for recruiters.",
+  title: "CareerIndex - Interactive Career Profile",
+  description:
+    "CareerIndex turns a CV into an interactive, structured knowledge base for recruiters.",
 };
 
 export const viewport = {

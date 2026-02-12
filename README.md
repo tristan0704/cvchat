@@ -1,12 +1,12 @@
-# CVChat
+# CareerIndex
 
-Kurze Beschreibung: Dieses Projekt verwandelt eine komplette Bewerbung in einen privaten, teilbaren Chat. Nutzer laden CV, Zeugnisse, Referenzen und Notizen hoch; Recruiter stellen Fragen und erhalten Antworten, die ausschließlich auf den hochgeladenen Unterlagen basieren.
+Kurze Beschreibung: CareerIndex verwandelt eine komplette Bewerbung in eine interaktive, strukturierte Wissensbasis ueber die berufliche Kompetenz einer Person. Recruiter koennen Fragen stellen und erhalten Antworten, die ausschliesslich auf den hochgeladenen Unterlagen basieren.
 
 **Features**
 - Upload von CV (PDF) plus zusätzliche Dokumente (Referenzen, Zertifikate, Notizen, Profilbild)
 - PDF-Parsing und strukturierte Extraktion des CVs via OpenAI
 - Speicherung der Daten in PostgreSQL (Prisma)
-- Chat-UI mit „shareable link“ für Recruiter
+- Chat-UI mit „shareable link“ fuer Recruiter
 - Antworten sind auf den Dokumenten-Kontext begrenzt (kein Halluzinieren)
 
 **Tech Stack**

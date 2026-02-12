@@ -22,7 +22,7 @@ const QUICK_PROMPTS = [
     "Which experiences are most relevant for this role?",
     "What measurable outcomes are documented?",
     "Which technologies are used in real projects?",
-    "What are the strongest indicators of ownership and impact?",
+    "What are strong indicators of ownership and impact?",
     "What are good follow-up interview questions?",
 ]
 
@@ -44,10 +44,7 @@ export default function PublicCvPage() {
 
     const smartPrompts = useMemo(() => {
         if (!meta?.position?.trim()) return QUICK_PROMPTS
-        return [
-            `How well does this profile match a ${meta.position} role?`,
-            ...QUICK_PROMPTS.slice(1),
-        ]
+        return [`How well does this profile match a ${meta.position} role?`, ...QUICK_PROMPTS.slice(1)]
     }, [meta?.position])
 
     function showToast(message: string) {
@@ -72,7 +69,7 @@ export default function PublicCvPage() {
                 const res = await fetch(`/api/public-cv/${shareToken}`)
                 const data = await res.json().catch(() => ({}))
                 if (!res.ok) {
-                    setError(data.error || "CV not found")
+                    setError(data.error || "Profile not found")
                     return
                 }
                 setMeta(data.meta)
@@ -103,8 +100,8 @@ export default function PublicCvPage() {
     }, [chatStorageKey, messages])
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "auto" })
-    }, [messages.length, isTyping])
+        bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
+    }, [messages.length])
 
     async function askQuestion(raw?: string) {
         const nextQuestion = (raw ?? question).trim()
@@ -120,7 +117,7 @@ export default function PublicCvPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ shareToken, question: nextQuestion }),
             })
-            const data = await res.json()
+            const data = await res.json().catch(() => ({}))
             if (!res.ok) {
                 setError(data.error || "Something went wrong")
                 return
@@ -142,21 +139,20 @@ export default function PublicCvPage() {
     }
 
     useEffect(() => {
-        if (isTyping) return
-        if (queuedQuestions.length === 0) return
+        if (isTyping || queuedQuestions.length === 0) return
         const [next, ...rest] = queuedQuestions
         setQueuedQuestions(rest)
         askQuestion(next)
     }, [queuedQuestions, isTyping])
 
     return (
-        <main className="min-h-[100svh] flex flex-col bg-gradient-to-b from-white to-gray-50">
-            {meta && (
-                <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200">
-                    <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">
-                        <div className="mb-3 flex items-center justify-between">
+        <main className="min-h-screen bg-gradient-to-b from-white to-gray-50 px-4 py-6 sm:px-6 sm:py-10">
+            <div className="mx-auto w-full max-w-4xl space-y-6">
+                {meta && (
+                    <header className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                        <div className="mb-4 flex items-center justify-between">
                             <Link href="/home" className="text-sm font-semibold tracking-tight text-gray-900">
-                                CVChat
+                                CareerIndex
                             </Link>
                             <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-600">
                                 Recruiter View
@@ -165,26 +161,18 @@ export default function PublicCvPage() {
 
                         <div className="flex gap-3 items-start min-w-0">
                             {meta.imageUrl ? (
-                                <img
-                                    src={meta.imageUrl}
-                                    alt={meta.name}
-                                    className="h-12 w-12 rounded-full object-cover flex-shrink-0"
-                                />
+                                <img src={meta.imageUrl} alt={meta.name} className="h-12 w-12 rounded-full object-cover flex-shrink-0" />
                             ) : (
                                 <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                    <span className="text-sm font-medium text-gray-700">
-                                        {meta.name?.[0] ?? "?"}
-                                    </span>
+                                    <span className="text-sm font-medium text-gray-700">{meta.name?.[0] ?? "?"}</span>
                                 </div>
                             )}
 
                             <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-900 truncate">{meta.name}</p>
-                                <p className="text-sm text-gray-500 mb-2 truncate">{meta.position}</p>
-                                <div className="text-sm text-gray-700 leading-relaxed line-clamp-3">{meta.summary}</div>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    Shared profile - {publishedAt ? new Date(publishedAt).toLocaleString() : "-"}
-                                </p>
+                                <p className="font-semibold text-gray-900 break-words">{meta.name}</p>
+                                <p className="text-sm text-gray-600 break-words">{meta.position}</p>
+                                <p className="mt-2 text-sm text-gray-700 break-words">{meta.summary}</p>
+                                <p className="mt-2 text-xs text-gray-500">Shared profile: {publishedAt ? new Date(publishedAt).toLocaleString() : "-"}</p>
                             </div>
                         </div>
 
@@ -194,83 +182,77 @@ export default function PublicCvPage() {
                                 showToast("Link copied")
                                 await track("share_link_copied", { source: "public_cv" })
                             }}
-                            className="mt-3 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white"
+                            className="mt-4 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white"
                         >
                             Copy link
                         </button>
-                    </div>
-                </header>
-            )}
+                    </header>
+                )}
 
-            <section className="flex-1 mx-auto w-full max-w-3xl px-4 py-4 space-y-4 sm:px-6">
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                    Responses are generated only from uploaded application documents.
-                </div>
+                <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs text-gray-600">
+                        CareerIndex helps recruiters understand a candidate profile faster and with better context.
+                    </p>
 
-                {loading && <p className="text-sm text-gray-500">Loading profile...</p>}
-
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <p className="text-sm font-medium text-gray-900">Smart question ideas</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-4 flex flex-wrap gap-2">
                         {smartPrompts.map((prompt) => (
                             <button
                                 key={prompt}
                                 onClick={() => enqueueQuestion(prompt)}
-                                className="shrink-0 rounded-full border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:border-gray-500"
+                                className="rounded-full border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:border-gray-500"
                             >
                                 {prompt}
                             </button>
                         ))}
                     </div>
-                </div>
 
-                {messages.map((m, i) => (
-                    <div
-                        key={i}
-                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                        <div
-                            className={`max-w-[88%] rounded-2xl px-4 py-3 leading-relaxed break-words ${
-                                m.role === "user"
-                                    ? "bg-black text-white rounded-br-md"
-                                    : "bg-white border border-gray-200 text-gray-800 rounded-bl-md shadow-sm"
-                            }`}
-                        >
-                            {m.role === "assistant" ? (
-                                <div className="prose prose-sm prose-neutral prose-p:my-2 prose-ul:my-2 prose-li:my-1 max-w-none break-words">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {m.content}
-                                    </ReactMarkdown>
+                    <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                        <div className="space-y-3">
+                            {loading && <p className="text-sm text-gray-500">Loading profile...</p>}
+                            {!loading && messages.length === 0 && <p className="text-sm text-gray-500">No questions yet.</p>}
+
+                            {messages.map((m, i) => (
+                                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                    <div
+                                        className={`max-w-[88%] rounded-2xl px-4 py-3 leading-relaxed break-words ${
+                                            m.role === "user"
+                                                ? "bg-black text-white rounded-br-md"
+                                                : "bg-white border border-gray-200 text-gray-800 rounded-bl-md"
+                                        }`}
+                                    >
+                                        {m.role === "assistant" ? (
+                                            <div className="prose prose-sm prose-neutral prose-p:my-2 prose-ul:my-2 prose-li:my-1 max-w-none break-words">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                            </div>
+                                        ) : (
+                                            m.content
+                                        )}
+                                    </div>
                                 </div>
-                            ) : (
-                                m.content
+                            ))}
+
+                            {isTyping && (
+                                <div className="flex justify-start">
+                                    <div className="rounded-2xl rounded-bl-md bg-white border border-gray-200 px-4 py-3 text-sm text-gray-500">
+                                        Thinking...
+                                    </div>
+                                </div>
                             )}
+
+                            <div ref={bottomRef} />
                         </div>
                     </div>
-                ))}
 
-                {isTyping && (
-                    <div className="flex justify-start">
-                        <div className="rounded-2xl rounded-bl-md bg-white border border-gray-200 px-4 py-3 text-sm text-gray-500 animate-pulse shadow-sm">
-                            Thinking...
-                        </div>
-                    </div>
-                )}
+                    {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-                {error && <p className="text-sm text-red-600">{error}</p>}
-                <div ref={bottomRef} />
-            </section>
-
-            <footer className="border-t border-gray-200 bg-white md:sticky md:bottom-0 md:z-20">
-                <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                         <textarea
                             aria-label="Ask a question"
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
                             placeholder="Ask about experience, projects, skills..."
                             rows={2}
-                            className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2 text-base sm:text-sm min-h-[56px] max-h-24"
+                            className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2 text-base min-h-[56px]"
                         />
                         <button
                             aria-label="Send question"
@@ -281,11 +263,11 @@ export default function PublicCvPage() {
                             Ask
                         </button>
                     </div>
-                </div>
-            </footer>
+                </section>
+            </div>
 
             {toast && (
-                <div className="pointer-events-none fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
+                <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-black px-4 py-2 text-xs font-medium text-white shadow-lg">
                     {toast}
                 </div>
             )}

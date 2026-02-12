@@ -19,7 +19,7 @@ type Message = { role: "user" | "assistant"; content: string }
 const QUICK_PROMPTS = [
     "Welche Skills sind fuer Backend-Rollen am relevantesten?",
     "Welche Erfahrungen zeigen Ownership und Verantwortung?",
-    "Welche Technologien wurden in echten Projekten eingesetzt?",
+    "Welche Technologien wurden in realen Projekten eingesetzt?",
     "Welche messbaren Ergebnisse sind dokumentiert?",
 ]
 
@@ -66,7 +66,7 @@ export default function CvPage() {
                 const [cvRes, meRes] = await Promise.all([fetch(`/api/cv/${token}`), fetch("/api/auth/me")])
                 const cvData = (await cvRes.json().catch(() => ({}))) as CvResponse & { error?: string }
                 if (!cvRes.ok) {
-                    setError(cvData.error || "Could not load CV.")
+                    setError(cvData.error || "Could not load profile.")
                     return
                 }
                 setMeta(cvData.meta)
@@ -101,8 +101,8 @@ export default function CvPage() {
     }, [chatStorageKey, messages])
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "auto" })
-    }, [messages.length, isTyping])
+        bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
+    }, [messages.length])
 
     async function runAction(id: string, fn: () => Promise<void>) {
         setActionLoading(id)
@@ -123,6 +123,7 @@ export default function CvPage() {
         setMessages((prev) => [...prev, { role: "user", content: next }])
         setQuestion("")
         setIsTyping(true)
+
         try {
             const res = await fetch("/api/chat", {
                 method: "POST",
@@ -156,79 +157,13 @@ export default function CvPage() {
         askQuestion(next)
     }, [isTyping, queuedQuestions])
 
-    function ChatBody() {
-        return (
-            <>
-                <div className="mt-4 flex flex-wrap gap-2">
-                    {QUICK_PROMPTS.map((prompt) => (
-                        <button
-                            key={prompt}
-                            onClick={() => enqueueQuestion(prompt)}
-                            className="shrink-0 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
-                        >
-                            {prompt}
-                        </button>
-                    ))}
-                </div>
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="space-y-3">
-                        {messages.map((m, i) => (
-                            <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                                <div
-                                    className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
-                                        m.role === "user"
-                                            ? "rounded-br-md bg-slate-900 text-white"
-                                            : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
-                                    }`}
-                                >
-                                    {m.role === "assistant" ? (
-                                        <div className="prose prose-sm prose-neutral max-w-none prose-p:my-1.5">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                                        </div>
-                                    ) : (
-                                        m.content
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-                                    Thinking...
-                                </div>
-                            </div>
-                        )}
-                        <div ref={bottomRef} />
-                    </div>
-                </div>
-                <div className="mt-3">
-                    <textarea
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        placeholder="Ask about skills, experience, projects..."
-                        rows={3}
-                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm"
-                    />
-                    <button
-                        onClick={() => enqueueQuestion()}
-                        disabled={isTyping}
-                        className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    >
-                        Ask question
-                    </button>
-                </div>
-            </>
-        )
-    }
-
-
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-            <div className="mx-auto w-full max-w-6xl px-4 py-6 pb-28 sm:px-6 sm:py-10 sm:pb-10">
+            <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
                 {meta && status && (
-                    <header className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8">
+                    <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-sm font-semibold tracking-tight text-slate-900">CVChat</p>
+                            <p className="text-sm font-semibold tracking-tight text-slate-900">CareerIndex</p>
                             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                                 <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">Owner View</span>
                                 <button
@@ -239,6 +174,7 @@ export default function CvPage() {
                                 </button>
                             </div>
                         </div>
+
                         <div className="grid min-w-0 gap-5 sm:grid-cols-[auto_1fr] sm:items-start">
                             {meta.imageUrl ? (
                                 <img src={meta.imageUrl} alt={meta.name} className="h-20 w-20 rounded-2xl object-cover" />
@@ -260,8 +196,77 @@ export default function CvPage() {
                 {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
 
                 {profile && (
-                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1.3fr_1fr]">
-                        <div className="order-2 min-w-0 space-y-6 lg:order-1">
+                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1fr_1.2fr]">
+                        <aside className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
+                            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                                CareerIndex hilft Recruitern, dein Profil schneller zu verstehen und hochwertiger einzuordnen.
+                            </p>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {QUICK_PROMPTS.map((prompt) => (
+                                    <button
+                                        key={prompt}
+                                        onClick={() => enqueueQuestion(prompt)}
+                                        className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
+                                    >
+                                        {prompt}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <div className="space-y-3">
+                                    {messages.length === 0 && <p className="text-sm text-slate-500">Noch keine Fragen gestellt.</p>}
+                                    {messages.map((m, i) => (
+                                        <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                            <div
+                                                className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
+                                                    m.role === "user"
+                                                        ? "rounded-br-md bg-slate-900 text-white"
+                                                        : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
+                                                }`}
+                                            >
+                                                {m.role === "assistant" ? (
+                                                    <div className="prose prose-sm prose-neutral max-w-none prose-p:my-1.5">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                                    </div>
+                                                ) : (
+                                                    m.content
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isTyping && (
+                                        <div className="flex justify-start">
+                                            <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+                                                Thinking...
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={bottomRef} />
+                                </div>
+                            </div>
+
+                            <div className="mt-3">
+                                <textarea
+                                    value={question}
+                                    onChange={(e) => setQuestion(e.target.value)}
+                                    placeholder="Ask about skills, experience, projects..."
+                                    rows={2}
+                                    className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base"
+                                />
+                                <button
+                                    onClick={() => enqueueQuestion()}
+                                    disabled={isTyping}
+                                    className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                                >
+                                    Ask question
+                                </button>
+                            </div>
+                        </aside>
+
+                        <div className="order-2 min-w-0 space-y-6">
                             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Skills</h2>
                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -272,6 +277,7 @@ export default function CvPage() {
                                     ))}
                                 </div>
                             </article>
+
                             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Experience</h2>
                                 <div className="mt-3 space-y-4">
@@ -294,6 +300,7 @@ export default function CvPage() {
                                     ))}
                                 </div>
                             </article>
+
                             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Projects</h2>
                                 <div className="mt-3 space-y-3">
@@ -307,24 +314,20 @@ export default function CvPage() {
                                 </div>
                             </article>
                         </div>
-
-                        <aside className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:order-2">
-                            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
-                            <ChatBody />
-                        </aside>
                     </section>
                 )}
             </div>
 
             {isSettingsOpen && (
                 <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6 sm:px-6 sm:py-8" onClick={() => setIsSettingsOpen(false)}>
-                    <div className="mx-auto max-h-[calc(100dvh-3rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:p-6" onClick={(e) => e.stopPropagation()}>
+                    <div className="mx-auto w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:p-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between">
                             <h2 className="text-base font-semibold text-slate-900">Owner settings</h2>
                             <button onClick={() => setIsSettingsOpen(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700">
                                 Close
                             </button>
                         </div>
+
                         <section className="mt-4 rounded-xl border border-slate-200 p-4">
                             <h3 className="text-sm font-semibold text-slate-900">Public share</h3>
                             {shareUrl && <p className="mt-2 break-all text-xs text-slate-500">{shareUrl}</p>}
@@ -348,6 +351,7 @@ export default function CvPage() {
                                 >
                                     Copy share link
                                 </button>
+
                                 {status?.shareEnabled && (
                                     <button
                                         onClick={() =>
@@ -362,6 +366,7 @@ export default function CvPage() {
                                         Stop sharing
                                     </button>
                                 )}
+
                                 {status?.needsRepublish && (
                                     <button
                                         onClick={() =>
@@ -378,6 +383,7 @@ export default function CvPage() {
                                 )}
                             </div>
                         </section>
+
                         <section className="mt-4 rounded-xl border border-slate-200 p-4">
                             <h3 className="text-sm font-semibold text-slate-900">Profile summary</h3>
                             <textarea
@@ -403,6 +409,7 @@ export default function CvPage() {
                                 Save summary
                             </button>
                         </section>
+
                         {actionError && <p className="mt-3 text-xs text-red-600">{actionError}</p>}
                     </div>
                 </div>

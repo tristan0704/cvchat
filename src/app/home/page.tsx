@@ -27,14 +27,14 @@ export default function HomePage() {
     }, [])
 
     const primaryHref = user?.cvToken ? `/cv/${user.cvToken}` : "/upload"
-    const primaryLabel = user?.cvToken ? "Open my CV chat" : "Create CV chat"
+    const primaryLabel = user?.cvToken ? "Open my CareerIndex" : "Create CareerIndex"
 
     return (
         <main className="min-h-screen bg-gradient-to-b from-white to-gray-50 px-4 py-8 sm:px-6 sm:py-12">
             <div className="mx-auto w-full max-w-5xl">
                 <header className="mb-12 flex items-center justify-between gap-3">
                     <Link href="/home" className="text-lg font-semibold tracking-tight text-gray-900">
-                        CVChat
+                        CareerIndex
                     </Link>
 
                     {!user ? (
@@ -62,13 +62,13 @@ export default function HomePage() {
                 <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
                         <p className="mb-4 inline-flex rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
-                            Modern recruiting workflow
+                            Career profile platform
                         </p>
                         <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                            Let recruiters talk to your CV instead of scanning PDFs
+                            Make your career profile understandable in minutes, not guesswork
                         </h1>
                         <p className="mt-5 max-w-2xl text-base text-gray-600 sm:text-lg">
-                            Upload your application once, share one public link, and let recruiters get instant, source-grounded answers.
+                            CareerIndex macht aus einem Lebenslauf eine interaktive, strukturierte Wissensbasis ueber die berufliche Kompetenz einer Person.
                         </p>
 
                         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -82,23 +82,23 @@ export default function HomePage() {
                                 href="/upload"
                                 className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-800"
                             >
-                                Upload now
+                                Upload documents
                             </Link>
                         </div>
                     </div>
 
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-                        <h2 className="text-lg font-semibold text-gray-900">How CVChat works</h2>
+                        <h2 className="text-lg font-semibold text-gray-900">How CareerIndex works</h2>
                         <ol className="mt-4 space-y-3 text-sm text-gray-600">
                             <li>1. Upload CV, references, certificates, and optional notes.</li>
-                            <li>2. We build a structured profile and a private chat context.</li>
-                            <li>3. Share one public link with recruiters.</li>
-                            <li>4. Keep control: update summary, refresh shared version, stop sharing anytime.</li>
+                            <li>2. CareerIndex builds a structured career knowledge base.</li>
+                            <li>3. Recruiters use AI chat to understand strengths and outcomes fast.</li>
+                            <li>4. Better understanding leads to more and higher-quality interviews.</li>
                         </ol>
 
                         {!user && (
                             <p className="mt-5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                                You can start without an account and link your CV later.
+                                Start free and decide later if you want to save and manage sharing.
                             </p>
                         )}
                     </div>

@@ -82,7 +82,7 @@ function AuthPageContent() {
             <div className="mx-auto w-full max-w-md">
                 <header className="mb-8 flex items-center justify-between">
                     <Link href="/home" className="text-lg font-semibold tracking-tight text-gray-900">
-                        CVChat
+                        CareerIndex
                     </Link>
                     <Link
                         href="/home"
@@ -98,8 +98,8 @@ function AuthPageContent() {
                     </h1>
                     <p className="mt-2 text-sm text-gray-600">
                         {mode === "login"
-                            ? "Sign in to manage and revisit your CV chat."
-                            : "Sign up to save your CV chat and manage sharing."}
+                            ? "Sign in to manage and revisit your CareerIndex."
+                            : "Sign up to save your CareerIndex and sharing settings."}
                     </p>
 
                     <div className="mt-6 space-y-3">

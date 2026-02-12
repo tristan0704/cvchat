@@ -52,11 +52,11 @@ type Message = {
 }
 
 const QUICK_PROMPTS = [
-    "Welche Skills sind fuer Backend-Rollen am relevantesten?",
+    "Welche Skills sind fuer diese Rolle am relevantesten?",
     "Welche Erfahrungen zeigen Ownership und Verantwortung?",
-    "Welche Technologien wurden in echten Projekten eingesetzt?",
+    "Welche Technologien wurden in realen Projekten eingesetzt?",
     "Welche messbaren Ergebnisse sind dokumentiert?",
-    "Welche sinnvollen Interview-Nachfragen empfiehlst du?",
+    "Welche sinnvollen Interviewfragen ergeben sich daraus?",
 ]
 
 function formatRange(start: string, end: string) {
@@ -124,8 +124,8 @@ export default function PublicPortfolioPage() {
     }, [chatStorageKey, messages])
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "auto" })
-    }, [messages.length, isTyping])
+        bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
+    }, [messages.length])
 
     async function askQuestion(raw?: string) {
         const nextQuestion = (raw ?? question).trim()
@@ -168,85 +168,16 @@ export default function PublicPortfolioPage() {
         askQuestion(next)
     }, [isTyping, queuedQuestions])
 
-    function ChatBody() {
-        return (
-            <>
-                <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                    Antworten basieren auf den strukturierten Profildaten und den freigegebenen Unterlagen.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                    {smartPrompts.map((prompt) => (
-                        <button
-                            key={prompt}
-                            onClick={() => enqueueQuestion(prompt)}
-                            className="shrink-0 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
-                        >
-                            {prompt}
-                        </button>
-                    ))}
-                </div>
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="space-y-3">
-                        {messages.map((m, i) => (
-                            <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                                <div
-                                    className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
-                                        m.role === "user"
-                                            ? "rounded-br-md bg-slate-900 text-white"
-                                            : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
-                                    }`}
-                                >
-                                    {m.role === "assistant" ? (
-                                        <div className="prose prose-sm prose-neutral max-w-none prose-p:my-1.5">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                                        </div>
-                                    ) : (
-                                        m.content
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-                                    Thinking...
-                                </div>
-                            </div>
-                        )}
-                        <div ref={bottomRef} />
-                    </div>
-                </div>
-                {error && profile && <p className="mt-3 text-xs text-red-600">{error}</p>}
-                <div className="mt-3">
-                    <textarea
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        placeholder="Frage zu Skills, Erfahrung, Projekten..."
-                        rows={3}
-                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm"
-                    />
-                    <button
-                        onClick={() => enqueueQuestion()}
-                        disabled={isTyping}
-                        className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    >
-                        Frage senden
-                    </button>
-                </div>
-            </>
-        )
-    }
-
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-            <div className="mx-auto w-full max-w-6xl px-4 py-6 pb-28 sm:px-6 sm:py-10 sm:pb-10">
-                <header className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8">
+            <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+                <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <Link href="/home" className="text-sm font-semibold tracking-tight text-slate-900">
-                            CVChat
+                            CareerIndex
                         </Link>
                         <span className="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-                            Recruiter Portfolio
+                            Recruiter View
                         </span>
                     </div>
 
@@ -263,9 +194,7 @@ export default function PublicPortfolioPage() {
                                 <h1 className="break-words text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{profile.meta.name}</h1>
                                 <p className="mt-1 break-words text-base text-emerald-700">{profile.meta.position}</p>
                                 <p className="mt-3 max-w-3xl break-words text-sm leading-relaxed text-slate-600">{profile.meta.summary}</p>
-                                <p className="mt-3 text-xs text-slate-500">
-                                    Public profile - zuletzt aktualisiert am {new Date(profile.updatedAt).toLocaleString()}
-                                </p>
+                                <p className="mt-3 text-xs text-slate-500">Zuletzt aktualisiert: {new Date(profile.updatedAt).toLocaleString()}</p>
                             </div>
                         </div>
                     )}
@@ -275,8 +204,81 @@ export default function PublicPortfolioPage() {
                 {error && !profile && <p className="mt-6 text-sm text-red-600">{error}</p>}
 
                 {profile && (
-                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1.3fr_1fr]">
-                        <div className="order-2 min-w-0 space-y-6 lg:order-1">
+                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1fr_1.2fr]">
+                        <aside className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
+                            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                                CareerIndex hilft Recruitern, dein Profil schneller und praeziser zu verstehen.
+                            </p>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {smartPrompts.map((prompt) => (
+                                    <button
+                                        key={prompt}
+                                        onClick={() => enqueueQuestion(prompt)}
+                                        className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
+                                    >
+                                        {prompt}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <div className="space-y-3">
+                                    {messages.length === 0 && (
+                                        <p className="text-sm text-slate-500">Noch keine Fragen gestellt.</p>
+                                    )}
+                                    {messages.map((m, i) => (
+                                        <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                            <div
+                                                className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
+                                                    m.role === "user"
+                                                        ? "rounded-br-md bg-slate-900 text-white"
+                                                        : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
+                                                }`}
+                                            >
+                                                {m.role === "assistant" ? (
+                                                    <div className="prose prose-sm prose-neutral max-w-none prose-p:my-1.5">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                                    </div>
+                                                ) : (
+                                                    m.content
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isTyping && (
+                                        <div className="flex justify-start">
+                                            <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+                                                Thinking...
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={bottomRef} />
+                                </div>
+                            </div>
+
+                            {error && profile && <p className="mt-3 text-xs text-red-600">{error}</p>}
+
+                            <div className="mt-3">
+                                <textarea
+                                    value={question}
+                                    onChange={(e) => setQuestion(e.target.value)}
+                                    placeholder="Frage zu Skills, Erfahrung, Projekten..."
+                                    rows={2}
+                                    className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base"
+                                />
+                                <button
+                                    onClick={() => enqueueQuestion()}
+                                    disabled={isTyping}
+                                    className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                                >
+                                    Frage senden
+                                </button>
+                            </div>
+                        </aside>
+
+                        <div className="order-2 min-w-0 space-y-6">
                             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Skills</h2>
                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -312,7 +314,6 @@ export default function PublicPortfolioPage() {
                                                     ))}
                                                 </ul>
                                             )}
-                                            {item.keywords.length > 0 && <p className="mt-3 break-words text-xs text-slate-500">Tech: {item.keywords.join(", ")}</p>}
                                         </div>
                                     ))}
                                 </div>
@@ -321,24 +322,18 @@ export default function PublicPortfolioPage() {
                             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Projects</h2>
                                 <div className="mt-3 space-y-3">
-                                    {profile.profile.projects.length === 0 && <p className="text-sm text-slate-500">Keine expliziten Projekte hinterlegt.</p>}
+                                    {profile.profile.projects.length === 0 && <p className="text-sm text-slate-500">Keine Projekte hinterlegt.</p>}
                                     {profile.profile.projects.map((project, idx) => (
                                         <div key={`${project.name}-${idx}`} className="min-w-0 rounded-xl border border-slate-200 p-4">
                                             <h3 className="break-words font-semibold text-slate-900">{project.name || "Projekt"}</h3>
                                             {project.role && <p className="break-words text-sm text-emerald-700">{project.role}</p>}
                                             {project.summary && <p className="mt-2 break-words text-sm text-slate-700">{project.summary}</p>}
                                             {project.impact && <p className="mt-2 break-words text-sm text-slate-600">Impact: {project.impact}</p>}
-                                            {project.tech.length > 0 && <p className="mt-2 break-words text-xs text-slate-500">Tech: {project.tech.join(", ")}</p>}
                                         </div>
                                     ))}
                                 </div>
                             </article>
                         </div>
-
-                        <aside className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:order-2">
-                            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
-                            <ChatBody />
-                        </aside>
                     </section>
                 )}
             </div>

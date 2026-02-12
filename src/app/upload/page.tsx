@@ -69,7 +69,7 @@ export default function UploadPage() {
             <div className="mx-auto w-full max-w-3xl">
                 <header className="mb-8 flex items-center justify-between">
                     <Link href="/home" className="text-lg font-semibold tracking-tight text-gray-900">
-                        CVChat
+                        CareerIndex
                     </Link>
                     <Link
                         href="/home"
@@ -81,10 +81,10 @@ export default function UploadPage() {
 
                 <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
                     <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
-                        Build your interactive CV chat
+                        Build your CareerIndex
                     </h1>
                     <p className="mt-3 text-sm text-gray-600 sm:text-base">
-                        Upload your CV and supporting documents. We combine everything into one structured chat context.
+                        Upload your CV and supporting documents. We convert them into a structured career profile for recruiters.
                     </p>
 
                     <div className="mt-6 space-y-3">
@@ -171,7 +171,7 @@ export default function UploadPage() {
                             disabled={loading}
                             className="w-full rounded-lg bg-black px-6 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {loading ? "Processing..." : "Create CV chat"}
+                            {loading ? "Processing..." : "Create CareerIndex"}
                         </button>
 
                         {loading && loadingStep && (
