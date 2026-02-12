@@ -125,18 +125,8 @@ export default function PublicPortfolioPage() {
     }, [chatStorageKey, messages])
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, [messages, isTyping, isMobileChatOpen])
-
-    useEffect(() => {
-        if (!isMobileChatOpen) return
-        if (!window.matchMedia("(max-width: 1023px)").matches) return
-        const previousOverflow = document.body.style.overflow
-        document.body.style.overflow = "hidden"
-        return () => {
-            document.body.style.overflow = previousOverflow
-        }
-    }, [isMobileChatOpen])
+        bottomRef.current?.scrollIntoView({ behavior: "auto" })
+    }, [messages.length, isTyping])
 
     async function askQuestion(raw?: string) {
         const nextQuestion = (raw ?? question).trim()

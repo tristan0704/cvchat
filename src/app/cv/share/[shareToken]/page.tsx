@@ -103,8 +103,8 @@ export default function PublicCvPage() {
     }, [chatStorageKey, messages])
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, [messages, isTyping])
+        bottomRef.current?.scrollIntoView({ behavior: "auto" })
+    }, [messages.length, isTyping])
 
     useEffect(() => {
         if (!window.matchMedia("(max-width: 1023px)").matches) return
@@ -159,7 +159,7 @@ export default function PublicCvPage() {
     }, [queuedQuestions, isTyping])
 
     return (
-        <main className="h-[100dvh] flex flex-col bg-gradient-to-b from-white to-gray-50 overflow-hidden">
+        <main className="min-h-[100svh] flex flex-col bg-gradient-to-b from-white to-gray-50">
             {meta && (
                 <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200">
                     <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">

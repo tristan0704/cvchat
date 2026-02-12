@@ -102,18 +102,8 @@ export default function CvPage() {
     }, [chatStorageKey, messages])
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, [messages, isTyping, isMobileChatOpen])
-
-    useEffect(() => {
-        if (!isMobileChatOpen) return
-        if (!window.matchMedia("(max-width: 1023px)").matches) return
-        const previousOverflow = document.body.style.overflow
-        document.body.style.overflow = "hidden"
-        return () => {
-            document.body.style.overflow = previousOverflow
-        }
-    }, [isMobileChatOpen])
+        bottomRef.current?.scrollIntoView({ behavior: "auto" })
+    }, [messages.length, isTyping])
 
     async function runAction(id: string, fn: () => Promise<void>) {
         setActionLoading(id)
