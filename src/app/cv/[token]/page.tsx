@@ -51,7 +51,6 @@ export default function CvPage() {
     const [summaryDraft, setSummaryDraft] = useState("")
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const [actionError, setActionError] = useState("")
-    const [isMobileChatOpen, setIsMobileChatOpen] = useState(true)
 
     const shareUrl = useMemo(() => {
         if (typeof window === "undefined") return null
@@ -222,72 +221,6 @@ export default function CvPage() {
         )
     }
 
-    function MobileChatBody() {
-        return (
-            <div className="flex h-full min-h-0 flex-col p-3">
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                    {QUICK_PROMPTS.map((prompt) => (
-                        <button
-                            key={prompt}
-                            onClick={() => enqueueQuestion(prompt)}
-                            className="shrink-0 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
-                        >
-                            {prompt}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 [overflow-anchor:none]">
-                    <div className="space-y-3">
-                        {messages.map((m, i) => (
-                            <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                                <div
-                                    className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
-                                        m.role === "user"
-                                            ? "rounded-br-md bg-slate-900 text-white"
-                                            : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
-                                    }`}
-                                >
-                                    {m.role === "assistant" ? (
-                                        <div className="prose prose-sm prose-neutral max-w-none overflow-x-auto prose-p:my-1.5 prose-pre:overflow-x-auto">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                                        </div>
-                                    ) : (
-                                        m.content
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-                                    Thinking...
-                                </div>
-                            </div>
-                        )}
-                        <div ref={bottomRef} />
-                    </div>
-                </div>
-
-                <div className="mt-3 border-t border-slate-200 pt-3">
-                    <textarea
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        placeholder="Ask about skills, experience, projects..."
-                        rows={2}
-                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm"
-                    />
-                    <button
-                        onClick={() => enqueueQuestion()}
-                        disabled={isTyping}
-                        className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    >
-                        Ask question
-                    </button>
-                </div>
-            </div>
-        )
-    }
 
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
@@ -375,47 +308,13 @@ export default function CvPage() {
                             </article>
                         </div>
 
-                        <aside className="hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:block">
+                        <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
                             <ChatBody />
                         </aside>
                     </section>
                 )}
             </div>
-
-            {profile && (
-                <div
-                    className={`fixed z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden ${
-                        isMobileChatOpen ? "inset-0 bg-slate-900/20 pt-20" : "inset-x-0 bottom-0"
-                    }`}
-                >
-                    {!isMobileChatOpen && (
-                        <div className="flex justify-end">
-                            <button
-                                onClick={() => setIsMobileChatOpen(true)}
-                                className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-lg"
-                            >
-                                <span>Chat</span>
-                                <span aria-hidden="true">?</span>
-                            </button>
-                        </div>
-                    )}
-                    {isMobileChatOpen && (
-                        <div className="ml-auto flex h-[min(66dvh,560px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
-                                <button
-                                    onClick={() => setIsMobileChatOpen(false)}
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                            <MobileChatBody />
-                        </div>
-                    )}
-                </div>
-            )}
 
             {isSettingsOpen && (
                 <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-6 sm:px-6 sm:py-8" onClick={() => setIsSettingsOpen(false)}>

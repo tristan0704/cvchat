@@ -270,7 +270,7 @@ export default function PublicCvPage() {
                 <div ref={bottomRef} />
             </section>
 
-            <footer className="sticky bottom-0 z-20 border-t border-gray-200 bg-white">
+            <footer className="border-t border-gray-200 bg-white md:sticky md:bottom-0 md:z-20">
                 <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                         <textarea
