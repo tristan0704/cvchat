@@ -206,7 +206,7 @@ export default function PublicCvPage() {
                         ))}
                     </div>
 
-                    <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="mt-4 max-h-[52vh] overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
                         <div className="space-y-3">
                             {loading && <p className="text-sm text-gray-500">Loading profile...</p>}
                             {!loading && messages.length === 0 && <p className="text-sm text-gray-500">No questions yet.</p>}

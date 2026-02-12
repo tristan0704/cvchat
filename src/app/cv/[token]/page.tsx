@@ -196,8 +196,57 @@ export default function CvPage() {
                 {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
 
                 {profile && (
-                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1fr_1.2fr]">
-                        <aside className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1.2fr_1fr]">
+                        <div className="order-1 min-w-0 space-y-6">
+                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Skills</h2>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {profile.skills.map((skill) => (
+                                        <span key={skill} className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                                            {skill}
+                                        </span>
+                                    ))}
+                                </div>
+                            </article>
+
+                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Experience</h2>
+                                <div className="mt-3 space-y-4">
+                                    {profile.experience.map((item, idx) => (
+                                        <div key={`${item.organization}-${idx}`} className="min-w-0 rounded-xl border border-slate-200 p-4">
+                                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                                <h3 className="break-words font-semibold text-slate-900">
+                                                    {item.role} {item.organization ? `@ ${item.organization}` : ""}
+                                                </h3>
+                                                <span className="text-xs text-slate-500">{formatRange(item.start, item.end)}</span>
+                                            </div>
+                                            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                                                {item.responsibilities.slice(0, 5).map((task) => (
+                                                    <li key={task} className="break-words">
+                                                        {task}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            </article>
+
+                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Projects</h2>
+                                <div className="mt-3 space-y-3">
+                                    {profile.projects.map((project, idx) => (
+                                        <div key={`${project.name}-${idx}`} className="min-w-0 rounded-xl border border-slate-200 p-4">
+                                            <h3 className="break-words font-semibold text-slate-900">{project.name || "Project"}</h3>
+                                            {project.role && <p className="break-words text-sm text-emerald-700">{project.role}</p>}
+                                            {project.summary && <p className="mt-2 break-words text-sm text-slate-700">{project.summary}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </article>
+                        </div>
+
+                        <aside className="order-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
                             <p className="mt-2 text-xs leading-relaxed text-slate-600">
                                 CareerIndex hilft Recruitern, dein Profil schneller zu verstehen und hochwertiger einzuordnen.
@@ -215,7 +264,7 @@ export default function CvPage() {
                                 ))}
                             </div>
 
-                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="mt-4 max-h-[52vh] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
                                 <div className="space-y-3">
                                     {messages.length === 0 && <p className="text-sm text-slate-500">Noch keine Fragen gestellt.</p>}
                                     {messages.map((m, i) => (
@@ -266,54 +315,6 @@ export default function CvPage() {
                             </div>
                         </aside>
 
-                        <div className="order-2 min-w-0 space-y-6">
-                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Skills</h2>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {profile.skills.map((skill) => (
-                                        <span key={skill} className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-                                            {skill}
-                                        </span>
-                                    ))}
-                                </div>
-                            </article>
-
-                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Experience</h2>
-                                <div className="mt-3 space-y-4">
-                                    {profile.experience.map((item, idx) => (
-                                        <div key={`${item.organization}-${idx}`} className="min-w-0 rounded-xl border border-slate-200 p-4">
-                                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                                <h3 className="break-words font-semibold text-slate-900">
-                                                    {item.role} {item.organization ? `@ ${item.organization}` : ""}
-                                                </h3>
-                                                <span className="text-xs text-slate-500">{formatRange(item.start, item.end)}</span>
-                                            </div>
-                                            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                                                {item.responsibilities.slice(0, 5).map((task) => (
-                                                    <li key={task} className="break-words">
-                                                        {task}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ))}
-                                </div>
-                            </article>
-
-                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Projects</h2>
-                                <div className="mt-3 space-y-3">
-                                    {profile.projects.map((project, idx) => (
-                                        <div key={`${project.name}-${idx}`} className="min-w-0 rounded-xl border border-slate-200 p-4">
-                                            <h3 className="break-words font-semibold text-slate-900">{project.name || "Project"}</h3>
-                                            {project.role && <p className="break-words text-sm text-emerald-700">{project.role}</p>}
-                                            {project.summary && <p className="mt-2 break-words text-sm text-slate-700">{project.summary}</p>}
-                                        </div>
-                                    ))}
-                                </div>
-                            </article>
-                        </div>
                     </section>
                 )}
             </div>

@@ -204,81 +204,8 @@ export default function PublicPortfolioPage() {
                 {error && !profile && <p className="mt-6 text-sm text-red-600">{error}</p>}
 
                 {profile && (
-                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1fr_1.2fr]">
-                        <aside className="order-1 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
-                            <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                                CareerIndex hilft Recruitern, dein Profil schneller und praeziser zu verstehen.
-                            </p>
-
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                {smartPrompts.map((prompt) => (
-                                    <button
-                                        key={prompt}
-                                        onClick={() => enqueueQuestion(prompt)}
-                                        className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
-                                    >
-                                        {prompt}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <div className="space-y-3">
-                                    {messages.length === 0 && (
-                                        <p className="text-sm text-slate-500">Noch keine Fragen gestellt.</p>
-                                    )}
-                                    {messages.map((m, i) => (
-                                        <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                                            <div
-                                                className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
-                                                    m.role === "user"
-                                                        ? "rounded-br-md bg-slate-900 text-white"
-                                                        : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
-                                                }`}
-                                            >
-                                                {m.role === "assistant" ? (
-                                                    <div className="prose prose-sm prose-neutral max-w-none prose-p:my-1.5">
-                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                                                    </div>
-                                                ) : (
-                                                    m.content
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {isTyping && (
-                                        <div className="flex justify-start">
-                                            <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-                                                Thinking...
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div ref={bottomRef} />
-                                </div>
-                            </div>
-
-                            {error && profile && <p className="mt-3 text-xs text-red-600">{error}</p>}
-
-                            <div className="mt-3">
-                                <textarea
-                                    value={question}
-                                    onChange={(e) => setQuestion(e.target.value)}
-                                    placeholder="Frage zu Skills, Erfahrung, Projekten..."
-                                    rows={2}
-                                    className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base"
-                                />
-                                <button
-                                    onClick={() => enqueueQuestion()}
-                                    disabled={isTyping}
-                                    className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                                >
-                                    Frage senden
-                                </button>
-                            </div>
-                        </aside>
-
-                        <div className="order-2 min-w-0 space-y-6">
+                    <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[1.2fr_1fr]">
+                        <div className="order-1 min-w-0 space-y-6">
                             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Skills</h2>
                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -334,6 +261,80 @@ export default function PublicPortfolioPage() {
                                 </div>
                             </article>
                         </div>
+
+                        <aside className="order-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
+                            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                                CareerIndex hilft Recruitern, dein Profil schneller und praeziser zu verstehen.
+                            </p>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {smartPrompts.map((prompt) => (
+                                    <button
+                                        key={prompt}
+                                        onClick={() => enqueueQuestion(prompt)}
+                                        className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
+                                    >
+                                        {prompt}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="mt-4 max-h-[52vh] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <div className="space-y-3">
+                                    {messages.length === 0 && (
+                                        <p className="text-sm text-slate-500">Noch keine Fragen gestellt.</p>
+                                    )}
+                                    {messages.map((m, i) => (
+                                        <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                            <div
+                                                className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
+                                                    m.role === "user"
+                                                        ? "rounded-br-md bg-slate-900 text-white"
+                                                        : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
+                                                }`}
+                                            >
+                                                {m.role === "assistant" ? (
+                                                    <div className="prose prose-sm prose-neutral max-w-none prose-p:my-1.5">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                                    </div>
+                                                ) : (
+                                                    m.content
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isTyping && (
+                                        <div className="flex justify-start">
+                                            <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+                                                Thinking...
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={bottomRef} />
+                                </div>
+                            </div>
+
+                            {error && profile && <p className="mt-3 text-xs text-red-600">{error}</p>}
+
+                            <div className="mt-3">
+                                <textarea
+                                    value={question}
+                                    onChange={(e) => setQuestion(e.target.value)}
+                                    placeholder="Frage zu Skills, Erfahrung, Projekten..."
+                                    rows={2}
+                                    className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-base"
+                                />
+                                <button
+                                    onClick={() => enqueueQuestion()}
+                                    disabled={isTyping}
+                                    className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                                >
+                                    Frage senden
+                                </button>
+                            </div>
+                        </aside>
+
                     </section>
                 )}
             </div>
