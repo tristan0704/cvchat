@@ -196,7 +196,7 @@ export default function PublicPortfolioPage() {
                         </button>
                     ))}
                 </div>
-                <div className="mt-4 h-[360px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 sm:h-[420px]">
+                <div className="mt-4 h-[360px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 [overflow-anchor:none] sm:h-[420px]">
                     <div className="space-y-3">
                         {messages.map((m, i) => (
                             <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -266,7 +266,7 @@ export default function PublicPortfolioPage() {
                     ))}
                 </div>
 
-                <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 [overflow-anchor:none]">
                     <div className="space-y-3">
                         {messages.map((m, i) => (
                             <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
