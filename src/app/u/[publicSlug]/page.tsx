@@ -128,6 +128,16 @@ export default function PublicPortfolioPage() {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" })
     }, [messages, isTyping, isMobileChatOpen])
 
+    useEffect(() => {
+        if (!isMobileChatOpen) return
+        if (!window.matchMedia("(max-width: 1023px)").matches) return
+        const previousOverflow = document.body.style.overflow
+        document.body.style.overflow = "hidden"
+        return () => {
+            document.body.style.overflow = previousOverflow
+        }
+    }, [isMobileChatOpen])
+
     async function askQuestion(raw?: string) {
         const nextQuestion = (raw ?? question).trim()
         if (!nextQuestion) return
@@ -238,6 +248,78 @@ export default function PublicPortfolioPage() {
         )
     }
 
+    function MobileChatBody() {
+        return (
+            <div className="flex h-full min-h-0 flex-col p-3">
+                <p className="text-xs leading-relaxed text-slate-600">
+                    Antworten basieren auf den strukturierten Profildaten und den freigegebenen Unterlagen.
+                </p>
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {smartPrompts.map((prompt) => (
+                        <button
+                            key={prompt}
+                            onClick={() => enqueueQuestion(prompt)}
+                            className="shrink-0 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-500"
+                        >
+                            {prompt}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="space-y-3">
+                        {messages.map((m, i) => (
+                            <div key={i} className={`flex min-w-0 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                <div
+                                    className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed break-words ${
+                                        m.role === "user"
+                                            ? "rounded-br-md bg-slate-900 text-white"
+                                            : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
+                                    }`}
+                                >
+                                    {m.role === "assistant" ? (
+                                        <div className="prose prose-sm prose-neutral max-w-none overflow-x-auto prose-p:my-1.5 prose-pre:overflow-x-auto">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                        </div>
+                                    ) : (
+                                        m.content
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {isTyping && (
+                            <div className="flex justify-start">
+                                <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+                                    Thinking...
+                                </div>
+                            </div>
+                        )}
+                        <div ref={bottomRef} />
+                    </div>
+                </div>
+
+                {error && profile && <p className="mt-2 text-xs text-red-600">{error}</p>}
+
+                <div className="mt-3 border-t border-slate-200 pt-3">
+                    <textarea
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        placeholder="Frage zu Skills, Erfahrung, Projekten..."
+                        rows={2}
+                        className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                    />
+                    <button
+                        onClick={() => enqueueQuestion()}
+                        disabled={isTyping}
+                        className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                        Frage senden
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
             <div className="mx-auto w-full max-w-6xl px-4 py-6 pb-28 sm:px-6 sm:py-10 sm:pb-10">
@@ -345,7 +427,11 @@ export default function PublicPortfolioPage() {
             </div>
 
             {profile && (
-                <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
+                <div
+                    className={`fixed z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden ${
+                        isMobileChatOpen ? "inset-0 bg-slate-900/20 pt-20" : "inset-x-0 bottom-0"
+                    }`}
+                >
                     {!isMobileChatOpen && (
                         <div className="flex justify-end">
                             <button
@@ -358,7 +444,7 @@ export default function PublicPortfolioPage() {
                         </div>
                     )}
                     {isMobileChatOpen && (
-                        <div className="max-h-[72dvh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="ml-auto flex h-[min(66dvh,560px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">AI Recruiter Chat</h2>
                                 <button
@@ -368,9 +454,7 @@ export default function PublicPortfolioPage() {
                                     Close
                                 </button>
                             </div>
-                            <div className="max-h-[calc(72dvh-3.25rem)] overflow-y-auto p-4">
-                                <ChatBody />
-                            </div>
+                            <MobileChatBody />
                         </div>
                     )}
                 </div>
