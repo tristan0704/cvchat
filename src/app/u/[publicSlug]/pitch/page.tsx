@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { marketingCopy } from "@/lib/marketingCopy"
 
 type PublicProfileResponse = {
     publicSlug: string
@@ -93,12 +94,12 @@ export default function PublicPitchPage() {
                 const res = await fetch(`/api/public-profile/${publicSlug}`)
                 const data = await res.json().catch(() => ({}))
                 if (!res.ok) {
-                    setError(data.error || "Profil nicht gefunden")
+                    setError(data.error || "Profile not found")
                     return
                 }
                 setProfile(data)
             } catch {
-                setError("Server nicht erreichbar")
+                setError("Server not reachable")
             } finally {
                 setLoading(false)
             }
@@ -121,28 +122,26 @@ export default function PublicPitchPage() {
                 const roleHits = roleTokens.filter((token) => haystack.includes(token))
                 if (roleHits.length > 0) {
                     score += roleHits.length * 3
-                    evidence.push(`Rollenbezug (${roleHits.slice(0, 3).join(", ")})`)
+                    evidence.push(`Role match (${roleHits.slice(0, 3).join(", ")})`)
                 }
 
                 const skillHits = skillTokens.filter((token) => haystack.includes(token))
                 if (skillHits.length > 0) {
                     score += Math.min(skillHits.length, 5)
-                    evidence.push("Skill-Match")
+                    evidence.push("Skill match")
                 }
 
                 if (project.impact?.trim()) {
                     score += 3
-                    evidence.push("Impact hinterlegt")
+                    evidence.push("Outcome documented")
                 }
 
                 if (project.tech.length > 0) {
                     score += Math.min(project.tech.length, 3)
-                    evidence.push("Tech-Stack genannt")
+                    evidence.push("Tech stack listed")
                 }
 
-                if (project.summary?.trim()) {
-                    score += 2
-                }
+                if (project.summary?.trim()) score += 2
 
                 return {
                     ...project,
@@ -160,13 +159,13 @@ export default function PublicPitchPage() {
 
         const projectSignals = topProjects.flatMap((project) => {
             const signals: string[] = []
-            if (project.impact) signals.push(`${project.name || "Projekt"}: ${project.impact}`)
-            else if (project.summary) signals.push(`${project.name || "Projekt"}: ${project.summary}`)
+            if (project.impact) signals.push(`${project.name || "Project"}: ${project.impact}`)
+            else if (project.summary) signals.push(`${project.name || "Project"}: ${project.summary}`)
             return signals
         })
 
         const experienceSignals = profile.profile.experience
-            .flatMap((item) => item.responsibilities.slice(0, 1).map((resp) => `${item.role || "Rolle"}: ${resp}`))
+            .flatMap((item) => item.responsibilities.slice(0, 1).map((resp) => `${item.role || "Role"}: ${resp}`))
             .slice(0, 3)
 
         return [...projectSignals, ...experienceSignals].slice(0, 3)
@@ -184,9 +183,9 @@ export default function PublicPitchPage() {
             if (projectMatch) {
                 return {
                     skill,
-                    proofIn: projectMatch.name || "Projekt",
-                    result: projectMatch.impact || projectMatch.summary || "Kein Ergebnis hinterlegt",
-                    ownership: projectMatch.role || "Nicht hinterlegt",
+                    proofIn: projectMatch.name || "Project",
+                    result: projectMatch.impact || projectMatch.summary || "No outcome documented",
+                    ownership: projectMatch.role || "Not specified",
                 }
             }
 
@@ -198,16 +197,16 @@ export default function PublicPitchPage() {
                 return {
                     skill,
                     proofIn: experienceMatch.organization || "Experience",
-                    result: experienceMatch.responsibilities[0] || "Kein Ergebnis hinterlegt",
-                    ownership: experienceMatch.role || "Nicht hinterlegt",
+                    result: experienceMatch.responsibilities[0] || "No outcome documented",
+                    ownership: experienceMatch.role || "Not specified",
                 }
             }
 
             return {
                 skill,
-                proofIn: "Nicht zugeordnet",
-                result: "Kein Nachweis in Projekten/Experience hinterlegt",
-                ownership: "Nicht hinterlegt",
+                proofIn: "Not mapped",
+                result: "No project/experience evidence found",
+                ownership: "Not specified",
             }
         })
     }, [profile, rankedProjects])
@@ -223,22 +222,26 @@ export default function PublicPitchPage() {
     }, [profile])
 
     return (
-        <main className="min-h-screen bg-gradient-to-b from-white to-gray-50 px-4 py-6 sm:px-6 sm:py-10">
+        <main className="min-h-screen bg-[#020817] px-4 py-6 text-slate-100 sm:px-6 sm:py-10">
+            <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(59,130,246,0.16),transparent_36%),radial-gradient(circle_at_88%_18%,rgba(139,92,246,0.16),transparent_42%),linear-gradient(180deg,#020617_0%,#040B1E_45%,#030514_100%)]" />
+            </div>
+
             <div className="mx-auto w-full max-w-6xl">
-                <header className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+                <header className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm sm:p-8">
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                        <Link href={`/u/${publicSlug}`} className="text-sm font-semibold text-gray-900">
-                            Zurueck zur Personal Seite
+                        <Link href={`/u/${publicSlug}`} className="text-sm font-semibold text-slate-100 hover:text-white">
+                            Back to profile page
                         </Link>
                         <div className="flex items-center gap-2 print:hidden">
-                            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-600">
-                                Web Pitch (PDF Ersatz)
+                            <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-300">
+                                {marketingCopy.publicPitch.badge}
                             </span>
                             <button
                                 onClick={() => window.print()}
-                                className="rounded-lg bg-black px-4 py-2 text-xs font-medium text-white"
+                                className="rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-2 text-xs font-semibold text-white"
                             >
-                                Als PDF herunterladen
+                                Export as PDF
                             </button>
                         </div>
                     </div>
@@ -246,37 +249,37 @@ export default function PublicPitchPage() {
                     {profile && (
                         <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-start">
                             <div className="min-w-0">
-                                <h1 className="break-words text-3xl font-semibold tracking-tight text-gray-900">{profile.meta.name}</h1>
-                                <p className="mt-1 break-words text-xl text-gray-700">{profile.meta.position || "Position nicht hinterlegt"}</p>
-                                <p className="mt-4 max-w-3xl break-words text-sm leading-relaxed text-gray-600">
-                                    {profile.meta.summary || "Keine Zusammenfassung hinterlegt."}
+                                <h1 className="break-words text-3xl font-semibold tracking-tight text-white">{profile.meta.name}</h1>
+                                <p className="mt-1 break-words text-xl text-slate-300">{profile.meta.position || "No position specified"}</p>
+                                <p className="mt-4 max-w-3xl break-words text-sm leading-relaxed text-slate-300">
+                                    {profile.meta.summary || "No summary provided."}
                                 </p>
                             </div>
 
-                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 md:w-80">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">Profil-Kontext</p>
-                                <ul className="mt-3 space-y-2 text-sm text-gray-700">
-                                    <li>Letztes Update: {new Date(profile.updatedAt).toLocaleString()}</li>
-                                    <li>Standort: {profile.profile.person.location || "Nicht hinterlegt"}</li>
+                            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:w-80">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Profile context</p>
+                                <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                                    <li>Last update: {new Date(profile.updatedAt).toLocaleString()}</li>
+                                    <li>Location: {profile.profile.person.location || "Not specified"}</li>
                                     <li>Skills: {profile.profile.skills.length}</li>
-                                    <li>Projekte: {profile.profile.projects.length}</li>
+                                    <li>Projects: {profile.profile.projects.length}</li>
                                 </ul>
                             </div>
                         </div>
                     )}
                 </header>
 
-                {loading && <p className="mt-6 text-sm text-gray-500">Pitch-Daten werden geladen...</p>}
-                {error && !profile && <p className="mt-6 text-sm text-red-600">{error}</p>}
+                {loading && <p className="mt-6 text-sm text-slate-400">Loading pitch data...</p>}
+                {error && !profile && <p className="mt-6 text-sm text-rose-300">{error}</p>}
 
                 {profile && (
                     <>
-                        <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-lg font-semibold text-gray-900">Entscheidungs-Signale</h2>
+                        <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
+                            <h2 className="text-lg font-semibold text-white">{marketingCopy.publicPitch.decisionSignalsTitle}</h2>
                             <div className="mt-4 grid gap-3 md:grid-cols-3">
-                                {decisionSignals.length === 0 && <p className="text-sm text-gray-600">Keine Signale aus den aktuellen Daten ableitbar.</p>}
+                                {decisionSignals.length === 0 && <p className="text-sm text-slate-300">No clear signals derivable from current data.</p>}
                                 {decisionSignals.map((signal, idx) => (
-                                    <article key={`${signal}-${idx}`} className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                                    <article key={`${signal}-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
                                         {signal}
                                     </article>
                                 ))}
@@ -284,24 +287,21 @@ export default function PublicPitchPage() {
                         </section>
 
                         <section className="mt-8">
-                            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Gelieferte Ergebnisse</h2>
+                            <h2 className="text-2xl font-semibold tracking-tight text-white">{marketingCopy.publicPitch.resultsTitle}</h2>
                             <div className="mt-4 space-y-4">
-                                {topProjects.length === 0 && (
-                                    <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600">Keine Projekte hinterlegt.</div>
-                                )}
+                                {topProjects.length === 0 && <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-slate-300">No projects available.</div>}
 
                                 {topProjects.map((project, idx) => (
-                                    <article key={`${project.name}-${idx}`} className="grid gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:grid-cols-[1.15fr_1fr]">
+                                    <article key={`${project.name}-${idx}`} className="grid gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm lg:grid-cols-[1.15fr_1fr]">
                                         <div>
-                                            <h3 className="text-xl font-semibold text-gray-900">{project.name || "Projekt ohne Titel"}</h3>
-                                            {project.role && <p className="mt-1 text-sm text-gray-700">{project.role}</p>}
-
-                                            {project.summary && <p className="mt-3 text-sm leading-relaxed text-gray-700">{project.summary}</p>}
+                                            <h3 className="text-xl font-semibold text-white">{project.name || "Untitled project"}</h3>
+                                            {project.role && <p className="mt-1 text-sm text-slate-300">{project.role}</p>}
+                                            {project.summary && <p className="mt-3 text-sm leading-relaxed text-slate-300">{project.summary}</p>}
 
                                             {project.tech.length > 0 && (
                                                 <div className="mt-3 flex flex-wrap gap-2">
                                                     {project.tech.map((tech) => (
-                                                        <span key={`${project.name}-${tech}`} className="rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                                                        <span key={`${project.name}-${tech}`} className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200">
                                                             {tech}
                                                         </span>
                                                     ))}
@@ -309,22 +309,22 @@ export default function PublicPitchPage() {
                                             )}
                                         </div>
 
-                                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Warum priorisiert</p>
-                                            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-gray-700">
-                                                {project.evidence.length === 0 && <li>Basisdaten vorhanden</li>}
+                                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Why prioritized</p>
+                                            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
+                                                {project.evidence.length === 0 && <li>Base project data available</li>}
                                                 {project.evidence.map((item) => (
                                                     <li key={`${project.name}-${item}`}>{item}</li>
                                                 ))}
                                             </ul>
-                                            <div className="mt-3 border-t border-gray-200 pt-3">
-                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Ergebnis</p>
-                                                <p className="mt-1 text-sm text-gray-800">{project.impact || "Kein Ergebnis hinterlegt"}</p>
+                                            <div className="mt-3 border-t border-white/10 pt-3">
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Outcome</p>
+                                                <p className="mt-1 text-sm text-slate-100">{project.impact || "No documented outcome"}</p>
                                             </div>
 
                                             {project.links.length > 0 && (
-                                                <div className="mt-3 border-t border-gray-200 pt-3">
-                                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Links</p>
+                                                <div className="mt-3 border-t border-white/10 pt-3">
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Links</p>
                                                     <div className="mt-2 flex flex-col gap-1">
                                                         {project.links.map((link) => (
                                                             <a
@@ -332,7 +332,7 @@ export default function PublicPitchPage() {
                                                                 href={toExternalLink(link)}
                                                                 target="_blank"
                                                                 rel="noreferrer"
-                                                                className="break-all text-sm text-gray-800 underline"
+                                                                className="break-all text-sm text-blue-300 underline"
                                                             >
                                                                 {link}
                                                             </a>
@@ -346,30 +346,30 @@ export default function PublicPitchPage() {
                             </div>
                         </section>
 
-                        <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Faehigkeit {'<->'} Nachweis</h2>
+                        <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
+                            <h2 className="text-2xl font-semibold tracking-tight text-white">{marketingCopy.publicPitch.evidenceTitle}</h2>
 
                             {skillEvidence.length === 0 ? (
-                                <p className="mt-4 text-sm text-gray-600">Keine Skills hinterlegt.</p>
+                                <p className="mt-4 text-sm text-slate-300">No skills available.</p>
                             ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+                                <div className="mt-4 overflow-x-auto rounded-lg border border-white/10">
                                     <table className="min-w-full border-collapse text-left text-sm">
                                         <thead>
-                                            <tr className="bg-gray-900 text-white">
-                                                <th className="px-4 py-3 font-semibold">Faehigkeit</th>
-                                                <th className="px-4 py-3 font-semibold">Nachgewiesen in</th>
-                                                <th className="px-4 py-3 font-semibold">Ergebnis</th>
+                                            <tr className="bg-[#0B132C] text-slate-100">
+                                                <th className="px-4 py-3 font-semibold">Skill</th>
+                                                <th className="px-4 py-3 font-semibold">Evidence in</th>
+                                                <th className="px-4 py-3 font-semibold">Outcome</th>
                                                 <th className="px-4 py-3 font-semibold">Ownership</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {skillEvidence.map((row) => (
-                                                <tr key={row.skill} className="border-t border-gray-200 bg-white">
-                                                    <td className="px-4 py-3 font-medium text-gray-900">{row.skill}</td>
-                                                    <td className="px-4 py-3 text-gray-700">{row.proofIn}</td>
-                                                    <td className="px-4 py-3 text-gray-700">{row.result}</td>
+                                                <tr key={row.skill} className="border-t border-white/10 bg-white/[0.02]">
+                                                    <td className="px-4 py-3 font-medium text-white">{row.skill}</td>
+                                                    <td className="px-4 py-3 text-slate-300">{row.proofIn}</td>
+                                                    <td className="px-4 py-3 text-slate-300">{row.result}</td>
                                                     <td className="px-4 py-3">
-                                                        <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">{row.ownership}</span>
+                                                        <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-medium text-slate-100">{row.ownership}</span>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -379,15 +379,15 @@ export default function PublicPitchPage() {
                             )}
                         </section>
 
-                        <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Arbeitskontext</h2>
+                        <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
+                            <h2 className="text-2xl font-semibold tracking-tight text-white">Work context</h2>
                             <div className="mt-5 grid gap-4 md:grid-cols-3">
-                                <article className="rounded-lg border border-gray-200 p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Rollen</p>
+                                <article className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Roles</p>
                                     {distinctRoles.length === 0 ? (
-                                        <p className="mt-2 text-sm text-gray-600">Keine Rollen hinterlegt.</p>
+                                        <p className="mt-2 text-sm text-slate-300">No roles listed.</p>
                                     ) : (
-                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-gray-700">
+                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
                                             {distinctRoles.map((role) => (
                                                 <li key={role}>{role}</li>
                                             ))}
@@ -395,12 +395,12 @@ export default function PublicPitchPage() {
                                     )}
                                 </article>
 
-                                <article className="rounded-lg border border-gray-200 p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Organisationen</p>
+                                <article className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Organizations</p>
                                     {distinctOrgs.length === 0 ? (
-                                        <p className="mt-2 text-sm text-gray-600">Keine Organisationen hinterlegt.</p>
+                                        <p className="mt-2 text-sm text-slate-300">No organizations listed.</p>
                                     ) : (
-                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-gray-700">
+                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
                                             {distinctOrgs.map((org) => (
                                                 <li key={org}>{org}</li>
                                             ))}
@@ -408,15 +408,15 @@ export default function PublicPitchPage() {
                                     )}
                                 </article>
 
-                                <article className="rounded-lg border border-gray-200 p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Zeitraeume</p>
+                                <article className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Timelines</p>
                                     {profile.profile.experience.length === 0 ? (
-                                        <p className="mt-2 text-sm text-gray-600">Keine Zeitraeume hinterlegt.</p>
+                                        <p className="mt-2 text-sm text-slate-300">No timelines listed.</p>
                                     ) : (
-                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-gray-700">
+                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
                                             {profile.profile.experience.slice(0, 8).map((item, idx) => (
                                                 <li key={`${item.organization}-${item.role}-${idx}`}>
-                                                    {item.role || "Rolle"}: {formatRange(item.start, item.end) || "Nicht hinterlegt"}
+                                                    {item.role || "Role"}: {formatRange(item.start, item.end) || "Not specified"}
                                                 </li>
                                             ))}
                                         </ul>
@@ -425,11 +425,14 @@ export default function PublicPitchPage() {
                             </div>
                         </section>
 
-                        <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Naechster Schritt</h2>
-                            <p className="mt-2 text-sm text-gray-700">Fuer Rueckfragen und technische Details direkt in den Personal Chatbot wechseln.</p>
-                            <Link href={`/u/${publicSlug}#chatbot`} className="mt-4 inline-flex rounded-lg bg-black px-5 py-3 text-sm font-medium text-white">
-                                Zum Personal Chatbot
+                        <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
+                            <h2 className="text-2xl font-semibold tracking-tight text-white">Next step</h2>
+                            <p className="mt-2 text-sm text-slate-300">For deeper technical follow-up questions, move to the public profile chatbot.</p>
+                            <Link
+                                href={`/u/${publicSlug}#chatbot`}
+                                className="mt-4 inline-flex rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-5 py-3 text-sm font-semibold text-white"
+                            >
+                                Open profile chatbot
                             </Link>
                         </section>
                     </>
