@@ -1,10 +1,10 @@
-﻿// DATEIUEBERSICHT: API-Route fuer aktuellen Session-Benutzer und zugehoerige Basisdaten.
+﻿// DATEIÜBERSICHT: API-Route für aktuellen Session-Benutzer und zugehörige Basisdaten.
 import { getSessionUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ensureUserPublicSlug } from "@/lib/publicSlug"
 
 export async function GET() {
-    // Session aus Cookie lesen; ohne Session kommt user: null zurueck.
+    // Session aus Cookie lesen; ohne Session kommt user: null zurück.
     const user = await getSessionUser()
     if (!user) {
         return Response.json({ user: null })
@@ -13,7 +13,7 @@ export async function GET() {
     // Sicherstellen, dass jeder Nutzer einen stabilen Public-Slug besitzt.
     const publicSlug = await ensureUserPublicSlug(user.id, user.name || user.email.split("@")[0])
 
-    // Letztes CV-Token fuer Deep-Link ins Dashboard mitgeben.
+    // Letztes CV-Token für Deep-Link ins Dashboard mitgeben.
     const cv = await prisma.cv.findFirst({
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },

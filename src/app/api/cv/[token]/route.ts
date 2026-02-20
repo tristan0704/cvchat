@@ -2,6 +2,7 @@
 import { getSessionUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildProfileFromCvData } from "@/lib/profileContext"
+import { ensureUserPublicSlug } from "@/lib/publicSlug"
 
 export async function GET(
     _req: Request,
@@ -36,12 +37,21 @@ export async function GET(
         return Response.json({ error: "CV meta not found" }, { status: 404 })
     }
 
+    // Exportseiten basieren auf einem stabilen publicSlug.
+    // Fehlt er noch, wird er beim Laden des Dashboards angelegt.
+    const publicSlug = cv.userId
+        ? await ensureUserPublicSlug(cv.userId, user?.name || user?.email.split("@")[0])
+        : null
+
     return Response.json({
         meta: {
             name: cv.meta.name,
             position: cv.meta.position,
             summary: cv.meta.summary,
             imageUrl: cv.meta.imageUrl,
+        },
+        owner: {
+            publicSlug,
         },
         profile: buildProfileFromCvData(cv.data, {
             name: cv.meta.name,

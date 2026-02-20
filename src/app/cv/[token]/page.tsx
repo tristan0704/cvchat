@@ -1,5 +1,5 @@
 ﻿"use client"
-// DATEIUEBERSICHT: Interne CV-Seite zum Anzeigen und Bearbeiten des generierten Profils.
+// DATEIUEBERSICHT: Interne CV/AnalyticsDashboard-Seite zum Anzeigen und Bearbeiten des generierten Profils.
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -7,7 +7,8 @@ import { useParams } from "next/navigation"
 
 type CvMeta = { name: string; position: string; summary: string; imageUrl?: string | null }
 type CvStatus = { updatedAt: string; metaUpdatedAt: string }
-type CvResponse = { meta: CvMeta; status: CvStatus }
+type CvOwner = { publicSlug?: string | null }
+type CvResponse = { meta: CvMeta; status: CvStatus; owner?: CvOwner }
 type AuthUser = { id: string; email: string; name?: string | null; publicSlug?: string | null }
 
 export default function CvPage() {
@@ -16,6 +17,7 @@ export default function CvPage() {
 
     const [meta, setMeta] = useState<CvMeta | null>(null)
     const [status, setStatus] = useState<CvStatus | null>(null)
+    const [owner, setOwner] = useState<CvOwner | null>(null)
     const [authUser, setAuthUser] = useState<AuthUser | null>(null)
     const [summaryDraft, setSummaryDraft] = useState("")
     const [loading, setLoading] = useState(true)
@@ -38,6 +40,7 @@ export default function CvPage() {
             const meData = await meRes.json().catch(() => ({}))
             setMeta(cvData.meta)
             setStatus(cvData.status)
+            setOwner(cvData.owner ?? null)
             setSummaryDraft(cvData.meta.summary || "")
             setAuthUser(meData.user ?? null)
         } catch {
@@ -60,14 +63,18 @@ export default function CvPage() {
     }, [authUser?.name, authUser?.email, meta?.name])
 
     const personalUrl = useMemo(() => {
-        if (typeof window === "undefined" || !authUser?.publicSlug) return ""
-        return `${window.location.origin}/u/${authUser.publicSlug}`
-    }, [authUser?.publicSlug])
+        const publicSlug = authUser?.publicSlug || owner?.publicSlug
+        if (typeof window === "undefined" || !publicSlug) return ""
+        return `${window.location.origin}/u/${publicSlug}`
+    }, [authUser?.publicSlug, owner?.publicSlug])
 
     const pitchUrl = useMemo(() => {
-        if (typeof window === "undefined" || !authUser?.publicSlug) return ""
-        return `${window.location.origin}/u/${authUser.publicSlug}/pitch`
-    }, [authUser?.publicSlug])
+        const publicSlug = authUser?.publicSlug || owner?.publicSlug
+        if (typeof window === "undefined" || !publicSlug) return ""
+        return `${window.location.origin}/u/${publicSlug}/pitch`
+    }, [authUser?.publicSlug, owner?.publicSlug])
+
+    const dashboardSlug = authUser?.publicSlug || owner?.publicSlug || ""
 
     async function saveSummary() {
         // Speichert nur die Summary; Rest bleibt read-only aus Parsing.
@@ -86,7 +93,10 @@ export default function CvPage() {
     }
 
     async function copyLink(link: string) {
-        if (!link) return
+        if (!link) {
+            setActionError("Export-Link noch nicht verfuegbar.")
+            return
+        }
         await navigator.clipboard.writeText(link)
     }
 
@@ -140,9 +150,15 @@ export default function CvPage() {
                                 <div className="rounded-md border p-3">
                                     <p className="text-sm font-semibold">Public Profile + Chatbot</p>
                                     <div className="mt-2 flex gap-2">
-                                        <Link href={authUser?.publicSlug ? `/u/${authUser.publicSlug}` : "#"} className="rounded-md border px-3 py-2 text-sm">
-                                            Oeffnen
-                                        </Link>
+                                        {dashboardSlug ? (
+                                            <Link href={`/u/${dashboardSlug}`} className="rounded-md border px-3 py-2 text-sm">
+                                                Oeffnen
+                                            </Link>
+                                        ) : (
+                                            <button type="button" disabled className="cursor-not-allowed rounded-md border px-3 py-2 text-sm text-slate-400">
+                                                Oeffnen
+                                            </button>
+                                        )}
                                         <button onClick={() => copyLink(personalUrl)} className="rounded-md border px-3 py-2 text-sm">
                                             Link kopieren
                                         </button>
@@ -152,9 +168,15 @@ export default function CvPage() {
                                 <div className="rounded-md border p-3">
                                     <p className="text-sm font-semibold">Pitch / PDF Seite</p>
                                     <div className="mt-2 flex gap-2">
-                                        <Link href={authUser?.publicSlug ? `/u/${authUser.publicSlug}/pitch` : "#"} className="rounded-md border px-3 py-2 text-sm">
-                                            Oeffnen
-                                        </Link>
+                                        {dashboardSlug ? (
+                                            <Link href={`/u/${dashboardSlug}/pitch`} className="rounded-md border px-3 py-2 text-sm">
+                                                Oeffnen
+                                            </Link>
+                                        ) : (
+                                            <button type="button" disabled className="cursor-not-allowed rounded-md border px-3 py-2 text-sm text-slate-400">
+                                                Oeffnen
+                                            </button>
+                                        )}
                                         <button onClick={() => copyLink(pitchUrl)} className="rounded-md border px-3 py-2 text-sm">
                                             Link kopieren
                                         </button>

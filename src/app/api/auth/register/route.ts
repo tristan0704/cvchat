@@ -1,4 +1,4 @@
-﻿// DATEIUEBERSICHT: API-Route fuer Registrierung: Benutzer anlegen, Session starten, optional CV verknuepfen.
+﻿// DATEIÜBERSICHT: API-Route für Registrierung: Benutzer anlegen, Session starten, optional CV verknüpfen.
 import { prisma } from "@/lib/prisma"
 import { createSession, hashPassword, setSessionCookie } from "@/lib/auth"
 import { ensureUserPublicSlug } from "@/lib/publicSlug"
@@ -12,7 +12,7 @@ type RegisterBody = {
 }
 
 export async function POST(req: Request) {
-    // SECURITY: Nicht beachten fÃ¼rs entwickeln
+    // SECURITY: Nicht beachten fürs entwickeln
     const limited = enforceRateLimit(req, "auth-register", {
         windowMs: 60_000,
         max: 20,
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     const name = body.name?.trim()
     const token = body.token?.trim()
 
-    // Nur minimale MVP-Regeln: gueltige E-Mail und Mindestlaenge Passwort.
+    // Nur minimale MVP-Regeln: gültige E-Mail und Mindestlänge Passwort.
     if (!email || !email.includes("@") || !password || password.length < 6) {
         return Response.json(
             { error: "Invalid email or password (min 6 chars)" },
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const passwordHash = await hashPassword(password)
 
     // Nutzer anlegen und direkt eine Session erstellen
-    // fuer einen nahtlosen Start nach der Registrierung.
+    // für einen nahtlosen Start nach der Registrierung.
     const user = await prisma.user.create({
         data: {
             email,
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     await setSessionCookie(session.token, session.expiresAt)
 
     if (token) {
-        // Optional: bereits hochgeladener CV (anonym) wird uebernommen.
+        // Optional: bereits hochgeladener CV (anonym) wird übernommen.
         await prisma.cv.updateMany({
             where: {
                 token,

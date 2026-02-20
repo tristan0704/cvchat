@@ -1,4 +1,4 @@
-﻿// DATEIUEBERSICHT: API-Route fuer Login: Credentials pruefen, Session erzeugen, Cookie setzen.
+﻿// DATEIUEBERSICHT: API-Route für Login: Credentials prüfen, Session erzeugen, Cookie setzen.
 import { prisma } from "@/lib/prisma"
 import { createSession, setSessionCookie, verifyPassword } from "@/lib/auth"
 import { ensureUserPublicSlug } from "@/lib/publicSlug"
@@ -11,7 +11,7 @@ type LoginBody = {
 }
 
 export async function POST(req: Request) {
-    // SECURITY: Nicht beachten fÃ¼rs entwickeln
+    // SECURITY: Nicht beachten fürs entwickeln
     const limited = enforceRateLimit(req, "auth-login", {
         windowMs: 60_000,
         max: 60,
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const password = body.password?.trim()
     const token = body.token?.trim()
 
-    // Fruehe Validierung fuer klare Fehlerantworten.
+    // Frühe Validierung für klare Fehlerantworten.
     if (!email || !password) {
         return Response.json(
             { error: "Missing email or password" },
@@ -31,13 +31,13 @@ export async function POST(req: Request) {
         )
     }
 
-    // Login immer nur ueber eindeutige E-Mail.
+    // Login immer nur über eindeutige E-Mail.
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
         return Response.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    // Passwort pruefen, dann Session starten.
+    // Passwort prüfen, dann Session starten.
     const ok = await verifyPassword(password, user.passwordHash)
     if (!ok) {
         return Response.json({ error: "Invalid credentials" }, { status: 401 })
