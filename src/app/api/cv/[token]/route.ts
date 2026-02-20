@@ -37,10 +37,21 @@ export async function GET(
         return Response.json({ error: "CV meta not found" }, { status: 404 })
     }
 
+    // Legacy-/Onboarding-Fall: CV wurde ohne Session erstellt (userId = null).
+    // Wenn jetzt ein User eingeloggt ist, binden wir das CV an ihn, damit Exporte funktionieren.
+    let ownerUserId = cv.userId ?? null
+    if (!ownerUserId && user) {
+        await prisma.cv.update({
+            where: { token: cv.token },
+            data: { userId: user.id },
+        })
+        ownerUserId = user.id
+    }
+
     // Exportseiten basieren auf einem stabilen publicSlug.
     // Fehlt er noch, wird er beim Laden des Dashboards angelegt.
-    const publicSlug = cv.userId
-        ? await ensureUserPublicSlug(cv.userId, user?.name || user?.email.split("@")[0])
+    const publicSlug = ownerUserId
+        ? await ensureUserPublicSlug(ownerUserId, user?.name || user?.email.split("@")[0])
         : null
 
     return Response.json({
