@@ -8,7 +8,6 @@ export async function getCvForWriteAccess(token: string) {
         include: {
             meta: true,
             certificates: true,
-            references: true,
             additionalText: true,
         },
     })

@@ -11,28 +11,13 @@ model Cv {
   token         String   @id
   userId        String?
   data          Json
-  isPublished   Boolean  @default(false)
-  publishedData Json?
-  shareToken    String?  @unique
-  shareEnabled  Boolean  @default(false)
-  publishedAt   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   user           User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
   meta           CvMeta?
-  references     ReferenceDocument[]
   certificates   Certificate[]
   additionalText AdditionalText[]
-}
-
-model ReferenceDocument {
-  id        String   @id @default(cuid())
-  cvToken   String
-  rawText   String
-  createdAt DateTime @default(now())
-
-  cv Cv @relation(fields: [cvToken], references: [token], onDelete: Cascade)
 }
 
 model Certificate {
@@ -80,7 +65,6 @@ model User {
 
   cvs      Cv[]
   sessions Session[]
-  events   AppEvent[]
 }
 
 model Session {
@@ -91,15 +75,4 @@ model Session {
   expiresAt DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model AppEvent {
-  id        String   @id @default(cuid())
-  userId    String?
-  cvToken   String?
-  type      String
-  context   Json?
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

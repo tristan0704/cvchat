@@ -1,12 +1,9 @@
 import { prisma } from "@/lib/prisma"
 import { getChatPrompt } from "@/lib/prompts/chatPrompt"
-import { PublishedSnapshot } from "@/lib/cvPublishing"
 import { buildStructuredChatContext } from "@/lib/profileContext"
-import { captureServerError, trackEvent } from "@/lib/observability"
 
 type PublicChatBody = {
     publicSlug?: string
-    shareToken?: string
     question?: string
 }
 
@@ -14,62 +11,63 @@ export async function POST(req: Request) {
     try {
         const body = (await req.json().catch(() => ({}))) as PublicChatBody
         const publicSlug = body.publicSlug?.trim().toLowerCase()
-        const shareToken = body.shareToken?.trim()
         const question = body.question?.trim()
 
-        if ((!publicSlug && !shareToken) || !question) {
-            return Response.json(
-                { error: "Missing publicSlug/shareToken or question" },
-                { status: 400 }
-            )
+        if (!publicSlug || !question) {
+            return Response.json({ error: "Missing publicSlug or question" }, { status: 400 })
         }
 
-        let cv: {
-            token: string
-            isPublished: boolean
-            shareEnabled: boolean
-            publishedData: unknown
-        } | null = null
-
-        if (publicSlug) {
-            const user = await prisma.user.findUnique({
-                where: { publicSlug },
-                select: {
-                    cvs: {
-                        where: {
-                            isPublished: true,
-                            shareEnabled: true,
-                        },
-                        orderBy: { publishedAt: "desc" },
-                        take: 1,
-                        select: {
-                            token: true,
-                            isPublished: true,
-                            shareEnabled: true,
-                            publishedData: true,
+        const user = await prisma.user.findUnique({
+            where: { publicSlug },
+            select: {
+                cvs: {
+                    orderBy: { updatedAt: "desc" },
+                    take: 1,
+                    select: {
+                        token: true,
+                        data: true,
+                        meta: {
+                            select: {
+                                name: true,
+                                position: true,
+                                summary: true,
+                                imageUrl: true,
+                            },
                         },
                     },
                 },
-            })
-            cv = user?.cvs[0] ?? null
-        } else if (shareToken) {
-            cv = await prisma.cv.findUnique({
-                where: { shareToken },
-                select: {
-                    token: true,
-                    isPublished: true,
-                    shareEnabled: true,
-                    publishedData: true,
-                },
-            })
-        }
+            },
+        })
 
-        if (!cv || !cv.isPublished || !cv.shareEnabled || !cv.publishedData) {
+        const cv = user?.cvs[0] as
+            | {
+            token: string
+                data: unknown
+                meta: { name: string; position: string; summary: string; imageUrl: string | null } | null
+            }
+            | undefined
+
+        if (!cv || !cv.meta) {
             return Response.json({ error: "CV not found" }, { status: 404 })
         }
 
-        const snapshot = cv.publishedData as PublishedSnapshot
-        const context = buildStructuredChatContext(snapshot)
+        // Chat context is currently composed from latest CV + certificates + additional text.
+        // BAUSTELLE: project upload artifacts will be merged into this context next.
+        const certificates = await prisma.certificate.findMany({
+            where: { cvToken: cv.token },
+            select: { data: true },
+        })
+        const additionalText = await prisma.additionalText.findMany({
+            where: { cvToken: cv.token },
+            select: { content: true },
+        })
+
+        const context = buildStructuredChatContext({
+            cvData: cv.data,
+            meta: cv.meta,
+            certificates: certificates.map((item) => item.data),
+            additionalText: additionalText.map((item) => item.content),
+        })
         const prompt = getChatPrompt(context)
 
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -93,15 +91,9 @@ export async function POST(req: Request) {
             data.choices?.[0]?.message?.content ??
             "Diese Information ist in den Unterlagen nicht enthalten."
 
-        await trackEvent({
-            type: "public_question_asked",
-            cvToken: cv.token,
-            context: { questionLength: question.length },
-        })
-
         return Response.json({ answer })
     } catch (err) {
-        await captureServerError("api/public-chat", err)
+        console.error("[api/public-chat]", err)
         return Response.json({ error: "Internal server error" }, { status: 500 })
     }
 }

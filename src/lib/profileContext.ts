@@ -1,5 +1,3 @@
-import { PublishedSnapshot } from "@/lib/cvPublishing"
-
 type UnknownRecord = Record<string, unknown>
 
 function asRecord(value: unknown): UnknownRecord {
@@ -66,35 +64,30 @@ export function buildProfileFromCvData(cvData: unknown, meta?: MetaLike) {
     }
 }
 
-export function buildPublicProfile(snapshot: PublishedSnapshot) {
-    const profileData = buildProfileFromCvData(snapshot.cv, snapshot.meta)
-
-    return {
-        meta: snapshot.meta,
-        profile: {
-            ...profileData,
-            certificates: snapshot.certificates,
-        },
-        sources: {
-            references: snapshot.references,
-            additionalText: snapshot.additionalText,
-        },
+type StructuredContextInput = {
+    cvData: unknown
+    meta: {
+        name: string
+        position: string
+        summary: string
+        imageUrl?: string | null
     }
+    certificates: unknown[]
+    additionalText: string[]
 }
 
-export function buildStructuredChatContext(snapshot: PublishedSnapshot) {
-    const profile = buildPublicProfile(snapshot)
+export function buildStructuredChatContext(input: StructuredContextInput) {
+    const profile = buildProfileFromCvData(input.cvData, input.meta)
     return {
-        candidate: profile.profile.person,
-        skills: profile.profile.skills,
-        experience: profile.profile.experience,
-        projects: profile.profile.projects,
-        education: profile.profile.education,
-        languages: profile.profile.languages,
-        certificates: profile.profile.certificates,
+        candidate: profile.person,
+        skills: profile.skills,
+        experience: profile.experience,
+        projects: profile.projects,
+        education: profile.education,
+        languages: profile.languages,
+        certificates: input.certificates,
         additionalEvidence: {
-            references: profile.sources.references,
-            additionalText: profile.sources.additionalText,
+            additionalText: input.additionalText,
         },
     }
 }

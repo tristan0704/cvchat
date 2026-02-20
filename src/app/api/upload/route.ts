@@ -6,7 +6,6 @@ import { getCvParsePrompt } from "@/lib/prompts/parsePrompt/getCvParsePrompt"
 import { getCertificateParsePrompt } from "@/lib/prompts/parsePrompt/getCertificateParsePrompt"
 import { randomUUID } from "crypto"
 import { uploadProfileImage } from "@/lib/uploadProfileImage"
-import { captureServerError, trackEvent } from "@/lib/observability"
 
 export async function POST(req: Request) {
     try {
@@ -14,10 +13,10 @@ export async function POST(req: Request) {
         const formData = await req.formData()
 
         const cvFile = formData.get("cv")
-        const referenceFiles = formData.getAll("references")
         const certificateFiles = formData.getAll("certificates")
         const additionalText = formData.get("additionalText")
         const imageFile = formData.get("image") as File | null
+        const projectPlaceholder = formData.get("projectPlaceholder")
 
         // --------------------
         // VALIDATE CV FILE
@@ -113,9 +112,8 @@ export async function POST(req: Request) {
             imageUrl = await uploadProfileImage(imageFile, token)
         }
 
-        // --------------------
-        // CREATE CV + META
-        // --------------------
+        // Core upload pipeline for the MVP:
+        // CV -> structured profile, plus optional certificates/image/additional text.
         const profile = await prisma.cv.create({
             data: {
                 token,
@@ -132,22 +130,6 @@ export async function POST(req: Request) {
                 },
             },
         })
-
-        // --------------------
-        // REFERENCES
-        // --------------------
-        for (const file of referenceFiles) {
-            if (file instanceof File && file.type === "application/pdf") {
-                const text = await parsePdfText(file)
-
-                await prisma.referenceDocument.create({
-                    data: {
-                        cvToken: profile.token,
-                        rawText: text,
-                    },
-                })
-            }
-        }
 
         // --------------------
         // CERTIFICATES
@@ -194,25 +176,23 @@ export async function POST(req: Request) {
             await prisma.additionalText.create({
                 data: {
                     cvToken: profile.token,
-                    content: additionalText.trim(),
+                    content: additionalText.trim() + (typeof projectPlaceholder === "string" && projectPlaceholder.trim()
+                        ? `\n\n[BAUSTELLE: PROJECT_UPLOAD_PLACEHOLDER]\n${projectPlaceholder.trim()}`
+                        : ""),
+                },
+            })
+        } else if (typeof projectPlaceholder === "string" && projectPlaceholder.trim()) {
+            await prisma.additionalText.create({
+                data: {
+                    cvToken: profile.token,
+                    content: `[BAUSTELLE: PROJECT_UPLOAD_PLACEHOLDER]\n${projectPlaceholder.trim()}`,
                 },
             })
         }
 
-        await trackEvent({
-            type: "upload_completed",
-            cvToken: token,
-            context: {
-                hasReferences: referenceFiles.length > 0,
-                hasCertificates: certificateFiles.length > 0,
-                hasImage: !!imageFile,
-                hasAdditionalText: typeof additionalText === "string" && !!additionalText.trim(),
-            },
-        })
-
         return Response.json({ token })
     } catch (err) {
-        await captureServerError("api/upload", err)
+        console.error("[api/upload]", err)
         return Response.json({ error: "Internal server error" }, { status: 500 })
     }
 }

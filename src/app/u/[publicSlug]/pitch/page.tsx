@@ -1,13 +1,12 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { marketingCopy } from "@/lib/marketingCopy"
 
 type PublicProfileResponse = {
     publicSlug: string
-    publishedAt: string | null
+    cvToken: string
     updatedAt: string
     meta: {
         name: string
@@ -39,9 +38,6 @@ type PublicProfileResponse = {
             tech: string[]
             links: string[]
         }[]
-        education: unknown[]
-        languages: unknown[]
-        certificates: unknown[]
     }
 }
 
@@ -63,19 +59,6 @@ function tokenize(text: string) {
         .replace(/[^a-z0-9\s]/g, " ")
         .split(/\s+/)
         .filter((token) => token.length > 2)
-}
-
-function formatRange(start: string, end: string) {
-    const s = start?.trim()
-    const e = end?.trim()
-    if (!s && !e) return ""
-    if (s && e) return `${s} - ${e}`
-    return s || e
-}
-
-function toExternalLink(link: string) {
-    if (link.startsWith("http://") || link.startsWith("https://")) return link
-    return `https://${link}`
 }
 
 export default function PublicPitchPage() {
@@ -122,23 +105,23 @@ export default function PublicPitchPage() {
                 const roleHits = roleTokens.filter((token) => haystack.includes(token))
                 if (roleHits.length > 0) {
                     score += roleHits.length * 3
-                    evidence.push(`Role match (${roleHits.slice(0, 3).join(", ")})`)
+                    evidence.push(`Rollenfit (${roleHits.slice(0, 3).join(", ")})`)
                 }
 
                 const skillHits = skillTokens.filter((token) => haystack.includes(token))
                 if (skillHits.length > 0) {
                     score += Math.min(skillHits.length, 5)
-                    evidence.push("Skill match")
+                    evidence.push("Skill-Fit")
                 }
 
                 if (project.impact?.trim()) {
                     score += 3
-                    evidence.push("Outcome documented")
+                    evidence.push("Ergebnis dokumentiert")
                 }
 
                 if (project.tech.length > 0) {
                     score += Math.min(project.tech.length, 3)
-                    evidence.push("Tech stack listed")
+                    evidence.push("Tech-Stack vorhanden")
                 }
 
                 if (project.summary?.trim()) score += 2
@@ -154,23 +137,6 @@ export default function PublicPitchPage() {
 
     const topProjects = useMemo(() => rankedProjects.slice(0, 3), [rankedProjects])
 
-    const decisionSignals = useMemo(() => {
-        if (!profile) return [] as string[]
-
-        const projectSignals = topProjects.flatMap((project) => {
-            const signals: string[] = []
-            if (project.impact) signals.push(`${project.name || "Project"}: ${project.impact}`)
-            else if (project.summary) signals.push(`${project.name || "Project"}: ${project.summary}`)
-            return signals
-        })
-
-        const experienceSignals = profile.profile.experience
-            .flatMap((item) => item.responsibilities.slice(0, 1).map((resp) => `${item.role || "Role"}: ${resp}`))
-            .slice(0, 3)
-
-        return [...projectSignals, ...experienceSignals].slice(0, 3)
-    }, [profile, topProjects])
-
     const skillEvidence = useMemo<SkillEvidenceRow[]>(() => {
         if (!profile) return []
 
@@ -183,9 +149,9 @@ export default function PublicPitchPage() {
             if (projectMatch) {
                 return {
                     skill,
-                    proofIn: projectMatch.name || "Project",
-                    result: projectMatch.impact || projectMatch.summary || "No outcome documented",
-                    ownership: projectMatch.role || "Not specified",
+                    proofIn: projectMatch.name || "Projekt",
+                    result: projectMatch.impact || projectMatch.summary || "Kein Ergebnis dokumentiert",
+                    ownership: projectMatch.role || "Nicht spezifiziert",
                 }
             }
 
@@ -196,149 +162,119 @@ export default function PublicPitchPage() {
             if (experienceMatch) {
                 return {
                     skill,
-                    proofIn: experienceMatch.organization || "Experience",
-                    result: experienceMatch.responsibilities[0] || "No outcome documented",
-                    ownership: experienceMatch.role || "Not specified",
+                    proofIn: experienceMatch.organization || "Erfahrung",
+                    result: experienceMatch.responsibilities[0] || "Kein Ergebnis dokumentiert",
+                    ownership: experienceMatch.role || "Nicht spezifiziert",
                 }
             }
 
             return {
                 skill,
-                proofIn: "Not mapped",
-                result: "No project/experience evidence found",
-                ownership: "Not specified",
+                proofIn: "Nicht zugeordnet",
+                result: "Kein Nachweis in Projekten/Erfahrung gefunden",
+                ownership: "Nicht spezifiziert",
             }
         })
     }, [profile, rankedProjects])
 
-    const distinctRoles = useMemo(() => {
-        if (!profile) return []
-        return Array.from(new Set(profile.profile.experience.map((item) => item.role).filter(Boolean))).slice(0, 8)
-    }, [profile])
-
-    const distinctOrgs = useMemo(() => {
-        if (!profile) return []
-        return Array.from(new Set(profile.profile.experience.map((item) => item.organization).filter(Boolean))).slice(0, 8)
-    }, [profile])
-
     return (
-        <main className="min-h-screen bg-[#020817] px-4 py-6 text-slate-100 sm:px-6 sm:py-10">
-            <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(59,130,246,0.16),transparent_36%),radial-gradient(circle_at_88%_18%,rgba(139,92,246,0.16),transparent_42%),linear-gradient(180deg,#020617_0%,#040B1E_45%,#030514_100%)]" />
-            </div>
+        <main className="min-h-screen bg-slate-50 text-slate-900">
+            <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+                <div className="mb-4 flex items-center justify-between print:hidden">
+                    <Link href={`/u/${publicSlug}`} className="rounded-md border bg-white px-3 py-2 text-sm">
+                        Zur Public Profile Seite
+                    </Link>
+                    <button onClick={() => window.print()} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+                        Als PDF exportieren
+                    </button>
+                </div>
 
-            <div className="mx-auto w-full max-w-6xl">
-                <header className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm sm:p-8">
-                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                        <Link href={`/u/${publicSlug}`} className="text-sm font-semibold text-slate-100 hover:text-white">
-                            Back to profile page
-                        </Link>
-                        <div className="flex items-center gap-2 print:hidden">
-                            <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-300">
-                                {marketingCopy.publicPitch.badge}
-                            </span>
-                            <button
-                                onClick={() => window.print()}
-                                className="rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-2 text-xs font-semibold text-white"
-                            >
-                                Export as PDF
-                            </button>
-                        </div>
-                    </div>
+                {loading && <p className="text-sm text-slate-600">Lade Pitch-Daten...</p>}
+                {error && !profile && <p className="text-sm text-red-600">{error}</p>}
 
-                    {profile && (
-                        <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-start">
-                            <div className="min-w-0">
-                                <h1 className="break-words text-3xl font-semibold tracking-tight text-white">{profile.meta.name}</h1>
-                                <p className="mt-1 break-words text-xl text-slate-300">{profile.meta.position || "No position specified"}</p>
-                                <p className="mt-4 max-w-3xl break-words text-sm leading-relaxed text-slate-300">
-                                    {profile.meta.summary || "No summary provided."}
+                {profile && (
+                    <div className="rounded-lg border bg-white p-6 sm:p-8 print:border-0 print:p-0">
+                        <header className="grid gap-6 border-b pb-8 sm:grid-cols-[1fr_320px]">
+                            <div>
+                                <h1 className="text-4xl font-semibold tracking-tight">{profile.meta.name}</h1>
+                                <p className="mt-3 text-xl text-slate-700">{profile.meta.position || "Position nicht angegeben"}</p>
+                                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-700">
+                                    {profile.meta.summary || profile.profile.person.summary || "Keine Zusammenfassung vorhanden."}
                                 </p>
                             </div>
 
-                            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:w-80">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Profile context</p>
-                                <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                                    <li>Last update: {new Date(profile.updatedAt).toLocaleString()}</li>
-                                    <li>Location: {profile.profile.person.location || "Not specified"}</li>
-                                    <li>Skills: {profile.profile.skills.length}</li>
-                                    <li>Projects: {profile.profile.projects.length}</li>
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-                </header>
+                            <aside className="rounded-md border border-blue-300 bg-blue-50 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Profil-Kontext</p>
+                                <div className="mt-3 space-y-3 text-sm">
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Primaerer Fokusbereich</p>
+                                        <p className="font-medium">{profile.meta.position || "Nicht gesetzt"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Typischer Projekt-Umfang</p>
+                                        <p className="font-medium">Web-App, API, Datenmodell, Frontend</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Skills im Profil</p>
+                                        <p className="font-medium">{profile.profile.skills.length}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Aktualisiert</p>
+                                        <p className="font-medium">{new Date(profile.updatedAt).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </aside>
+                        </header>
 
-                {loading && <p className="mt-6 text-sm text-slate-400">Loading pitch data...</p>}
-                {error && !profile && <p className="mt-6 text-sm text-rose-300">{error}</p>}
-
-                {profile && (
-                    <>
-                        <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
-                            <h2 className="text-lg font-semibold text-white">{marketingCopy.publicPitch.decisionSignalsTitle}</h2>
-                            <div className="mt-4 grid gap-3 md:grid-cols-3">
-                                {decisionSignals.length === 0 && <p className="text-sm text-slate-300">No clear signals derivable from current data.</p>}
-                                {decisionSignals.map((signal, idx) => (
-                                    <article key={`${signal}-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
-                                        {signal}
-                                    </article>
-                                ))}
-                            </div>
-                        </section>
-
-                        <section className="mt-8">
-                            <h2 className="text-2xl font-semibold tracking-tight text-white">{marketingCopy.publicPitch.resultsTitle}</h2>
-                            <div className="mt-4 space-y-4">
-                                {topProjects.length === 0 && <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-slate-300">No projects available.</div>}
+                        <section className="mt-8 border-b pb-8">
+                            <h2 className="text-3xl font-semibold tracking-tight">Gelieferte Ergebnisse</h2>
+                            <div className="mt-5 space-y-4">
+                                {topProjects.length === 0 && <p className="text-sm text-slate-600">Keine Projekte vorhanden.</p>}
 
                                 {topProjects.map((project, idx) => (
-                                    <article key={`${project.name}-${idx}`} className="grid gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm lg:grid-cols-[1.15fr_1fr]">
+                                    <article key={`${project.name}-${idx}`} className="grid gap-4 rounded-md border p-4 sm:grid-cols-[1.2fr_1fr]">
                                         <div>
-                                            <h3 className="text-xl font-semibold text-white">{project.name || "Untitled project"}</h3>
-                                            {project.role && <p className="mt-1 text-sm text-slate-300">{project.role}</p>}
-                                            {project.summary && <p className="mt-3 text-sm leading-relaxed text-slate-300">{project.summary}</p>}
+                                            <h3 className="text-lg font-semibold">{project.name || "Projekt"}</h3>
+                                            {project.role && <p className="mt-1 text-sm text-slate-700">{project.role}</p>}
 
-                                            {project.tech.length > 0 && (
-                                                <div className="mt-3 flex flex-wrap gap-2">
-                                                    {project.tech.map((tech) => (
-                                                        <span key={`${project.name}-${tech}`} className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200">
-                                                            {tech}
-                                                        </span>
-                                                    ))}
+                                            <div className="mt-4 space-y-3 text-sm">
+                                                <div>
+                                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Problem</p>
+                                                    <p className="text-slate-700">{project.summary || "Nicht dokumentiert"}</p>
                                                 </div>
-                                            )}
-                                        </div>
-
-                                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Why prioritized</p>
-                                            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
-                                                {project.evidence.length === 0 && <li>Base project data available</li>}
-                                                {project.evidence.map((item) => (
-                                                    <li key={`${project.name}-${item}`}>{item}</li>
-                                                ))}
-                                            </ul>
-                                            <div className="mt-3 border-t border-white/10 pt-3">
-                                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Outcome</p>
-                                                <p className="mt-1 text-sm text-slate-100">{project.impact || "No documented outcome"}</p>
-                                            </div>
-
-                                            {project.links.length > 0 && (
-                                                <div className="mt-3 border-t border-white/10 pt-3">
-                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Links</p>
-                                                    <div className="mt-2 flex flex-col gap-1">
-                                                        {project.links.map((link) => (
-                                                            <a
-                                                                key={`${project.name}-${link}`}
-                                                                href={toExternalLink(link)}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="break-all text-sm text-blue-300 underline"
-                                                            >
-                                                                {link}
-                                                            </a>
+                                                <div>
+                                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Aktion</p>
+                                                    <p className="text-slate-700">{project.tech.length > 0 ? `Implementierung mit ${project.tech.join(", ")}` : "Tech-Umsetzung nicht spezifiziert"}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Angewandte Faehigkeiten</p>
+                                                    <div className="mt-1 flex flex-wrap gap-1.5">
+                                                        {(project.tech.length > 0 ? project.tech : ["BAUSTELLE"]).slice(0, 8).map((tech) => (
+                                                            <span key={tech} className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                                                                {tech}
+                                                            </span>
                                                         ))}
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-md border bg-slate-50 p-3">
+                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Verantwortungsebene</p>
+                                            <p className="mt-1 text-sm text-slate-800">{project.role || "Nicht spezifiziert"}</p>
+
+                                            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Umfang</p>
+                                            <p className="mt-1 text-sm text-slate-800">{project.tech.length > 0 ? `${project.tech.length} Technologien` : "Nicht angegeben"}</p>
+
+                                            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-green-700">Ergebnis</p>
+                                            <p className="mt-1 text-sm text-slate-900">{project.impact || "Kein Ergebnis dokumentiert"}</p>
+
+                                            {project.evidence.length > 0 && (
+                                                <ul className="mt-3 list-disc space-y-1 pl-4 text-xs text-slate-700">
+                                                    {project.evidence.slice(0, 4).map((item) => (
+                                                        <li key={item}>{item}</li>
+                                                    ))}
+                                                </ul>
                                             )}
                                         </div>
                                     </article>
@@ -346,30 +282,29 @@ export default function PublicPitchPage() {
                             </div>
                         </section>
 
-                        <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
-                            <h2 className="text-2xl font-semibold tracking-tight text-white">{marketingCopy.publicPitch.evidenceTitle}</h2>
-
+                        <section className="mt-8 border-b pb-8">
+                            <h2 className="text-3xl font-semibold tracking-tight">Faehigkeit {"<->"} Nachweis</h2>
                             {skillEvidence.length === 0 ? (
-                                <p className="mt-4 text-sm text-slate-300">No skills available.</p>
+                                <p className="mt-4 text-sm text-slate-600">Keine Skills verfuegbar.</p>
                             ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-white/10">
-                                    <table className="min-w-full border-collapse text-left text-sm">
-                                        <thead>
-                                            <tr className="bg-[#0B132C] text-slate-100">
-                                                <th className="px-4 py-3 font-semibold">Skill</th>
-                                                <th className="px-4 py-3 font-semibold">Evidence in</th>
-                                                <th className="px-4 py-3 font-semibold">Outcome</th>
-                                                <th className="px-4 py-3 font-semibold">Ownership</th>
+                                <div className="mt-5 overflow-x-auto rounded-md border">
+                                    <table className="min-w-full text-left text-sm">
+                                        <thead className="bg-blue-600 text-white">
+                                            <tr>
+                                                <th className="px-3 py-2 font-semibold">Faehigkeit</th>
+                                                <th className="px-3 py-2 font-semibold">Nachgewiesen in</th>
+                                                <th className="px-3 py-2 font-semibold">Ergebnis</th>
+                                                <th className="px-3 py-2 font-semibold">Ownership</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {skillEvidence.map((row) => (
-                                                <tr key={row.skill} className="border-t border-white/10 bg-white/[0.02]">
-                                                    <td className="px-4 py-3 font-medium text-white">{row.skill}</td>
-                                                    <td className="px-4 py-3 text-slate-300">{row.proofIn}</td>
-                                                    <td className="px-4 py-3 text-slate-300">{row.result}</td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-medium text-slate-100">{row.ownership}</span>
+                                                <tr key={row.skill} className="border-t">
+                                                    <td className="px-3 py-2 font-medium">{row.skill}</td>
+                                                    <td className="px-3 py-2 text-slate-700">{row.proofIn}</td>
+                                                    <td className="px-3 py-2 text-slate-700">{row.result}</td>
+                                                    <td className="px-3 py-2">
+                                                        <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">{row.ownership}</span>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -379,63 +314,22 @@ export default function PublicPitchPage() {
                             )}
                         </section>
 
-                        <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
-                            <h2 className="text-2xl font-semibold tracking-tight text-white">Work context</h2>
-                            <div className="mt-5 grid gap-4 md:grid-cols-3">
-                                <article className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Roles</p>
-                                    {distinctRoles.length === 0 ? (
-                                        <p className="mt-2 text-sm text-slate-300">No roles listed.</p>
-                                    ) : (
-                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
-                                            {distinctRoles.map((role) => (
-                                                <li key={role}>{role}</li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </article>
+                        <section className="mt-8 rounded-md border border-blue-300 bg-blue-50 p-6 text-center">
+                            <h2 className="text-3xl font-semibold tracking-tight">Mehr ueber meine Projekte & Arbeitsweise</h2>
+                            <p className="mx-auto mt-3 max-w-3xl text-sm text-slate-700">
+                                Entdecke technische Details, Architektur-Entscheidungen und stelle Fragen im interaktiven Deep Dive.
+                            </p>
+                            <Link href={`/u/${publicSlug}`} className="mt-5 inline-flex rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
+                                Zur Personal Site
+                            </Link>
 
-                                <article className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Organizations</p>
-                                    {distinctOrgs.length === 0 ? (
-                                        <p className="mt-2 text-sm text-slate-300">No organizations listed.</p>
-                                    ) : (
-                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
-                                            {distinctOrgs.map((org) => (
-                                                <li key={org}>{org}</li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </article>
-
-                                <article className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Timelines</p>
-                                    {profile.profile.experience.length === 0 ? (
-                                        <p className="mt-2 text-sm text-slate-300">No timelines listed.</p>
-                                    ) : (
-                                        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-300">
-                                            {profile.profile.experience.slice(0, 8).map((item, idx) => (
-                                                <li key={`${item.organization}-${item.role}-${idx}`}>
-                                                    {item.role || "Role"}: {formatRange(item.start, item.end) || "Not specified"}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </article>
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-700">
+                                <span>Interaktiver Q&A Chatbot</span>
+                                <span>Code-Snippets & Architektur</span>
+                                <span>Projekt-Deep-Dive</span>
                             </div>
                         </section>
-
-                        <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
-                            <h2 className="text-2xl font-semibold tracking-tight text-white">Next step</h2>
-                            <p className="mt-2 text-sm text-slate-300">For deeper technical follow-up questions, move to the public profile chatbot.</p>
-                            <Link
-                                href={`/u/${publicSlug}#chatbot`}
-                                className="mt-4 inline-flex rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-5 py-3 text-sm font-semibold text-white"
-                            >
-                                Open profile chatbot
-                            </Link>
-                        </section>
-                    </>
+                    </div>
                 )}
             </div>
         </main>

@@ -1,16 +1,5 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-
-const displaySans = Space_Grotesk({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const codeMono = JetBrains_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "CareerIndex - Interactive Career Profile",
@@ -31,9 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${displaySans.variable} ${codeMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         {children}
       </body>
     </html>

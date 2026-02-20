@@ -33,11 +33,6 @@ export async function GET(
         return Response.json({ error: "CV meta not found" }, { status: 404 })
     }
 
-    const needsRepublish =
-        !!cv.isPublished &&
-        !!cv.publishedAt &&
-        cv.meta.updatedAt.getTime() > cv.publishedAt.getTime()
-
     return Response.json({
         meta: {
             name: cv.meta.name,
@@ -52,13 +47,8 @@ export async function GET(
             imageUrl: cv.meta.imageUrl,
         }),
         status: {
-            isPublished: cv.isPublished,
-            shareEnabled: cv.shareEnabled,
-            shareToken: cv.shareToken,
-            publishedAt: cv.publishedAt,
             updatedAt: cv.updatedAt,
             metaUpdatedAt: cv.meta.updatedAt,
-            needsRepublish,
         },
     })
 }

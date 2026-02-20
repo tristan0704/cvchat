@@ -13,21 +13,21 @@ export const marketingCopy = {
       "1. Add project links and your role in each project.",
       "2. CareerIndex extracts stack, tasks, solved problems, and outcomes.",
       "3. You get polished career assets for recruiter screens and interviews.",
-      "4. Share your strongest project narrative in applications and on LinkedIn.",
+      "4. Export your public profile and pitch page for recruiter sharing.",
     ],
     freeHint:
-      "Start free with one project. Add CV context for better role-specific wording.",
+      "Start with CV + certificates and expand into project evidence iteratively.",
   },
   upload: {
     title: "Build your Project Career Index",
     intro:
-      "Start with project evidence, then enrich with CV and supporting files. This keeps the output concrete and role-relevant.",
+      "Start with CV, optional certificates, profile image and context notes. Project upload is currently prepared as a placeholder.",
     projectSectionTitle: "Project signal intake",
     projectSectionText:
       "Capture repo, role target, your contributions, and measurable impact. This is the primary input for your career assets.",
     repoBetaNote:
       "Public GitHub auto-fetch can plug into the same schema later (prepared).",
-    cta: "Create project-focused CareerIndex",
+    cta: "Create CareerIndex profile",
   },
   auth: {
     loginTitle: "Welcome back",
@@ -40,9 +40,8 @@ export const marketingCopy = {
   dashboard: {
     title: "Project Asset Dashboard",
     subtitle:
-      "Manage your project-based profile, update your summary, and control public sharing.",
+      "Manage your profile, update your summary, and export your two recruiter views.",
     profileCardTitle: "Profile Core",
-    sharingCardTitle: "Publishing & Sharing",
     personalCardTitle: "Public Profile Page",
     pitchCardTitle: "Public Pitch Page",
   },

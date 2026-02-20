@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { PublishedSnapshot } from "@/lib/cvPublishing"
-import { buildPublicProfile } from "@/lib/profileContext"
+import { buildProfileFromCvData } from "@/lib/profileContext"
 
 export async function GET(
     _req: Request,
@@ -17,31 +16,38 @@ export async function GET(
             id: true,
             publicSlug: true,
             cvs: {
-                where: {
-                    isPublished: true,
-                    shareEnabled: true,
-                },
-                orderBy: { publishedAt: "desc" },
+                orderBy: { updatedAt: "desc" },
                 take: 1,
                 select: {
-                    publishedAt: true,
+                    token: true,
                     updatedAt: true,
-                    publishedData: true,
+                    data: true,
+                    meta: {
+                        select: {
+                            name: true,
+                            position: true,
+                            summary: true,
+                            imageUrl: true,
+                        },
+                    },
                 },
             },
         },
     })
 
     const cv = user?.cvs[0]
-    if (!user || !cv || !cv.publishedData) {
+    if (!user || !cv || !cv.meta) {
         return Response.json({ error: "Not found" }, { status: 404 })
     }
 
-    const snapshot = cv.publishedData as PublishedSnapshot
+    // NOTE: export is currently "latest CV by user". Fine for MVP.
+    // BAUSTELLE: add explicit access control/release workflow per profile snapshot.
+    const profile = buildProfileFromCvData(cv.data, cv.meta)
     return Response.json({
         publicSlug: user.publicSlug,
-        publishedAt: cv.publishedAt,
+        cvToken: cv.token,
         updatedAt: cv.updatedAt,
-        ...buildPublicProfile(snapshot),
+        meta: cv.meta,
+        profile,
     })
 }
