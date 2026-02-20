@@ -1,4 +1,5 @@
 ﻿"use client"
+// DATEIUEBERSICHT: Interne CV-Seite zum Anzeigen und Bearbeiten des generierten Profils.
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -22,6 +23,7 @@ export default function CvPage() {
     const [actionError, setActionError] = useState("")
 
     const loadData = useCallback(async () => {
+        // Zentrale Ladefunktion: wird beim Start und nach Speichern erneut genutzt.
         setLoading(true)
         setError("")
         try {
@@ -50,6 +52,7 @@ export default function CvPage() {
     }, [loadData])
 
     const displayName = useMemo(() => {
+        // Anzeige-Reihenfolge: echter Name -> Name aus CV -> E-Mail-Teil.
         if (authUser?.name?.trim()) return authUser.name.trim()
         if (meta?.name?.trim()) return meta.name.trim()
         if (authUser?.email) return authUser.email.split("@")[0]
@@ -67,6 +70,7 @@ export default function CvPage() {
     }, [authUser?.publicSlug])
 
     async function saveSummary() {
+        // Speichert nur die Summary; Rest bleibt read-only aus Parsing.
         setActionError("")
         try {
             const res = await fetch(`/api/cv/${token}/meta`, {
@@ -130,6 +134,7 @@ export default function CvPage() {
                         </section>
 
                         <section className="rounded-lg border bg-white p-5">
+                            {/* Exportbereich: Recruiter-Ansichten als direkte Links. */}
                             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Exporte</h2>
                             <div className="mt-3 space-y-4">
                                 <div className="rounded-md border p-3">
@@ -178,3 +183,5 @@ export default function CvPage() {
         </main>
     )
 }
+
+

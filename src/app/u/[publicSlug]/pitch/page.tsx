@@ -1,4 +1,5 @@
 ﻿"use client"
+// DATEIUEBERSICHT: Oeffentliche Pitch-Ansicht als kurze Zusammenfassung fuer Recruiter.
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -338,3 +339,5 @@ export default function PublicPitchPage() {
         </main>
     )
 }
+
+

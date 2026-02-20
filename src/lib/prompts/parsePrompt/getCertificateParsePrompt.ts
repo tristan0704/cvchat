@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: Erzeugt den Parsing-Prompt fuer Zertifikats-PDFs.
 export function getCertificateParsePrompt(text: string) {
     return `
 Extract certificate information from the text below.
@@ -22,3 +23,4 @@ CERTIFICATE TEXT:
 ${text}
 `
 }
+

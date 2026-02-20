@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: API-Route zum Laden eines CV-Profils inkl. Meta-Informationen.
 import { getSessionUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildProfileFromCvData } from "@/lib/profileContext"
@@ -6,6 +7,7 @@ export async function GET(
     _req: Request,
     context: { params: Promise<{ token: string }> }
 ) {
+    // Token kommt aus der URL: /api/cv/[token]
     const { token } = await context.params
 
     if (!token || typeof token !== "string") {
@@ -29,6 +31,7 @@ export async function GET(
         return Response.json({ error: "Forbidden" }, { status: 403 })
     }
 
+    // UI erwartet ein fertiges "profile"-Objekt aus den Rohdaten.
     if (!cv.meta) {
         return Response.json({ error: "CV meta not found" }, { status: 404 })
     }
@@ -52,3 +55,4 @@ export async function GET(
         },
     })
 }
+

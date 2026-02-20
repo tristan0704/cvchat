@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: API-Route fuer oeffentlichen Chat auf Basis des freigegebenen Profils.
 import { prisma } from "@/lib/prisma"
 import { getChatPrompt } from "@/lib/prompts/chatPrompt"
 import { buildStructuredChatContext } from "@/lib/profileContext"
@@ -11,7 +12,7 @@ type PublicChatBody = {
 
 export async function POST(req: Request) {
     try {
-        // SECURITY: Nicht beachten fürs entwickeln
+        // SECURITY: Nicht beachten fÃ¼rs entwickeln
         const limited = enforceRateLimit(req, "public-chat", {
             windowMs: 60_000,
             max: 120,
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
         if (!publicSlug || !question) {
             return Response.json({ error: "Missing publicSlug or question" }, { status: 400 })
         }
-        // SECURITY: Nicht beachten fürs entwickeln
+        // SECURITY: Nicht beachten fÃ¼rs entwickeln
         if (question.length > 4000) {
             return Response.json({ error: "Question too long (max 4000 chars)" }, { status: 400 })
         }
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
 
         // BAUSTELLE:
         // Projekt-Uploads sollen spaeter hier als weitere Evidenzquellen dazukommen.
+        // Bereits jetzt werden Zertifikate und Freitext als zusaetzliche Hinweise einbezogen.
         const certificates = await prisma.certificate.findMany({
             where: { cvToken: cv.token },
             select: { data: true },
@@ -85,7 +87,8 @@ export async function POST(req: Request) {
         })
         const prompt = getChatPrompt(context)
 
-        // SECURITY: Nicht beachten fürs entwickeln
+        // SECURITY: Nicht beachten fÃ¼rs entwickeln
+        // Der OpenAI-Helper kapselt Timeout und Fehlerbehandlung.
         const ai = await callOpenAiChat({
             prompt,
             question,
@@ -104,3 +107,4 @@ export async function POST(req: Request) {
         return Response.json({ error: "Internal server error" }, { status: 500 })
     }
 }
+

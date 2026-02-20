@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: API-Route fuer oeffentliches Profil anhand des Slugs.
 import { prisma } from "@/lib/prisma"
 import { buildProfileFromCvData } from "@/lib/profileContext"
 
@@ -44,6 +45,7 @@ export async function GET(
 
     // BAUSTELLE:
     // spaeter Snapshot-/Freigabe-Logik einfuehren (statt immer "latest CV").
+    // buildProfileFromCvData vereinheitlicht die Struktur fuer Frontend/Chat.
     const profile = buildProfileFromCvData(cv.data, cv.meta)
     return Response.json({
         publicSlug: user.publicSlug,
@@ -53,3 +55,4 @@ export async function GET(
         profile,
     })
 }
+

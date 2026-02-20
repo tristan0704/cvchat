@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: Erzeugt den Parsing-Prompt fuer CV-PDFs.
 export function getCvParsePrompt(text: string) {
     return `
 You are extracting structured CV data.
@@ -42,3 +43,4 @@ RESUME TEXT:
 ${text}
 `
 }
+

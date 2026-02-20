@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: Root-Layout der App mit globalen Styles und Metadaten.
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -19,6 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // Globale HTML-Huelle fuer alle App-Routen.
     <html lang="en">
       <body className="antialiased">
         {children}
@@ -26,3 +28,4 @@ export default function RootLayout({
     </html>
   );
 }
+

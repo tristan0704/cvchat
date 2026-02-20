@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: Gemeinsamer OpenAI-Client mit Timeout und einheitlichem Fehlerhandling.
 type OpenAiChatArgs = {
     prompt: string
     question?: string
@@ -17,6 +18,7 @@ export async function callOpenAiChat(args: OpenAiChatArgs) {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
+        // Basis ist immer ein System-Prompt; optional kommt die User-Frage dazu.
         const messages: Array<{ role: "system" | "user"; content: string }> = [
             { role: "system", content: args.prompt },
         ]
@@ -41,6 +43,7 @@ export async function callOpenAiChat(args: OpenAiChatArgs) {
 
         if (!response.ok) {
             const body = await response.text().catch(() => "")
+            // Fehlertext kuerzen, damit Logs nicht zu gross werden.
             return {
                 ok: false as const,
                 error: `OpenAI error (${response.status}): ${body.slice(0, 300)}`,
@@ -55,6 +58,7 @@ export async function callOpenAiChat(args: OpenAiChatArgs) {
 
         return { ok: true as const, content }
     } catch (error) {
+        // Einheitliches Fehlerformat fuer alle API-Routen.
         const message =
             error instanceof Error ? error.message : "OpenAI request failed"
         return { ok: false as const, error: message }
@@ -62,3 +66,4 @@ export async function callOpenAiChat(args: OpenAiChatArgs) {
         clearTimeout(timeoutId)
     }
 }
+

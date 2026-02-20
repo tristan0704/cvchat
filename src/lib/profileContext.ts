@@ -1,6 +1,8 @@
+﻿// DATEIUEBERSICHT: Hilfsfunktionen zum Aufbereiten von CV-Daten fuer Profil-Ansicht und Chat-Kontext.
 type UnknownRecord = Record<string, unknown>
 
 function asRecord(value: unknown): UnknownRecord {
+    // Defensive Konvertierung: verhindert Laufzeitfehler bei unerwarteten Daten.
     return value && typeof value === "object" ? (value as UnknownRecord) : {}
 }
 
@@ -28,6 +30,7 @@ export function buildProfileFromCvData(cvData: unknown, meta?: MetaLike) {
     const experienceRaw = Array.isArray(cv.experience) ? cv.experience : []
     const experience = experienceRaw.map((item) => {
         const row = asRecord(item)
+        // Frontend bekommt ein stabiles, einfaches Format fuer jede Station.
         return {
             organization: asString(row.organization),
             role: asString(row.role),
@@ -53,6 +56,7 @@ export function buildProfileFromCvData(cvData: unknown, meta?: MetaLike) {
 
     return {
         person: {
+            // Meta-Werte sind Fallback, falls Parsing-Felder leer sind.
             name: asString(person.name) || meta?.name || "",
             title: asString(person.title) || meta?.position || "",
             location: asString(person.location),
@@ -94,3 +98,4 @@ export function buildStructuredChatContext(input: StructuredContextInput) {
         },
     }
 }
+

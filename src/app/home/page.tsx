@@ -1,4 +1,5 @@
 ﻿"use client"
+// DATEIUEBERSICHT: Home-Dashboard fuer eingeloggte und nicht eingeloggte Benutzer.
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -16,6 +17,7 @@ export default function HomePage() {
     useEffect(() => {
         async function loadSession() {
             try {
+                // Session nur fuer Header/CTA laden; Seite bleibt auch ohne Login nutzbar.
                 const res = await fetch("/api/auth/me")
                 if (!res.ok) return
                 const data = await res.json()
@@ -26,6 +28,7 @@ export default function HomePage() {
         loadSession()
     }, [])
 
+    // Primarziel: mit CV ins Dashboard, sonst in Onboarding.
     const primaryHref = user?.cvToken ? `/cv/${user.cvToken}` : "/upload"
 
     return (
@@ -67,3 +70,5 @@ export default function HomePage() {
         </main>
     )
 }
+
+

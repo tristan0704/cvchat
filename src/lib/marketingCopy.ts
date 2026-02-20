@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: Zentrale Marketing- und UI-Texte fuer Landing/Auth-Ansichten.
 export const marketingCopy = {
   home: {
     badge: "Project-to-career signal platform",
@@ -59,3 +60,4 @@ export const marketingCopy = {
     evidenceTitle: "Skill-to-evidence map",
   },
 } as const
+

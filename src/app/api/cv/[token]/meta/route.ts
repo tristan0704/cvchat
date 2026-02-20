@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: API-Route zum Aktualisieren der editierbaren CV-Meta-Daten.
 import { getCvForWriteAccess } from "@/lib/cvAccess"
 import { prisma } from "@/lib/prisma"
 
@@ -17,6 +18,7 @@ export async function PATCH(
     const body = (await req.json().catch(() => ({}))) as MetaPatchBody
     const summary = body.summary?.trim()
 
+    // Nur "summary" ist aktuell editierbar; andere Felder kommen aus Parsing.
     if (typeof summary !== "string") {
         return Response.json(
             { error: "Missing summary" },
@@ -31,6 +33,7 @@ export async function PATCH(
         )
     }
 
+    // Zentraler Access-Check: CV vorhanden + Nutzer darf schreiben.
     const access = await getCvForWriteAccess(token)
     if ("error" in access) return access.error
 
@@ -53,3 +56,4 @@ export async function PATCH(
 
     return Response.json(updatedMeta)
 }
+

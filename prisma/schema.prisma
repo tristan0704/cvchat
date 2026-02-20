@@ -1,3 +1,4 @@
+// DATEIUEBERSICHT: Datenmodell fuer Benutzer, Sessions, CVs, Metadaten und Zusatzdokumente.
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

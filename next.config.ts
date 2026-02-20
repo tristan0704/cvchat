@@ -1,3 +1,4 @@
+// DATEIUEBERSICHT: Zentrale Next.js-Konfiguration fuer Build-Verhalten und Compiler-Optionen.
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {

@@ -1,4 +1,5 @@
 ﻿"use client"
+// DATEIUEBERSICHT: Upload-Seite fuer CV, Zertifikate, Bild und Zusatzinformationen.
 
 import Link from "next/link"
 import { useRef, useState } from "react"
@@ -28,6 +29,7 @@ export default function UploadPage() {
     const [error, setError] = useState("")
 
     async function handleUpload() {
+        // Ohne CV macht der Backend-Parser keinen Sinn.
         if (!cvFile) {
             setError("Bitte zuerst ein CV-PDF auswaehlen.")
             return
@@ -45,6 +47,7 @@ export default function UploadPage() {
         if (projectPlaceholder.trim()) formData.append("projectPlaceholder", projectPlaceholder.trim())
 
         try {
+            // Multipart-Upload an die zentrale Onboarding-Route.
             const res = await fetch("/api/upload", {
                 method: "POST",
                 body: formData,
@@ -57,6 +60,7 @@ export default function UploadPage() {
                 return
             }
 
+            // Nach erfolgreichem Parsing direkt ins persoehnliche Dashboard.
             router.push(`/cv/${data.token}`)
         } catch {
             setError("Server nicht erreichbar.")
@@ -79,6 +83,7 @@ export default function UploadPage() {
                     <p className="mt-2 text-sm text-slate-700">CV ist Pflicht. Zertifikate, Bild und Zusatztext sind optional.</p>
 
                     <div className="mt-5 grid gap-5 md:grid-cols-2">
+                        {/* Linke Seite: echte Inputs fuer die aktuelle MVP-Pipeline. */}
                         <div className="space-y-3">
                             <input
                                 ref={cvInputRef}
@@ -153,3 +158,5 @@ export default function UploadPage() {
         </main>
     )
 }
+
+

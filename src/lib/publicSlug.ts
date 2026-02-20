@@ -1,6 +1,8 @@
+﻿// DATEIUEBERSICHT: Generiert und stellt einen eindeutigen oeffentlichen Slug pro Benutzer sicher.
 import { prisma } from "@/lib/prisma"
 
 function slugify(value: string) {
+    // Nur URL-freundliche Zeichen behalten.
     const cleaned = value
         .toLowerCase()
         .trim()
@@ -22,6 +24,7 @@ export async function ensureUserPublicSlug(userId: string, hint?: string | null)
     const baseHint = hint?.trim() || user.name || user.email.split("@")[0] || "profile"
     const base = slugify(baseHint).slice(0, 42)
 
+    // Mehrere Versuche gegen Kollisionen bei bereits vergebenen Slugs.
     for (let attempt = 0; attempt < 30; attempt++) {
         const suffix = attempt === 0 ? "" : `-${Math.random().toString(36).slice(2, 6)}`
         const candidate = `${base}${suffix}`.slice(0, 50)
@@ -34,9 +37,10 @@ export async function ensureUserPublicSlug(userId: string, hint?: string | null)
             })
             return updated.publicSlug
         } catch {
-            // unique collision, try next suffix
+            // Unique-Kollision: naechsten Kandidaten probieren.
         }
     }
 
     return null
 }
+

@@ -1,4 +1,5 @@
-"use client"
+﻿"use client"
+// DATEIUEBERSICHT: Login-/Registrierungsseite mit Formularlogik und Session-Pruefung.
 
 import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -15,6 +16,7 @@ type AuthUser = {
 function AuthPageContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
+    // mode wird aus der URL gelesen: /auth?mode=login|register
     const mode = useMemo(() => (searchParams.get("mode") === "register" ? "register" : "login"), [searchParams])
 
     const [email, setEmail] = useState("")
@@ -26,6 +28,7 @@ function AuthPageContent() {
     useEffect(() => {
         async function redirectIfLoggedIn() {
             try {
+                // Bereits eingeloggte Nutzer direkt weiterleiten.
                 const res = await fetch("/api/auth/me")
                 if (!res.ok) return
                 const data = (await res.json()) as { user: AuthUser | null }
@@ -47,6 +50,7 @@ function AuthPageContent() {
         setError("")
 
         try {
+            // Selbe UI fuer Login und Register; Route wird ueber mode bestimmt.
             const res = await fetch(`/api/auth/${mode}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -67,6 +71,7 @@ function AuthPageContent() {
             const meData = (await meRes.json()) as { user: AuthUser | null }
             const cvToken = meData.user?.cvToken
 
+            // Nach Auth direkt in den naechsten sinnvollen Schritt.
             router.push(cvToken ? `/cv/${cvToken}` : "/upload")
         } catch {
             setError("Server not reachable.")
@@ -149,3 +154,5 @@ export default function AuthPage() {
         </Suspense>
     )
 }
+
+

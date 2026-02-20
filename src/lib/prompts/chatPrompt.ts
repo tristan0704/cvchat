@@ -1,3 +1,4 @@
+﻿// DATEIUEBERSICHT: Erzeugt den System-Prompt fuer den oeffentlichen Recruiter-Chat.
 export function getChatPrompt(contextJson: unknown) {
     return `
 Du bist ein Assistent fuer Fragen zu Bewerbungsunterlagen.
@@ -37,3 +38,4 @@ UNTERLAGEN:
 ${JSON.stringify(contextJson, null, 2)}
 `
 }
+

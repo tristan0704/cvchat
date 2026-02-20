@@ -1,4 +1,5 @@
 ﻿"use client"
+// DATEIUEBERSICHT: Oeffentliche Profilseite fuer Recruiter inklusive Chat.
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "next/navigation"
@@ -61,12 +62,14 @@ export default function PublicProfilePage() {
     const bottomRef = useRef<HTMLDivElement | null>(null)
 
     const smartPrompts = useMemo(() => {
+        // Erster Quick-Prompt passt sich an die erkannte Zielrolle an.
         const role = profile?.meta.position?.trim()
         if (!role) return QUICK_PROMPTS
         return [`Wie gut passt dieses Profil auf ${role}?`, ...QUICK_PROMPTS.slice(1)]
     }, [profile?.meta.position])
 
     useEffect(() => {
+        // Public-Profil ueber den Slug laden.
         async function loadProfile() {
             setLoading(true)
             setError("")
@@ -88,6 +91,7 @@ export default function PublicProfilePage() {
     }, [publicSlug])
 
     useEffect(() => {
+        // Persistenter Chat je Profilseite (lokal im Browser).
         try {
             const raw = localStorage.getItem(chatStorageKey)
             if (!raw) return
@@ -109,6 +113,7 @@ export default function PublicProfilePage() {
     async function askQuestion(raw?: string) {
         const nextQuestion = (raw ?? question).trim()
         if (!nextQuestion) return
+        // User-Nachricht sofort anzeigen, dann API-Antwort nachladen.
         setMessages((prev) => [...prev, { role: "user", content: nextQuestion }])
         setQuestion("")
         setIsTyping(true)
@@ -134,6 +139,7 @@ export default function PublicProfilePage() {
     }
 
     function enqueueQuestion(raw?: string) {
+        // Queue erlaubt mehrere Klicks auf Quick-Prompts ohne Request-Kollisionen.
         const nextQuestion = (raw ?? question).trim()
         if (!nextQuestion) return
         setQueuedQuestions((prev) => [...prev, nextQuestion])
@@ -195,6 +201,7 @@ export default function PublicProfilePage() {
                             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Chatbot</h2>
                             <p className="mt-2 text-xs text-slate-600">Fragen zu Profil, Projekten und Rollen-Fit.</p>
 
+                            {/* Schnelle Einstiegsfragen fuer Recruiter. */}
                             <div className="mt-3 flex flex-wrap gap-2">
                                 {smartPrompts.map((prompt) => (
                                     <button key={prompt} onClick={() => enqueueQuestion(prompt)} className="rounded-md border px-2 py-1 text-xs">
@@ -253,3 +260,5 @@ export default function PublicProfilePage() {
         </main>
     )
 }
+
+
