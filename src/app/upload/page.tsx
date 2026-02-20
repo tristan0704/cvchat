@@ -13,6 +13,8 @@ const pickerButtonClass =
 export default function UploadPage() {
     const router = useRouter()
 
+    // Onboarding-Eingaben:
+    // alles, was fuer die erste Profilgenerierung gebraucht wird.
     const cvInputRef = useRef<HTMLInputElement | null>(null)
     const certificateInputRef = useRef<HTMLInputElement | null>(null)
     const imageInputRef = useRef<HTMLInputElement | null>(null)

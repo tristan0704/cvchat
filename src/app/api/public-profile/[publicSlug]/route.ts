@@ -10,6 +10,8 @@ export async function GET(
         return Response.json({ error: "Missing public slug" }, { status: 400 })
     }
 
+    // Wichtig fuer alle Exporte:
+    // Der Public-Slug zeigt derzeit immer auf das zuletzt aktualisierte CV des Users.
     const user = await prisma.user.findUnique({
         where: { publicSlug: publicSlug.trim().toLowerCase() },
         select: {
@@ -40,8 +42,8 @@ export async function GET(
         return Response.json({ error: "Not found" }, { status: 404 })
     }
 
-    // NOTE: export is currently "latest CV by user". Fine for MVP.
-    // BAUSTELLE: add explicit access control/release workflow per profile snapshot.
+    // BAUSTELLE:
+    // spaeter Snapshot-/Freigabe-Logik einfuehren (statt immer "latest CV").
     const profile = buildProfileFromCvData(cv.data, cv.meta)
     return Response.json({
         publicSlug: user.publicSlug,

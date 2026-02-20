@@ -12,6 +12,8 @@ export async function POST(req: Request) {
         const sessionUser = await getSessionUser()
         const formData = await req.formData()
 
+        // Aktueller Onboarding-Scope:
+        // CV (Pflicht), Zertifikate/Bild/Zusatztext (optional), Projekt nur als Placeholder.
         const cvFile = formData.get("cv")
         const certificateFiles = formData.getAll("certificates")
         const additionalText = formData.get("additionalText")
@@ -112,8 +114,8 @@ export async function POST(req: Request) {
             imageUrl = await uploadProfileImage(imageFile, token)
         }
 
-        // Core upload pipeline for the MVP:
-        // CV -> structured profile, plus optional certificates/image/additional text.
+        // Kernpipeline fuer das MVP:
+        // Aus dem CV wird ein strukturiertes Profil erzeugt und direkt persistiert.
         const profile = await prisma.cv.create({
             data: {
                 token,
@@ -131,9 +133,7 @@ export async function POST(req: Request) {
             },
         })
 
-        // --------------------
-        // CERTIFICATES
-        // --------------------
+        // Zertifikate werden aktuell separat geparst und als zusaetzliche Evidenz gespeichert.
         for (const file of certificateFiles) {
             if (file instanceof File && file.type === "application/pdf") {
                 const text = await parsePdfText(file)
@@ -169,9 +169,8 @@ export async function POST(req: Request) {
             }
         }
 
-        // --------------------
-        // ADDITIONAL TEXT
-        // --------------------
+        // BAUSTELLE-Hinweis zum Projekt-Upload wird bewusst im Zusatztext mitgespeichert,
+        // damit die nachgelagerte Analyse bereits eine Spur fuer den naechsten Ausbau hat.
         if (typeof additionalText === "string" && additionalText.trim()) {
             await prisma.additionalText.create({
                 data: {

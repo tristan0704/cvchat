@@ -48,6 +48,7 @@ const QUICK_PROMPTS = [
 export default function PublicProfilePage() {
     const params = useParams()
     const publicSlug = params.publicSlug as string
+    // Chat-Verlauf ist bewusst pro publicSlug lokal gespeichert (Recruiter-Kontext bleibt erhalten).
     const chatStorageKey = `public-portfolio-chat-${publicSlug}`
 
     const [profile, setProfile] = useState<PublicProfileResponse | null>(null)
@@ -141,6 +142,7 @@ export default function PublicProfilePage() {
 
     useEffect(() => {
         if (isTyping || queuedQuestions.length === 0) return
+        // Einfache Queue, damit mehrere Quick-Prompts nacheinander sauber abgearbeitet werden.
         const [next, ...rest] = queuedQuestions
         setQueuedQuestions(rest)
         askQuestion(next)

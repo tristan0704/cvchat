@@ -20,6 +20,8 @@ type MetaLike = {
 }
 
 export function buildProfileFromCvData(cvData: unknown, meta?: MetaLike) {
+    // Diese Funktion ist die zentrale Normalisierung fuer UI + Chat.
+    // Neue Felder immer zuerst hier aufnehmen, damit Frontend und API konsistent bleiben.
     const cv = asRecord(cvData)
     const person = asRecord(cv.person)
 
@@ -77,6 +79,7 @@ type StructuredContextInput = {
 }
 
 export function buildStructuredChatContext(input: StructuredContextInput) {
+    // Einheitliches Chat-Context-Objekt fuer Prompting.
     const profile = buildProfileFromCvData(input.cvData, input.meta)
     return {
         candidate: profile.person,

@@ -25,6 +25,8 @@ export default function CvPage() {
         setLoading(true)
         setError("")
         try {
+            // Dashboard braucht beides:
+            // CV-Daten + Session-User (fuer publicSlug und Exportlinks).
             const [cvRes, meRes] = await Promise.all([fetch(`/api/cv/${token}`), fetch("/api/auth/me")])
             const cvData = (await cvRes.json().catch(() => ({}))) as CvResponse & { error?: string }
             if (!cvRes.ok) {
@@ -158,6 +160,7 @@ export default function CvPage() {
 
                         <section className="rounded-lg border border-yellow-300 bg-yellow-50 p-5 md:col-span-2">
                             <span className="inline-flex rounded bg-yellow-300 px-2 py-1 text-xs font-semibold">BAUSTELLE</span>
+                            {/* Geplanter Produktkern: Score/Gap/Verbesserungslogik landet hier. */}
                             <h2 className="mt-3 text-sm font-semibold uppercase tracking-wide">Analyse & Scoring Layer</h2>
                             <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-md border border-yellow-300 bg-white p-3 text-sm">Skill Score nach Rollenprofil</div>

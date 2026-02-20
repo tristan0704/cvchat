@@ -17,6 +17,8 @@ export async function POST(req: Request) {
             return Response.json({ error: "Missing publicSlug or question" }, { status: 400 })
         }
 
+        // Gleiche Datenbasis wie Public Profile:
+        // Chat arbeitet immer auf dem zuletzt aktualisierten CV dieses Slugs.
         const user = await prisma.user.findUnique({
             where: { publicSlug },
             select: {
@@ -51,8 +53,8 @@ export async function POST(req: Request) {
             return Response.json({ error: "CV not found" }, { status: 404 })
         }
 
-        // Chat context is currently composed from latest CV + certificates + additional text.
-        // BAUSTELLE: project upload artifacts will be merged into this context next.
+        // BAUSTELLE:
+        // Projekt-Uploads sollen spaeter hier als weitere Evidenzquellen dazukommen.
         const certificates = await prisma.certificate.findMany({
             where: { cvToken: cv.token },
             select: { data: true },

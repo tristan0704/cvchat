@@ -93,6 +93,8 @@ export default function PublicPitchPage() {
     const rankedProjects = useMemo<RankedProject[]>(() => {
         if (!profile) return []
 
+        // Heuristische Priorisierung fuer MVP:
+        // Rollenbezug + Skill-Treffer + dokumentiertes Ergebnis.
         const roleTokens = tokenize(profile.meta.position || profile.profile.person.title || "")
         const skillTokens = profile.profile.skills.flatMap((skill) => tokenize(skill))
 
@@ -140,6 +142,7 @@ export default function PublicPitchPage() {
     const skillEvidence = useMemo<SkillEvidenceRow[]>(() => {
         if (!profile) return []
 
+        // Mapping "Skill -> konkreter Nachweis" fuer PDF-Lesbarkeit.
         return profile.profile.skills.slice(0, 12).map((skill) => {
             const lowerSkill = skill.toLowerCase()
             const projectMatch = rankedProjects.find((project) =>
