@@ -6,9 +6,37 @@ import { getCvParsePrompt } from "@/lib/prompts/parsePrompt/getCvParsePrompt"
 import { getCertificateParsePrompt } from "@/lib/prompts/parsePrompt/getCertificateParsePrompt"
 import { randomUUID } from "crypto"
 import { uploadProfileImage } from "@/lib/uploadProfileImage"
+import { enforceRateLimit } from "@/lib/securityRateLimit"
+import { callOpenAiChat } from "@/lib/openai"
+
+const MAX_MULTIPART_BYTES = 50_000_000
+const MAX_CV_BYTES = 20_000_000
+const MAX_CERTIFICATE_BYTES = 15_000_000
+const MAX_CERTIFICATES = 20
+const MAX_ADDITIONAL_TEXT = 20_000
 
 export async function POST(req: Request) {
     try {
+        // SECURITY: Nicht beachten fürs entwickeln
+        const limited = enforceRateLimit(req, "upload", {
+            windowMs: 60_000,
+            max: 30,
+        })
+        if (limited) return limited
+
+        // SECURITY: Nicht beachten fürs entwickeln
+        const contentLength = Number(req.headers.get("content-length") || "0")
+        if (
+            Number.isFinite(contentLength) &&
+            contentLength > 0 &&
+            contentLength > MAX_MULTIPART_BYTES
+        ) {
+            return Response.json(
+                { error: "Upload too large (max 50MB)" },
+                { status: 413 }
+            )
+        }
+
         const sessionUser = await getSessionUser()
         const formData = await req.formData()
 
@@ -30,6 +58,13 @@ export async function POST(req: Request) {
         if (cvFile.type !== "application/pdf") {
             return Response.json({ error: "CV must be a PDF file" }, { status: 400 })
         }
+        // SECURITY: Nicht beachten fürs entwickeln
+        if (cvFile.size > MAX_CV_BYTES) {
+            return Response.json(
+                { error: "CV must be smaller than 20MB" },
+                { status: 400 }
+            )
+        }
 
         // --------------------
         // IMAGE VALIDATION
@@ -50,6 +85,40 @@ export async function POST(req: Request) {
                     { status: 400 }
                 )
             }
+        }
+
+        // SECURITY: Nicht beachten fürs entwickeln
+        if (certificateFiles.length > MAX_CERTIFICATES) {
+            return Response.json(
+                { error: "Too many certificates (max 20)" },
+                { status: 400 }
+            )
+        }
+        for (const file of certificateFiles) {
+            if (!(file instanceof File)) continue
+            if (file.type !== "application/pdf") {
+                return Response.json(
+                    { error: "Certificates must be PDF files" },
+                    { status: 400 }
+                )
+            }
+            if (file.size > MAX_CERTIFICATE_BYTES) {
+                return Response.json(
+                    { error: "Each certificate must be smaller than 15MB" },
+                    { status: 400 }
+                )
+            }
+        }
+
+        // SECURITY: Nicht beachten fürs entwickeln
+        if (
+            typeof additionalText === "string" &&
+            additionalText.length > MAX_ADDITIONAL_TEXT
+        ) {
+            return Response.json(
+                { error: "Additional text too long (max 20000 chars)" },
+                { status: 400 }
+            )
         }
 
         // --------------------
@@ -77,29 +146,19 @@ export async function POST(req: Request) {
 
         const cvPrompt = getCvParsePrompt(cvText)
 
-        const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: [{ role: "system", content: cvPrompt }],
-                temperature: 0,
-            }),
+        // SECURITY: Nicht beachten fürs entwickeln
+        const cvAi = await callOpenAiChat({
+            prompt: cvPrompt,
+            timeoutMs: 25_000,
         })
-
-        const aiData = await aiResponse.json()
-
-        if (!aiData.choices?.[0]?.message?.content) {
-            console.error("OpenAI returned invalid response:", aiData)
-            return Response.json({ error: "AI parsing failed" }, { status: 500 })
+        if (!cvAi.ok) {
+            console.error("[api/upload] CV parse failed:", cvAi.error)
+            return Response.json({ error: "AI parsing failed" }, { status: 502 })
         }
 
         let cvData
         try {
-            cvData = JSON.parse(aiData.choices[0].message.content)
+            cvData = JSON.parse(cvAi.content)
         } catch (err) {
             console.error("Failed to parse CV JSON:", err)
             return Response.json({ error: "AI parsing failed" }, { status: 500 })
@@ -140,24 +199,23 @@ export async function POST(req: Request) {
 
                 const certPrompt = getCertificateParsePrompt(text)
 
-                const certResponse = await fetch(
-                    "https://api.openai.com/v1/chat/completions",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                        },
-                        body: JSON.stringify({
-                            model: "gpt-4o-mini",
-                            messages: [{ role: "system", content: certPrompt }],
-                            temperature: 0,
-                        }),
-                    }
-                )
+                // SECURITY: Nicht beachten fürs entwickeln
+                const certAi = await callOpenAiChat({
+                    prompt: certPrompt,
+                    timeoutMs: 25_000,
+                })
+                if (!certAi.ok) {
+                    console.error("[api/upload] Certificate parse failed:", certAi.error)
+                    return Response.json({ error: "AI parsing failed" }, { status: 502 })
+                }
 
-                const certData = await certResponse.json()
-                const parsedCert = JSON.parse(certData.choices[0].message.content)
+                let parsedCert
+                try {
+                    parsedCert = JSON.parse(certAi.content)
+                } catch (err) {
+                    console.error("Failed to parse certificate JSON:", err)
+                    return Response.json({ error: "AI parsing failed" }, { status: 500 })
+                }
 
                 await prisma.certificate.create({
                     data: {

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { createSession, hashPassword, setSessionCookie } from "@/lib/auth"
 import { ensureUserPublicSlug } from "@/lib/publicSlug"
+import { enforceRateLimit } from "@/lib/securityRateLimit"
 
 type RegisterBody = {
     email?: string
@@ -10,6 +11,13 @@ type RegisterBody = {
 }
 
 export async function POST(req: Request) {
+    // SECURITY: Nicht beachten fürs entwickeln
+    const limited = enforceRateLimit(req, "auth-register", {
+        windowMs: 60_000,
+        max: 20,
+    })
+    if (limited) return limited
+
     const body = (await req.json()) as RegisterBody
     const email = body.email?.trim().toLowerCase()
     const password = body.password?.trim()

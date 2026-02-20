@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { getChatPrompt } from "@/lib/prompts/chatPrompt"
 import { buildStructuredChatContext } from "@/lib/profileContext"
+import { callOpenAiChat } from "@/lib/openai"
+import { enforceRateLimit } from "@/lib/securityRateLimit"
 
 type PublicChatBody = {
     publicSlug?: string
@@ -9,12 +11,23 @@ type PublicChatBody = {
 
 export async function POST(req: Request) {
     try {
+        // SECURITY: Nicht beachten fürs entwickeln
+        const limited = enforceRateLimit(req, "public-chat", {
+            windowMs: 60_000,
+            max: 120,
+        })
+        if (limited) return limited
+
         const body = (await req.json().catch(() => ({}))) as PublicChatBody
         const publicSlug = body.publicSlug?.trim().toLowerCase()
         const question = body.question?.trim()
 
         if (!publicSlug || !question) {
             return Response.json({ error: "Missing publicSlug or question" }, { status: 400 })
+        }
+        // SECURITY: Nicht beachten fürs entwickeln
+        if (question.length > 4000) {
+            return Response.json({ error: "Question too long (max 4000 chars)" }, { status: 400 })
         }
 
         // Gleiche Datenbasis wie Public Profile:
@@ -72,26 +85,18 @@ export async function POST(req: Request) {
         })
         const prompt = getChatPrompt(context)
 
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: prompt },
-                    { role: "user", content: question },
-                ],
-                temperature: 0,
-            }),
+        // SECURITY: Nicht beachten fürs entwickeln
+        const ai = await callOpenAiChat({
+            prompt,
+            question,
+            timeoutMs: 20_000,
         })
+        if (!ai.ok) {
+            console.error("[api/public-chat] OpenAI error:", ai.error)
+            return Response.json({ error: "AI request failed" }, { status: 502 })
+        }
 
-        const data = await response.json()
-        const answer =
-            data.choices?.[0]?.message?.content ??
-            "Diese Information ist in den Unterlagen nicht enthalten."
+        const answer = ai.content
 
         return Response.json({ answer })
     } catch (err) {
