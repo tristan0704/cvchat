@@ -51,7 +51,7 @@ export async function GET(
     // Exportseiten basieren auf einem stabilen publicSlug.
     // Fehlt er noch, wird er beim Laden des Dashboards angelegt.
     const publicSlug = ownerUserId
-        ? await ensureUserPublicSlug(ownerUserId, user?.name || user?.email.split("@")[0])
+        ? await ensureUserPublicSlug(ownerUserId, user?.name || user?.email?.split("@")[0])
         : null
 
     return Response.json({

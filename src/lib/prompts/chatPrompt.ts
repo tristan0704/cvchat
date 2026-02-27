@@ -35,7 +35,7 @@ Wichtig:
 - Keine Spekulationen ueber Persoenlichkeit, Leistung oder Senioritaet als Fakt darstellen.
 
 UNTERLAGEN:
-${JSON.stringify(contextJson, null, 2)}
+${JSON.stringify(contextJson)}
 `
 }
 

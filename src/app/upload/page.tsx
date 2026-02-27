@@ -56,7 +56,6 @@ export default function UploadPage() {
 
             if (!res.ok) {
                 setError(data.error || "Upload fehlgeschlagen.")
-                setLoading(false)
                 return
             }
 
@@ -64,6 +63,7 @@ export default function UploadPage() {
             router.push(`/cv/${data.token}`)
         } catch {
             setError("Server nicht erreichbar.")
+        } finally {
             setLoading(false)
         }
     }

@@ -128,6 +128,7 @@ export async function POST(req: Request) {
         // --------------------
         // PDF PARSER
         // --------------------
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const pdfParse = require("pdf-parse/lib/pdf-parse")
 
         async function parsePdfText(file: File): Promise<string> {
@@ -199,11 +200,14 @@ export async function POST(req: Request) {
             },
         })
 
-        // Zertifikate werden aktuell separat geparst und als zusaetzliche Evidenz gespeichert.
-        for (const file of certificateFiles) {
-            if (file instanceof File && file.type === "application/pdf") {
-                const text = await parsePdfText(file)
+        // Zertifikate werden parallel geparst fuer bessere Performance bei vielen Uploads.
+        const validCertFiles = certificateFiles.filter(
+            (file): file is File => file instanceof File && file.type === "application/pdf"
+        )
 
+        const certResults = await Promise.allSettled(
+            validCertFiles.map(async (file) => {
+                const text = await parsePdfText(file)
                 const certPrompt = getCertificateParsePrompt(text)
 
                 // SECURITY: Nicht beachten fÃ¼rs entwickeln
@@ -212,28 +216,29 @@ export async function POST(req: Request) {
                     timeoutMs: 25_000,
                 })
                 if (!certAi.ok) {
-                    console.error("[api/upload] Certificate parse failed:", certAi.error)
-                    return Response.json({ error: "AI parsing failed" }, { status: 502 })
+                    throw new Error(`Certificate parse failed: ${certAi.error}`)
                 }
 
-                let parsedCert
-                try {
-                    parsedCert = JSON.parse(certAi.content)
-                } catch (err) {
-                    console.error("Failed to parse certificate JSON:", err)
-                    return Response.json({ error: "AI parsing failed" }, { status: 500 })
-                }
+                const parsedCert = JSON.parse(certAi.content)
+                return { parsedCert, text }
+            })
+        )
 
-                // Zertifikate werden als separate Evidenz gespeichert,
-                // damit Chat und spaetere Bewertung darauf zugreifen koennen.
-                await prisma.certificate.create({
-                    data: {
-                        cvToken: profile.token,
-                        data: parsedCert,
-                        rawText: text,
-                    },
-                })
+        for (const result of certResults) {
+            if (result.status === "rejected") {
+                console.error("[api/upload] Certificate parse failed:", result.reason)
+                return Response.json({ error: "AI parsing failed" }, { status: 502 })
             }
+
+            // Zertifikate werden als separate Evidenz gespeichert,
+            // damit Chat und spaetere Bewertung darauf zugreifen koennen.
+            await prisma.certificate.create({
+                data: {
+                    cvToken: profile.token,
+                    data: result.value.parsedCert,
+                    rawText: result.value.text,
+                },
+            })
         }
 
         // BAUSTELLE-Hinweis zum Projekt-Upload wird bewusst im Zusatztext mitgespeichert,
