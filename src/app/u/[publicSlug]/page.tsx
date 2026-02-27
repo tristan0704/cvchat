@@ -1,7 +1,7 @@
 ﻿"use client"
 // DATEIUEBERSICHT: Oeffentliche Profilseite fuer Recruiter inklusive Chat.
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -110,7 +110,7 @@ export default function PublicProfilePage() {
         bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
     }, [messages.length])
 
-    async function askQuestion(raw?: string) {
+    const askQuestion = useCallback(async (raw?: string) => {
         const nextQuestion = (raw ?? question).trim()
         if (!nextQuestion) return
         // User-Nachricht sofort anzeigen, dann API-Antwort nachladen.
@@ -136,7 +136,7 @@ export default function PublicProfilePage() {
         } finally {
             setIsTyping(false)
         }
-    }
+    }, [publicSlug, question])
 
     function enqueueQuestion(raw?: string) {
         // Queue erlaubt mehrere Klicks auf Quick-Prompts ohne Request-Kollisionen.
@@ -152,7 +152,7 @@ export default function PublicProfilePage() {
         const [next, ...rest] = queuedQuestions
         setQueuedQuestions(rest)
         askQuestion(next)
-    }, [isTyping, queuedQuestions])
+    }, [isTyping, queuedQuestions, askQuestion])
 
     return (
         <main className="min-h-screen bg-slate-50 text-slate-900">

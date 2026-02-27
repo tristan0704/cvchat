@@ -70,14 +70,16 @@ export async function POST(req: Request) {
         // BAUSTELLE:
         // Projekt-Uploads sollen spaeter hier als weitere Evidenzquellen dazukommen.
         // Bereits jetzt werden Zertifikate und Freitext als zusaetzliche Hinweise einbezogen.
-        const certificates = await prisma.certificate.findMany({
-            where: { cvToken: cv.token },
-            select: { data: true },
-        })
-        const additionalText = await prisma.additionalText.findMany({
-            where: { cvToken: cv.token },
-            select: { content: true },
-        })
+        const [certificates, additionalText] = await Promise.all([
+            prisma.certificate.findMany({
+                where: { cvToken: cv.token },
+                select: { data: true },
+            }),
+            prisma.additionalText.findMany({
+                where: { cvToken: cv.token },
+                select: { content: true },
+            }),
+        ])
 
         const context = buildStructuredChatContext({
             cvData: cv.data,

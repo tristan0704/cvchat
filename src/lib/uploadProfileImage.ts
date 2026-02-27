@@ -1,7 +1,7 @@
 ﻿// DATEIUEBERSICHT: Upload von Profilbildern nach Supabase Storage und Rueckgabe der Public-URL.
 export const runtime = "nodejs"
 
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
 
 export async function uploadProfileImage(
     file: File,
@@ -13,6 +13,7 @@ export async function uploadProfileImage(
         const ext = file.type.split("/")[1]
         const path = `${token}/profile.${ext}`
 
+        const supabase = getSupabase()
         const { error } = await supabase.storage
             .from("cv-images")
             .upload(path, buffer, {
