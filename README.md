@@ -1,5 +1,7 @@
 ﻿# CareerIndex MVP
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/tristan0704/cvchat)
+
 CareerIndex erzeugt aus CV-Daten ein recruiter-taugliches Profil mit zwei Exportansichten:
 
 - Public Profile mit Chatbot: `/u/[publicSlug]`
