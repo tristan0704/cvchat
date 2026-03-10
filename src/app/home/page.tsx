@@ -17,10 +17,10 @@ const roles = [
 ]
 
 const stages = [
-    "CV Upload fuer eine konkrete Zielrolle",
-    "Interview-Simulation mit AI-Interviewer",
-    "Coding Challenge als eigener Schritt",
-    "Finale Analyse mit Readiness-Fazit",
+    "Rolle waehlen",
+    "CV hochladen und Screening sehen",
+    "Interview und Coding als vorbereitete Schritte",
+    "Finale Analyse als Platzhalter",
 ]
 
 export default function HomePage() {
@@ -72,13 +72,13 @@ export default function HomePage() {
 
                 <section className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-[32px] border border-black/10 bg-white p-7 shadow-[0_30px_80px_rgba(15,23,42,0.08)] sm:p-10">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">AI Hiring Process Simulator</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">MVP Hiring Flow</p>
                         <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-                            Bewerbungen nicht nur optimieren, sondern realistisch durchspielen.
+                            Ein einfacher Hiring-Flow als Vorbereitung fuer spaetere Logik.
                         </h1>
                         <p className="mt-5 max-w-2xl text-base text-slate-700 sm:text-lg">
-                            CareerPitch simuliert fuer Studenten und Early-Career-Kandidaten den Bewerbungsprozess fuer eine konkrete Rolle:
-                            CV-Screening, Interview, Coding Challenge und finale Analyse.
+                            Der aktuelle Stand ist bewusst schlicht: Rolle waehlen, CV hochladen, Interview-Chat durchlaufen,
+                            Platzhalter-Feedback sehen und am Ende eine vorbereitete Gesamtanalyse bekommen.
                         </p>
 
                         <div className="mt-8 flex flex-wrap gap-3">
@@ -94,7 +94,7 @@ export default function HomePage() {
                     </div>
 
                     <aside className="rounded-[32px] border border-black/10 bg-[#111827] p-7 text-white shadow-[0_30px_80px_rgba(15,23,42,0.16)] sm:p-8">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">MVP Fokus</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Rollen</p>
                         <div className="mt-5 space-y-3">
                             {roles.map((role) => (
                                 <div key={role} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm">

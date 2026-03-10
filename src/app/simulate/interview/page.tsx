@@ -19,13 +19,11 @@ function InterviewPageContent() {
     const searchParams = useSearchParams()
     const token = searchParams.get("token") ?? ""
     const role = searchParams.get("role") ?? "Backend Developer"
-    const company = searchParams.get("company") ?? ""
-    const github = searchParams.get("github") ?? ""
 
     const [messages, setMessages] = useState<Message[]>([
         {
             role: "assistant",
-            content: `Willkommen zur Interview-Simulation fuer ${role}${company ? ` bei ${company}` : ""}.`,
+            content: `Willkommen. Das ist aktuell ein einfacher Interview-Chat fuer ${role}.`,
         },
     ])
     const [question, setQuestion] = useState("")
@@ -48,15 +46,13 @@ function InterviewPageContent() {
                 body: JSON.stringify({
                     token,
                     role,
-                    company,
-                    github,
                     question: nextQuestion,
                 }),
             })
             const data = await res.json()
 
             if (!res.ok) {
-                setError(data.error || "Interview request failed.")
+                setError(data.error || "Interview-Anfrage fehlgeschlagen.")
                 return
             }
 
@@ -68,45 +64,37 @@ function InterviewPageContent() {
         }
     }
 
-    const nextHref = `/simulate/coding?${new URLSearchParams({
-        token,
-        role,
-        ...(company ? { company } : {}),
-    }).toString()}`
+    const nextHref = `/simulate/interview-feedback?${new URLSearchParams({ token, role }).toString()}`
 
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100">
             <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
                 <header className="mb-6 flex items-center justify-between rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Step 2</p>
-                        <h1 className="text-xl font-semibold">Interview Simulation</h1>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Step 4</p>
+                        <h1 className="text-xl font-semibold">Interview</h1>
                     </div>
                     <div className="flex gap-2">
-                        <Link href="/simulate/new" className="rounded-full border border-white/15 px-4 py-2 text-sm">
+                        <Link href={`/simulate/screening?${new URLSearchParams({ token, role, screening: "passed" }).toString()}`} className="rounded-full border border-white/15 px-4 py-2 text-sm">
                             Zurueck
                         </Link>
                         <Link href={nextHref} className="rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950">
-                            Weiter
+                            Weiter zum Feedback
                         </Link>
                     </div>
                 </header>
 
                 <section className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
                     <aside className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Kontext</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Setup</p>
                         <div className="mt-5 space-y-3 text-sm text-slate-300">
                             <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
                                 <p className="text-xs uppercase tracking-wide text-slate-500">Rolle</p>
                                 <p className="mt-1 text-slate-100">{role}</p>
                             </div>
                             <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
-                                <p className="text-xs uppercase tracking-wide text-slate-500">Firma</p>
-                                <p className="mt-1 text-slate-100">{company || "Nicht gesetzt"}</p>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
-                                <p className="text-xs uppercase tracking-wide text-slate-500">GitHub</p>
-                                <p className="mt-1 break-all text-slate-100">{github || "Nicht gesetzt"}</p>
+                                <p className="text-xs uppercase tracking-wide text-slate-500">Interviewer Mode</p>
+                                <p className="mt-1 text-slate-100">Einfacher GPT Wrapper</p>
                             </div>
                         </div>
 
@@ -140,7 +128,7 @@ function InterviewPageContent() {
                                 {loading && (
                                     <div className="flex justify-start">
                                         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-                                            Interviewer schreibt...
+                                            Interviewer antwortet...
                                         </div>
                                     </div>
                                 )}
@@ -152,11 +140,11 @@ function InterviewPageContent() {
                                 value={question}
                                 onChange={(e) => setQuestion(e.target.value)}
                                 rows={4}
-                                placeholder="Deine Antwort oder Rueckfrage..."
+                                placeholder="Deine Antwort eingeben..."
                                 className="w-full rounded-3xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none focus:border-amber-300"
                             />
                             <div className="mt-3 flex items-center justify-between">
-                                {error ? <p className="text-sm text-rose-300">{error}</p> : <span className="text-xs text-slate-500">Einfacher GPT Wrapper fuer den MVP.</span>}
+                                {error ? <p className="text-sm text-rose-300">{error}</p> : <span className="text-xs text-slate-500">Aktuell nur Vorbereitung fuer echtes Interview-Scoring.</span>}
                                 <button
                                     onClick={() => askInterview()}
                                     disabled={loading}
