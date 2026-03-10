@@ -11,6 +11,15 @@ import { getCvParsePrompt } from "@/lib/prompts/parsePrompt/getCvParsePrompt"
 const MAX_MULTIPART_BYTES = 25_000_000
 const MAX_CV_BYTES = 20_000_000
 const MAX_CONTEXT_TEXT = 20_000
+const MISSING_CONTEXT_TEXT_COLUMN = "contextText"
+
+function isMissingContextTextColumnError(err: unknown) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return false
+    if (err.code !== "P2022") return false
+
+    const column = err.meta?.column
+    return typeof column === "string" && column.includes(MISSING_CONTEXT_TEXT_COLUMN)
+}
 
 export async function POST(req: Request) {
     try {
@@ -84,14 +93,27 @@ export async function POST(req: Request) {
         }
 
         const token = randomUUID()
-        await prisma.cv.create({
-            data: {
-                token,
-                userId: sessionUser?.id ?? null,
-                data: cvData,
-                contextText: contextText || null,
-            },
-        })
+        try {
+            await prisma.cv.create({
+                data: {
+                    token,
+                    userId: sessionUser?.id ?? null,
+                    data: cvData,
+                    contextText: contextText || null,
+                },
+            })
+        } catch (err) {
+            if (!isMissingContextTextColumnError(err)) throw err
+
+            console.warn("[api/upload] Database missing Cv.contextText column; retrying without contextText")
+            await prisma.cv.create({
+                data: {
+                    token,
+                    userId: sessionUser?.id ?? null,
+                    data: cvData,
+                },
+            })
+        }
 
         return Response.json({ token })
     } catch (err) {
