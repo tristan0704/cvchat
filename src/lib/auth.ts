@@ -96,7 +96,7 @@ export async function getSessionUser() {
     if (!session) return null
     if (session.expiresAt.getTime() < Date.now()) {
         // Abgelaufene Sessions direkt bereinigen, damit sie nicht liegen bleiben.
-        await prisma.session.delete({ where: { id: session.id } })
+        await prisma.session.delete({ where: { token: session.token } })
         cookieStore.delete(SESSION_COOKIE)
         return null
     }

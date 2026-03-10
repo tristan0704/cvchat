@@ -21,7 +21,6 @@ export default function NewSimulationPage() {
     const [selectedRole, setSelectedRole] = useState(roles[0])
     const [company, setCompany] = useState("")
     const [githubUrl, setGithubUrl] = useState("")
-    const [projectDescription, setProjectDescription] = useState("")
     const [cvFile, setCvFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -37,20 +36,6 @@ export default function NewSimulationPage() {
 
         const formData = new FormData()
         formData.append("cv", cvFile)
-        formData.append(
-            "additionalText",
-            [
-                `ROLE: ${selectedRole}`,
-                company.trim() ? `COMPANY: ${company.trim()}` : "",
-                githubUrl.trim() ? `GITHUB: ${githubUrl.trim()}` : "",
-            ]
-                .filter(Boolean)
-                .join("\n")
-        )
-
-        if (projectDescription.trim()) {
-            formData.append("projectPlaceholder", projectDescription.trim())
-        }
 
         try {
             const res = await fetch("/api/upload", {
@@ -129,14 +114,6 @@ export default function NewSimulationPage() {
                                 value={githubUrl}
                                 onChange={(e) => setGithubUrl(e.target.value)}
                                 placeholder="GitHub Profil oder Repo optional"
-                                className={inputClass}
-                            />
-
-                            <textarea
-                                value={projectDescription}
-                                onChange={(e) => setProjectDescription(e.target.value)}
-                                rows={6}
-                                placeholder="Kurze Projektbeschreibung oder Zusatzkontext"
                                 className={inputClass}
                             />
 

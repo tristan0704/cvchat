@@ -1,4 +1,4 @@
-﻿-- Simplify MVP: remove publish/share + tracking + references pipeline
+-- Simplify MVP: remove publish/share + tracking + references pipeline
 
 -- Drop share/publish related structures
 DROP INDEX IF EXISTS "Cv_shareToken_key";
@@ -15,4 +15,3 @@ DROP TABLE IF EXISTS "ReferenceDocument";
 
 -- Drop analytics table
 DROP TABLE IF EXISTS "AppEvent";
-

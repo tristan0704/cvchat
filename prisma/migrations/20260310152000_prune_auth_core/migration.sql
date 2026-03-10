@@ -1,0 +1,21 @@
+DROP TABLE IF EXISTS "Cv";
+DROP TABLE IF EXISTS "Certificate";
+DROP TABLE IF EXISTS "AdditionalText";
+DROP TABLE IF EXISTS "CvMeta";
+DROP TABLE IF EXISTS "ReferenceDocument";
+
+DROP INDEX IF EXISTS "User_publicSlug_key";
+
+ALTER TABLE "User"
+DROP COLUMN IF EXISTS "createdAt",
+DROP COLUMN IF EXISTS "publicSlug";
+
+ALTER TABLE "Session"
+DROP CONSTRAINT IF EXISTS "Session_pkey";
+
+ALTER TABLE "Session"
+DROP COLUMN IF EXISTS "id",
+DROP COLUMN IF EXISTS "createdAt";
+
+ALTER TABLE "Session"
+ADD CONSTRAINT "Session_pkey" PRIMARY KEY ("token");
