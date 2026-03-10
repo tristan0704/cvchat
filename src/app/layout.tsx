@@ -2,9 +2,8 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-    title: "CareerPitch - AI Hiring Process Simulator",
-    description:
-        "CareerPitch lets students and early-career candidates simulate CV screening, interviews, coding challenges, and a final hiring analysis.",
+    title: "CareerPitch",
+    description: "Ein einfacher Hiring-Flow als MVP.",
 }
 
 export const viewport = {

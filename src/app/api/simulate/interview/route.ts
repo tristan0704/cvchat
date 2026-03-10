@@ -1,19 +1,11 @@
 import { callOpenAiChat } from "@/lib/openai"
-import { enforceRateLimit } from "@/lib/securityRateLimit"
 
 type InterviewBody = {
-    token?: string
     role?: string
     question?: string
 }
 
 export async function POST(req: Request) {
-    const limited = enforceRateLimit(req, "simulate-interview", {
-        windowMs: 60_000,
-        max: 80,
-    })
-    if (limited) return limited
-
     const body = (await req.json().catch(() => ({}))) as InterviewBody
     const role = body.role?.trim() || "Backend Developer"
     const question = body.question?.trim()
@@ -41,7 +33,6 @@ export async function POST(req: Request) {
     }
 
     return Response.json({
-        token: body.token ?? null,
         answer: ai.content,
     })
 }

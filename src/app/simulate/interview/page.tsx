@@ -17,7 +17,6 @@ const starterQuestions = [
 
 function InterviewPageContent() {
     const searchParams = useSearchParams()
-    const token = searchParams.get("token") ?? ""
     const role = searchParams.get("role") ?? "Backend Developer"
 
     const [messages, setMessages] = useState<Message[]>([
@@ -44,7 +43,6 @@ function InterviewPageContent() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    token,
                     role,
                     question: nextQuestion,
                 }),
@@ -64,18 +62,18 @@ function InterviewPageContent() {
         }
     }
 
-    const nextHref = `/simulate/interview-feedback?${new URLSearchParams({ token, role }).toString()}`
+    const nextHref = `/simulate/interview-feedback?${new URLSearchParams({ role }).toString()}`
 
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100">
-            <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+            <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
                 <header className="mb-6 flex items-center justify-between rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Step 4</p>
                         <h1 className="text-xl font-semibold">Interview</h1>
                     </div>
                     <div className="flex gap-2">
-                        <Link href={`/simulate/screening?${new URLSearchParams({ token, role, screening: "passed" }).toString()}`} className="rounded-full border border-white/15 px-4 py-2 text-sm">
+                        <Link href={`/simulate/screening?${new URLSearchParams({ role, screening: "passed" }).toString()}`} className="rounded-full border border-white/15 px-4 py-2 text-sm">
                             Zurueck
                         </Link>
                         <Link href={nextHref} className="rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950">
@@ -84,34 +82,21 @@ function InterviewPageContent() {
                     </div>
                 </header>
 
-                <section className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
-                    <aside className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Setup</p>
-                        <div className="mt-5 space-y-3 text-sm text-slate-300">
-                            <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
-                                <p className="text-xs uppercase tracking-wide text-slate-500">Rolle</p>
-                                <p className="mt-1 text-slate-100">{role}</p>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3">
-                                <p className="text-xs uppercase tracking-wide text-slate-500">Interviewer Mode</p>
-                                <p className="mt-1 text-slate-100">Einfacher GPT Wrapper</p>
-                            </div>
-                        </div>
+                <section className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+                    <p className="mb-4 text-sm text-slate-300">{role}</p>
+                    <div className="mb-4 flex flex-wrap gap-2">
+                        {starterQuestions.map((starterQuestion) => (
+                            <button
+                                key={starterQuestion}
+                                onClick={() => askInterview(starterQuestion)}
+                                className="rounded-full border border-white/10 px-3 py-2 text-xs text-slate-200"
+                            >
+                                {starterQuestion}
+                            </button>
+                        ))}
+                    </div>
 
-                        <div className="mt-6 flex flex-wrap gap-2">
-                            {starterQuestions.map((starterQuestion) => (
-                                <button
-                                    key={starterQuestion}
-                                    onClick={() => askInterview(starterQuestion)}
-                                    className="rounded-full border border-white/10 px-3 py-2 text-xs text-slate-200"
-                                >
-                                    {starterQuestion}
-                                </button>
-                            ))}
-                        </div>
-                    </aside>
-
-                    <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+                    <div>
                         <div className="h-[420px] overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/70 p-4">
                             <div className="space-y-3">
                                 {messages.map((message, index) => (

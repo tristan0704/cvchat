@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
@@ -11,9 +10,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2",
     "next": "16.1.6",
-    "pdf-parse": "^1.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -25,7 +22,6 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "prisma": "^6.19.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
