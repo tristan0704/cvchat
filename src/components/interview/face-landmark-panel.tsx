@@ -1,3 +1,16 @@
+/**
+ * Face Landmark Panel
+ *
+ * Webcam-based face tracking panel using MediaPipe FaceLandmarker.
+ * Detects facial landmarks in real-time, computes body-language metrics
+ * (head pose, eye openness, blink detection, speaking likelihood),
+ * and sends collected snapshots to the face-analysis API on session stop.
+ *
+ * The heavy metric computation logic lives in `@/lib/face-metrics`;
+ * this component handles the MediaPipe lifecycle, webcam stream,
+ * canvas rendering, and the analysis UI.
+ */
+
 "use client"
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
@@ -7,19 +20,29 @@ import type {
     FaceAnalysisStatus as FaceScoreStatus,
     FaceLandmarkExportSnapshot,
 } from "@/lib/face-analysis"
+import {
+    type BlendShapeCategory,
+    type FaceBodyLanguageSample,
+    type FaceBodyMetricState,
+    type FaceLandmarkPoint,
+    buildFaceLandmarkExportSnapshot,
+    computeBodyLanguageSample,
+    createEmptyBodyLanguageSummary,
+    createEmptyMetricState,
+    keepRecentSamples,
+    METRICS_SAMPLE_INTERVAL_MS,
+    METRICS_WRITE_INTERVAL_MS,
+    persistBodyLanguageSummary,
+    resolveEffectiveLandmarks,
+    summarizeBodyLanguageSamples,
+} from "@/lib/face-metrics"
+
+// ---------------------------------------------------------------------------
+// MediaPipe SDK types (typed locally to avoid bundling the full SDK)
+// ---------------------------------------------------------------------------
 
 type RunningMode = "IMAGE" | "VIDEO"
 type ModelStatus = "idle" | "loading" | "ready" | "error"
-type BlendShapeCategory = {
-    displayName?: string
-    categoryName?: string
-    score: number
-}
-type FaceLandmarkPoint = {
-    x: number
-    y: number
-    z?: number
-}
 type FaceLandmarkerResult = {
     faceLandmarks?: FaceLandmarkPoint[][]
     faceBlendshapes?: Array<{
@@ -67,19 +90,16 @@ type VisionModule = {
     DrawingUtils: new (ctx: CanvasRenderingContext2D) => DrawingUtilsInstance
 }
 
+// ---------------------------------------------------------------------------
+// MediaPipe constants
+// ---------------------------------------------------------------------------
+
 const VISION_BUNDLE_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"
 const VISION_WASM_URL = `${VISION_BUNDLE_URL}/wasm`
 const MODEL_ASSET_URL =
     "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
-const FACE_BODY_LANGUAGE_STORAGE_KEY = "faceBodyLanguageMetrics"
-const METRICS_SAMPLE_INTERVAL_MS = 120
-const METRICS_WRITE_INTERVAL_MS = 1_000
-const METRICS_RECENT_SAMPLE_LIMIT = 180
-const METRICS_FALLBACK_GRACE_MS = 450
-const INVALID_STATE_PRESERVE_SAMPLES = 4
-const BLINK_CLOSE_THRESHOLD = 0.19
-const BLINK_OPEN_THRESHOLD = 0.245
-const SPEAKING_ACTIVITY_THRESHOLD = 0.45
+
+/** Console noise patterns from MediaPipe that we suppress to keep DevTools clean. */
 const MEDIAPIPE_NOISE_PATTERNS = [
     "face blendshape model contains cpu only ops",
     "gl version:",
@@ -88,67 +108,9 @@ const MEDIAPIPE_NOISE_PATTERNS = [
     "created tensorflow lite xnnpack delegate for cpu",
 ]
 
-const FACE_INDEX = {
-    noseTip: 1,
-    forehead: 10,
-    chin: 152,
-    leftCheek: 234,
-    rightCheek: 454,
-    leftEyeOuter: 33,
-    leftEyeInner: 133,
-    leftEyeUpper: 159,
-    leftEyeLower: 145,
-    rightEyeOuter: 263,
-    rightEyeInner: 362,
-    rightEyeUpper: 386,
-    rightEyeLower: 374,
-    mouthLeft: 61,
-    mouthRight: 291,
-    mouthUpper: 13,
-    mouthLower: 14,
-} as const
-
-type FaceBodyLanguageSample = {
-    ts: number
-    faceDetected: boolean
-    frontalFacingScore: number
-    headYaw: number
-    headPitch: number
-    headMovement: number
-    eyeOpenness: number
-    blink: boolean
-    mouthOpenness: number
-    speakingLikelihood: number
-}
-
-type FaceBodyMetricState = {
-    previousNoseTip: FaceLandmarkPoint | null
-    previousMouthOpenness: number | null
-    previousSampleTs: number | null
-    blinkActive: boolean
-    invalidFrameCount: number
-}
-
-type FaceBodyLanguageSummary = {
-    updatedAt: string
-    role: string | null
-    webcamActive: boolean
-    sampleCount: number
-    faceDetectedPct: number
-    avgFrontalFacingScore: number
-    avgHeadMovement: number
-    blinkCount: number
-    blinkRatePerMin: number
-    avgMouthOpenness: number
-    speakingActivityPct: number
-    current: FaceBodyLanguageSample | null
-    recentSamples: FaceBodyLanguageSample[]
-}
-
-type ComputeBodyLanguageResult = {
-    sample: FaceBodyLanguageSample
-    nextState: FaceBodyMetricState
-}
+// ---------------------------------------------------------------------------
+// Local types & helpers
+// ---------------------------------------------------------------------------
 
 type FaceAnalysisRequestStatus = "idle" | "analyzing" | "ready" | "error"
 
@@ -165,291 +127,9 @@ function shouldIgnoreMediapipeConsoleMessage(args: unknown[]) {
     return MEDIAPIPE_NOISE_PATTERNS.some((pattern) => text.includes(pattern))
 }
 
-function clamp01(value: number) {
-    return Math.max(0, Math.min(1, value))
-}
-
-function safeRatio(numerator: number, denominator: number) {
-    if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return 0
-    return numerator / denominator
-}
-
-function distance(a: FaceLandmarkPoint, b: FaceLandmarkPoint) {
-    return Math.hypot(a.x - b.x, a.y - b.y)
-}
-
-function averagePoint(points: FaceLandmarkPoint[]) {
-    const total = points.reduce(
-        (acc: { x: number; y: number; z: number }, point) => ({
-            x: acc.x + point.x,
-            y: acc.y + point.y,
-            z: acc.z + (point.z ?? 0),
-        }),
-        { x: 0, y: 0, z: 0 }
-    )
-
-    return {
-        x: total.x / points.length,
-        y: total.y / points.length,
-        z: total.z / points.length,
-    }
-}
-
-function roundMetric(value: number, decimals = 3) {
-    const factor = 10 ** decimals
-    return Math.round(value * factor) / factor
-}
-
-function buildEmptyBodyLanguageSample(ts: number): FaceBodyLanguageSample {
-    return {
-        ts,
-        faceDetected: false,
-        frontalFacingScore: 0,
-        headYaw: 0,
-        headPitch: 0,
-        headMovement: 0,
-        eyeOpenness: 0,
-        blink: false,
-        mouthOpenness: 0,
-        speakingLikelihood: 0,
-    }
-}
-
-function createEmptyMetricState(): FaceBodyMetricState {
-    return {
-        previousNoseTip: null,
-        previousMouthOpenness: null,
-        previousSampleTs: null,
-        blinkActive: false,
-        invalidFrameCount: 0,
-    }
-}
-
-function createEmptyBodyLanguageSummary(role?: string): FaceBodyLanguageSummary {
-    return {
-        updatedAt: new Date().toISOString(),
-        role: role?.trim() || null,
-        webcamActive: false,
-        sampleCount: 0,
-        faceDetectedPct: 0,
-        avgFrontalFacingScore: 0,
-        avgHeadMovement: 0,
-        blinkCount: 0,
-        blinkRatePerMin: 0,
-        avgMouthOpenness: 0,
-        speakingActivityPct: 0,
-        current: null,
-        recentSamples: [],
-    }
-}
-
-function persistBodyLanguageSummary(summary: FaceBodyLanguageSummary) {
-    if (typeof window === "undefined") return
-    window.sessionStorage.setItem(FACE_BODY_LANGUAGE_STORAGE_KEY, JSON.stringify(summary))
-    if (process.env.NODE_ENV !== "production") {
-        console.log("[faceBodyLanguageMetrics]", summary)
-    }
-}
-
-function buildFaceLandmarkExportSnapshot(args: {
-    snapshot: number
-    role?: string
-    sample: FaceBodyLanguageSample
-}) {
-    return {
-        snapshot: args.snapshot,
-        ts: args.sample.ts,
-        isoTime: new Date(args.sample.ts).toISOString(),
-        role: args.role?.trim() || null,
-        faceDetected: args.sample.faceDetected,
-        frontalFacingScore: args.sample.frontalFacingScore,
-        headYaw: args.sample.headYaw,
-        headPitch: args.sample.headPitch,
-        headMovement: args.sample.headMovement,
-        eyeOpenness: args.sample.eyeOpenness,
-        blink: args.sample.blink,
-        mouthOpenness: args.sample.mouthOpenness,
-        speakingLikelihood: args.sample.speakingLikelihood,
-    } satisfies FaceLandmarkExportSnapshot
-}
-
-function keepRecentSamples(samples: FaceBodyLanguageSample[]) {
-    return samples.slice(-METRICS_RECENT_SAMPLE_LIMIT)
-}
-
-function createInvalidMetricResult(metricState: FaceBodyMetricState, ts: number): ComputeBodyLanguageResult {
-    const invalidFrameCount = metricState.invalidFrameCount + 1
-    const preserveContinuity = invalidFrameCount <= INVALID_STATE_PRESERVE_SAMPLES
-
-    return {
-        sample: buildEmptyBodyLanguageSample(ts),
-        nextState: preserveContinuity
-            ? {
-                  previousNoseTip: metricState.previousNoseTip,
-                  previousMouthOpenness: metricState.previousMouthOpenness,
-                  previousSampleTs: ts,
-                  blinkActive: metricState.blinkActive,
-                  invalidFrameCount,
-              }
-            : {
-                  previousNoseTip: null,
-                  previousMouthOpenness: null,
-                  previousSampleTs: ts,
-                  blinkActive: false,
-                  invalidFrameCount,
-              },
-    }
-}
-
-function resolveEffectiveLandmarks(args: {
-    detectedLandmarks: FaceLandmarkPoint[][]
-    fallbackLandmarks: FaceLandmarkPoint[][]
-    now: number
-    lastDetectionAt: number
-}) {
-    if (args.detectedLandmarks.length > 0) return args.detectedLandmarks
-    if (args.now - args.lastDetectionAt <= METRICS_FALLBACK_GRACE_MS) return args.fallbackLandmarks
-    return []
-}
-
-function computeBodyLanguageSample(
-    landmarks: FaceLandmarkPoint[] | null,
-    metricState: FaceBodyMetricState,
-    ts: number
-) : ComputeBodyLanguageResult {
-    if (!landmarks) {
-        return createInvalidMetricResult(metricState, ts)
-    }
-
-    const noseTip = landmarks[FACE_INDEX.noseTip]
-    const forehead = landmarks[FACE_INDEX.forehead]
-    const chin = landmarks[FACE_INDEX.chin]
-    const leftCheek = landmarks[FACE_INDEX.leftCheek]
-    const rightCheek = landmarks[FACE_INDEX.rightCheek]
-    const leftEyeOuter = landmarks[FACE_INDEX.leftEyeOuter]
-    const leftEyeInner = landmarks[FACE_INDEX.leftEyeInner]
-    const leftEyeUpper = landmarks[FACE_INDEX.leftEyeUpper]
-    const leftEyeLower = landmarks[FACE_INDEX.leftEyeLower]
-    const rightEyeOuter = landmarks[FACE_INDEX.rightEyeOuter]
-    const rightEyeInner = landmarks[FACE_INDEX.rightEyeInner]
-    const rightEyeUpper = landmarks[FACE_INDEX.rightEyeUpper]
-    const rightEyeLower = landmarks[FACE_INDEX.rightEyeLower]
-    const mouthLeft = landmarks[FACE_INDEX.mouthLeft]
-    const mouthRight = landmarks[FACE_INDEX.mouthRight]
-    const mouthUpper = landmarks[FACE_INDEX.mouthUpper]
-    const mouthLower = landmarks[FACE_INDEX.mouthLower]
-
-    if (
-        !noseTip ||
-        !forehead ||
-        !chin ||
-        !leftCheek ||
-        !rightCheek ||
-        !leftEyeOuter ||
-        !leftEyeInner ||
-        !leftEyeUpper ||
-        !leftEyeLower ||
-        !rightEyeOuter ||
-        !rightEyeInner ||
-        !rightEyeUpper ||
-        !rightEyeLower ||
-        !mouthLeft ||
-        !mouthRight ||
-        !mouthUpper ||
-        !mouthLower
-    ) {
-        return createInvalidMetricResult(metricState, ts)
-    }
-
-    const faceCenter = averagePoint([leftCheek, rightCheek, forehead, chin])
-    const faceWidth = Math.max(distance(leftCheek, rightCheek), 0.0001)
-    const faceHeight = Math.max(distance(forehead, chin), 0.0001)
-    const leftEyeWidth = Math.max(distance(leftEyeOuter, leftEyeInner), 0.0001)
-    const rightEyeWidth = Math.max(distance(rightEyeOuter, rightEyeInner), 0.0001)
-    const mouthWidth = Math.max(distance(mouthLeft, mouthRight), 0.0001)
-
-    const leftEyeOpenness = safeRatio(distance(leftEyeUpper, leftEyeLower), leftEyeWidth)
-    const rightEyeOpenness = safeRatio(distance(rightEyeUpper, rightEyeLower), rightEyeWidth)
-    const eyeOpenness = (leftEyeOpenness + rightEyeOpenness) / 2
-    const blink = metricState.blinkActive ? eyeOpenness < BLINK_OPEN_THRESHOLD : eyeOpenness < BLINK_CLOSE_THRESHOLD
-
-    const mouthOpenness = safeRatio(distance(mouthUpper, mouthLower), mouthWidth)
-    const mouthMovement = metricState.previousMouthOpenness === null ? 0 : Math.abs(mouthOpenness - metricState.previousMouthOpenness)
-    const mouthOpennessSignal = clamp01((mouthOpenness - 0.03) / 0.2)
-    const mouthMovementSignal = clamp01(mouthMovement / 0.04)
-    const speakingLikelihood = clamp01(mouthOpennessSignal * 0.65 + mouthMovementSignal * 0.35)
-
-    const headYaw = roundMetric((noseTip.x - faceCenter.x) / (faceWidth * 0.5))
-    const headPitch = roundMetric((noseTip.y - faceCenter.y) / (faceHeight * 0.5))
-    const sampleDeltaMs = metricState.previousSampleTs === null ? METRICS_SAMPLE_INTERVAL_MS : Math.max(1, ts - metricState.previousSampleTs)
-    const movementTimeNormalization = Math.min(1.25, METRICS_SAMPLE_INTERVAL_MS / sampleDeltaMs)
-    const headMovement = roundMetric(
-        metricState.previousNoseTip ? safeRatio(distance(metricState.previousNoseTip, noseTip), faceWidth) * movementTimeNormalization : 0
-    )
-    const frontalFacingScore = roundMetric(clamp01(1 - Math.abs(headYaw) * 0.85 - Math.abs(headPitch) * 0.65 - headMovement * 1.5))
-
-    return {
-        sample: {
-            ts,
-            faceDetected: true,
-            frontalFacingScore,
-            headYaw,
-            headPitch,
-            headMovement,
-            eyeOpenness: roundMetric(eyeOpenness),
-            blink,
-            mouthOpenness: roundMetric(mouthOpenness),
-            speakingLikelihood: roundMetric(speakingLikelihood),
-        },
-        nextState: {
-            previousNoseTip: noseTip,
-            previousMouthOpenness: mouthOpenness,
-            previousSampleTs: ts,
-            blinkActive: blink,
-            invalidFrameCount: 0,
-        },
-    }
-}
-
-function summarizeBodyLanguageSamples(args: {
-    allSamples: FaceBodyLanguageSample[]
-    recentSamples: FaceBodyLanguageSample[]
-    role?: string
-    webcamActive?: boolean
-}) : FaceBodyLanguageSummary {
-    const { allSamples, recentSamples, role, webcamActive = false } = args
-
-    if (allSamples.length === 0) {
-        const empty = createEmptyBodyLanguageSummary(role)
-        return { ...empty, webcamActive }
-    }
-
-    const detectedSamples = allSamples.filter((sample) => sample.faceDetected)
-    const totalDurationMs = allSamples.length > 1 ? Math.max(1, allSamples[allSamples.length - 1].ts - allSamples[0].ts) : METRICS_SAMPLE_INTERVAL_MS
-    const speakingSamples = detectedSamples.filter((sample) => sample.speakingLikelihood >= SPEAKING_ACTIVITY_THRESHOLD)
-    const blinkCount = detectedSamples.reduce((count, sample, index) => {
-        const previous = detectedSamples[index - 1]
-        return count + (!previous?.blink && sample.blink ? 1 : 0)
-    }, 0)
-
-    return {
-        updatedAt: new Date().toISOString(),
-        role: role?.trim() || null,
-        webcamActive,
-        sampleCount: allSamples.length,
-        faceDetectedPct: roundMetric(detectedSamples.length / allSamples.length),
-        avgFrontalFacingScore: roundMetric(
-            detectedSamples.reduce((sum, sample) => sum + sample.frontalFacingScore, 0) / Math.max(1, detectedSamples.length)
-        ),
-        avgHeadMovement: roundMetric(detectedSamples.reduce((sum, sample) => sum + sample.headMovement, 0) / Math.max(1, detectedSamples.length)),
-        blinkCount,
-        blinkRatePerMin: roundMetric(blinkCount / (totalDurationMs / 60_000), 2),
-        avgMouthOpenness: roundMetric(detectedSamples.reduce((sum, sample) => sum + sample.mouthOpenness, 0) / Math.max(1, detectedSamples.length)),
-        speakingActivityPct: roundMetric(speakingSamples.length / Math.max(1, detectedSamples.length)),
-        current: allSamples[allSamples.length - 1] ?? null,
-        recentSamples: recentSamples.length > 0 ? recentSamples : keepRecentSamples(allSamples),
-    }
-}
+// ---------------------------------------------------------------------------
+// Canvas drawing helpers
+// ---------------------------------------------------------------------------
 
 function drawFaceConnectors(
     drawingUtils: DrawingUtilsInstance,
@@ -486,6 +166,10 @@ function drawFaceConnectors(
     })
 }
 
+// ---------------------------------------------------------------------------
+// UI helper functions
+// ---------------------------------------------------------------------------
+
 function scoreWidth(score: number) {
     return `${Math.max(0, Math.min(100, score * 100))}%`
 }
@@ -516,6 +200,10 @@ function renderSummaryList(items: string[]) {
         <p className="mt-2 text-sm text-slate-500">Keine Punkte fuer diesen Block vorhanden.</p>
     )
 }
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
 function FaceAnalysisParameterRow({ parameter }: { parameter: FaceAnalysisParameterReport }) {
     return (
@@ -980,17 +668,18 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
             metricStateRef.current = nextState
             lastMetricsSampleAtRef.current = now
 
-            allMetricsSamplesRef.current = [...allMetricsSamplesRef.current, sample]
-            recentMetricsSamplesRef.current = keepRecentSamples([...recentMetricsSamplesRef.current, sample])
+            // Use push() instead of spread to avoid O(n) array copies in the hot rAF loop.
+            allMetricsSamplesRef.current.push(sample)
+            recentMetricsSamplesRef.current.push(sample)
+            recentMetricsSamplesRef.current = keepRecentSamples(recentMetricsSamplesRef.current)
             sessionSnapshotCounterRef.current += 1
-            sessionExportSnapshotsRef.current = [
-                ...sessionExportSnapshotsRef.current,
+            sessionExportSnapshotsRef.current.push(
                 buildFaceLandmarkExportSnapshot({
                     snapshot: sessionSnapshotCounterRef.current,
                     role,
                     sample,
                 }),
-            ]
+            )
             setExportSnapshotCount(sessionExportSnapshotsRef.current.length)
         }
 

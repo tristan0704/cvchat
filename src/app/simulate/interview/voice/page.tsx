@@ -1,42 +1,89 @@
+/**
+ * Voice Interview Page
+ *
+ * Session Lifecycle:
+ * 1. User clicks "Start" -> startCall()
+ *    - Validates browser capabilities (secure context, getUserMedia, MediaRecorder)
+ *    - Fetches a scoped Gemini Live auth token from /api/gemini/live-token
+ *    - Opens an AudioContext and connects to Gemini Live via WebSocket
+ *    - Starts the microphone pipeline (MediaStream -> ScriptProcessor -> Gemini)
+ *    - Starts a parallel MediaRecorder for the post-call transcription
+ *    - Sends the initial prompt so the AI interviewer begins
+ *    - Starts the countdown timer (default 5 min)
+ *
+ * 2. During the call:
+ *    - Mic audio is downsampled to 16 kHz, converted to PCM16, and sent as base64
+ *    - Gemini streams back audio chunks + live transcription events
+ *    - Audio chunks are decoded and scheduled for gapless playback
+ *    - Transcription events are buffered and flushed into the transcript log
+ *
+ * 3. Closing sequence (time-based phases):
+ *    - T-40s: "last-question" -> detach realtime session, speak final question locally
+ *    - T-15s: "finalizing" -> interrupt, speak closing line locally
+ *    - T-5s:  "silent" -> suppress all audio, wait for timer to expire
+ *    - T-0s:  stopCall() -> full teardown + post-call transcription
+ *
+ * 4. stopCall() teardown:
+ *    - Stops MediaRecorder, collects recorded blob
+ *    - Closes Gemini session and disconnects audio nodes
+ *    - Stops mic tracks, closes AudioContext
+ *    - Triggers face analysis via FaceLandmarkPanel.stopAndAnalyze()
+ *    - Sends recorded audio to /api/simulate/interview-transcript for transcription
+ *    - Persists all state to sessionStorage for feedback page handoff
+ */
+
 "use client"
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { GoogleGenAI, LiveServerMessage, MediaResolution, Modality, Session } from "@google/genai"
 import { FaceLandmarkPanel, type FaceLandmarkPanelHandle } from "@/components/interview/face-landmark-panel"
 import { formatCountdown, getInterviewQuestionPool } from "@/lib/interview"
+import {
+    decodePcm16,
+    downsampleBuffer,
+    encodeBase64,
+    floatTo16BitPcm,
+    getSupportedRecordingMimeType,
+    INPUT_SAMPLE_RATE,
+    parseSampleRate,
+} from "@/lib/audio"
+import {
+    buildTranscriptQaPairs,
+    buildTranscriptQaExport,
+    normalizeTranscriptText,
+    persistVoiceFeedbackDraft,
+    type PostCallTranscriptStatus,
+    type Speaker,
+    type TranscriptEntry,
+} from "@/lib/transcript"
 
-// Gemini Live model used for the realtime voice interviewer.
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 const LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
-// Synthetic voice name for the interviewer.
 const LIVE_VOICE = "Zephyr"
-// Fallback playback sample rate when the stream does not specify one.
-const OUTPUT_SAMPLE_RATE_FALLBACK = 24_000
-// Microphone audio is downsampled to this rate before being sent upstream.
-const INPUT_SAMPLE_RATE = 16_000
-// Total target call length in seconds.
 const CALL_DURATION_SECONDS = 300
-// How many seconds before call end the interviewer asks the final question.
 const LAST_QUESTION_LEAD_SECONDS = 40
-// How many seconds before call end the interviewer cuts off and closes verbally.
 const FINAL_INTERRUPT_LEAD_SECONDS = 15
-// Final silent window before the call is force-stopped.
 const SILENT_TAIL_SECONDS = 5
-// Session storage key for the post-call transcript/feedback handoff.
-const VOICE_FEEDBACK_DRAFT_STORAGE_KEY = "voiceInterviewFeedbackDraft"
-// Deterministic local fallback for the final question to avoid LLM drift near call end.
+/**
+ * Deterministic local fallback for the final question.
+ * Spoken via browser SpeechSynthesis after the realtime session is detached,
+ * ensuring the closing question is always delivered reliably.
+ */
 const LOCAL_FINAL_QUESTION = "Zum Abschluss noch eine letzte kurze Frage: Warum bist du fuer diese Rolle jetzt konkret die richtige Besetzung?"
-// Deterministic local closing line right before the silent tail.
 const LOCAL_FINAL_CLOSING = "Ich unterbreche kurz, die Zeit ist vorbei. Vielen Dank fuer das Gespraech."
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "error"
 type ClosingPhase = "idle" | "armed" | "last-question" | "finalizing" | "silent"
 type ClosingMode = "lastQuestion" | "finalInterrupt" | "goAway"
-type Speaker = "candidate" | "interviewer" | "system"
-type TranscriptEntry = { id: string; speaker: Speaker; text: string }
-type TranscriptQaPair = { question: string; answer: string }
 type LiveTokenResponse = { token: string; model: string; voiceName: string }
-type PostCallTranscriptStatus = "idle" | "recording" | "transcribing" | "ready" | "error"
 type CallTiming = {
     startedAtMs: number
     targetEndAtMs: number
@@ -45,83 +92,9 @@ type CallTiming = {
     silentTailAtMs: number
 }
 
-function normalizeTranscriptText(text: string) {
-    return text.replace(/\s+/g, " ").replace(/\s+([,.!?;:])/g, "$1").trim()
-}
-
-function parseSampleRate(mimeType?: string) {
-    const match = mimeType?.match(/rate=(\d+)/i)
-    return match ? Number(match[1]) : OUTPUT_SAMPLE_RATE_FALLBACK
-}
-
-function base64ToUint8Array(base64: string) {
-    const binary = window.atob(base64)
-    const bytes = new Uint8Array(binary.length)
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
-    return bytes
-}
-
-function encodeBase64(bytes: Uint8Array) {
-    let binary = ""
-    for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index])
-    return window.btoa(binary)
-}
-
-function downsampleBuffer(input: Float32Array, inputRate: number, outputRate: number) {
-    if (inputRate === outputRate) return input
-    const ratio = inputRate / outputRate
-    const newLength = Math.round(input.length / ratio)
-    const result = new Float32Array(newLength)
-    let offsetResult = 0
-    let offsetInput = 0
-
-    while (offsetResult < result.length) {
-        const nextOffsetInput = Math.round((offsetResult + 1) * ratio)
-        let accumulated = 0
-        let count = 0
-
-        for (let index = offsetInput; index < nextOffsetInput && index < input.length; index += 1) {
-            accumulated += input[index]
-            count += 1
-        }
-
-        result[offsetResult] = count > 0 ? accumulated / count : 0
-        offsetResult += 1
-        offsetInput = nextOffsetInput
-    }
-
-    return result
-}
-
-function floatTo16BitPcm(input: Float32Array) {
-    const buffer = new ArrayBuffer(input.length * 2)
-    const view = new DataView(buffer)
-
-    for (let index = 0; index < input.length; index += 1) {
-        const sample = Math.max(-1, Math.min(1, input[index]))
-        view.setInt16(index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
-    }
-
-    return new Uint8Array(buffer)
-}
-
-function decodePcm16(base64: string) {
-    const pcmBytes = base64ToUint8Array(base64)
-    const sampleCount = Math.floor(pcmBytes.byteLength / 2)
-    const samples = new Float32Array(sampleCount)
-    const view = new DataView(pcmBytes.buffer, pcmBytes.byteOffset, pcmBytes.byteLength)
-
-    for (let index = 0; index < sampleCount; index += 1) samples[index] = view.getInt16(index * 2, true) / 0x8000
-
-    return samples
-}
-
-function getSupportedRecordingMimeType() {
-    if (typeof MediaRecorder === "undefined") return ""
-
-    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
-    return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ""
-}
+// ---------------------------------------------------------------------------
+// Pure helpers
+// ---------------------------------------------------------------------------
 
 function createCallTiming(startedAtMs = Date.now()): CallTiming {
     return {
@@ -133,80 +106,9 @@ function createCallTiming(startedAtMs = Date.now()): CallTiming {
     }
 }
 
-function buildTranscriptQaPairs(entries: TranscriptEntry[]) {
-    const pairs: TranscriptQaPair[] = []
-    let activeQuestion = ""
-    let activeAnswer = ""
-
-    for (const entry of entries) {
-        if (entry.speaker === "system") continue
-
-        if (entry.speaker === "interviewer") {
-            if (activeQuestion) {
-                pairs.push({
-                    question: activeQuestion,
-                    answer: activeAnswer || "(keine Antwort erfasst)",
-                })
-            }
-
-            activeQuestion = entry.text
-            activeAnswer = ""
-            continue
-        }
-
-        if (!activeQuestion) continue
-        activeAnswer = activeAnswer ? `${activeAnswer} ${entry.text}` : entry.text
-    }
-
-    if (activeQuestion) {
-        pairs.push({
-            question: activeQuestion,
-            answer: activeAnswer || "(keine Antwort erfasst)",
-        })
-    }
-
-    return pairs
-}
-
-function buildTranscriptQaExport(role: string, entries: TranscriptEntry[]) {
-    const pairs = buildTranscriptQaPairs(entries)
-    if (!pairs.length) return ""
-
-    return [
-        `Rolle: ${role}`,
-        `Exportiert: ${new Date().toISOString()}`,
-        "",
-        ...pairs.flatMap((pair, index) => [
-            `${index + 1}.`,
-            `Frage: ${pair.question}`,
-            `Antwort: ${pair.answer}`,
-            "",
-        ]),
-    ].join("\n")
-}
-
-function persistVoiceFeedbackDraft(args: {
-    role: string
-    transcriptEntries: TranscriptEntry[]
-    postCallCandidateTranscript: string
-    postCallTranscriptStatus: PostCallTranscriptStatus
-    postCallTranscriptError: string
-}) {
-    if (typeof window === "undefined") return
-
-    window.sessionStorage.setItem(
-        VOICE_FEEDBACK_DRAFT_STORAGE_KEY,
-        JSON.stringify({
-            role: args.role,
-            mode: "voice",
-            transcriptEntries: args.transcriptEntries,
-            postCallCandidateTranscript: args.postCallCandidateTranscript,
-            postCallTranscriptStatus: args.postCallTranscriptStatus,
-            postCallTranscriptError: args.postCallTranscriptError,
-            updatedAt: new Date().toISOString(),
-        })
-    )
-}
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 function VoiceInterview({ role }: { role: string }) {
     const questionPlan = getInterviewQuestionPool(role)
@@ -221,62 +123,71 @@ function VoiceInterview({ role }: { role: string }) {
     const [postCallTranscriptError, setPostCallTranscriptError] = useState("")
     const [callStarted, setCallStarted] = useState(false)
     const [secondsLeft, setSecondsLeft] = useState(CALL_DURATION_SECONDS)
-    const transcriptQaPairs = buildTranscriptQaPairs(transcriptEntries)
+    // Memoize Q&A pairs to avoid recomputing on every render
+    const transcriptQaPairs = useMemo(() => buildTranscriptQaPairs(transcriptEntries), [transcriptEntries])
 
+    // -- Refs: Gemini session & audio pipeline --
     const sessionRef = useRef<Session | null>(null)
     const audioContextRef = useRef<AudioContext | null>(null)
     const microphoneStreamRef = useRef<MediaStream | null>(null)
     const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
     const processorNodeRef = useRef<ScriptProcessorNode | null>(null)
     const silentGainRef = useRef<GainNode | null>(null)
+
+    // -- Refs: Audio playback scheduling --
     const scheduledSourcesRef = useRef<AudioBufferSourceNode[]>([])
     const nextPlaybackTimeRef = useRef(0)
+
+    // -- Refs: Transcript tracking --
     const transcriptCounterRef = useRef(0)
-    const closingRequestedRef = useRef(false)
-    const stopCallRef = useRef<(() => Promise<void>) | null>(null)
-    const connectionStatusRef = useRef<ConnectionStatus>("idle")
-    const closingPhaseRef = useRef<ClosingPhase>("idle")
-    const startCallInFlightRef = useRef(false)
-    const stopCallInFlightRef = useRef(false)
-    const callTimingRef = useRef<CallTiming | null>(null)
-    const transcriptEntriesRef = useRef<TranscriptEntry[]>([])
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-    const recordedAudioChunksRef = useRef<Blob[]>([])
-    const recordedAudioMimeTypeRef = useRef("")
-    const postCallCandidateTranscriptRef = useRef("")
-    const postCallTranscriptStatusRef = useRef<PostCallTranscriptStatus>("idle")
-    const postCallTranscriptErrorRef = useRef("")
-    const candidateAudioSuppressedRef = useRef(false)
-    const localSpeechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
     const pendingCandidateTranscriptRef = useRef("")
     const pendingInterviewerTranscriptRef = useRef("")
     const lastCandidateTranscriptRef = useRef("")
     const lastInterviewerTranscriptRef = useRef("")
-    const realtimeSessionDetachedRef = useRef(false)
+
+    // -- Refs: Closing sequence coordination --
+    const closingRequestedRef = useRef(false)
+    const closingPhaseRef = useRef<ClosingPhase>("idle")
     const finalQuestionTriggeredRef = useRef(false)
     const finalInterruptTriggeredRef = useRef(false)
     const silentTailTriggeredRef = useRef(false)
+    const candidateAudioSuppressedRef = useRef(false)
+    const realtimeSessionDetachedRef = useRef(false)
+    const localSpeechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+
+    // -- Refs: Call lifecycle guards --
+    const stopCallRef = useRef<(() => Promise<void>) | null>(null)
+    const connectionStatusRef = useRef<ConnectionStatus>("idle")
+    const startCallInFlightRef = useRef(false)
+    const stopCallInFlightRef = useRef(false)
+    const callTimingRef = useRef<CallTiming | null>(null)
+
+    /**
+     * Refs that shadow state values so that callbacks (which capture stale
+     * closures) can always read the latest value. This pattern is necessary
+     * because Gemini session callbacks are registered once at connect time
+     * and cannot be updated.
+     */
+    const transcriptEntriesRef = useRef<TranscriptEntry[]>([])
+    const postCallCandidateTranscriptRef = useRef("")
+    const postCallTranscriptStatusRef = useRef<PostCallTranscriptStatus>("idle")
+    const postCallTranscriptErrorRef = useRef("")
+
+    // -- Refs: MediaRecorder for post-call transcription --
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const recordedAudioChunksRef = useRef<Blob[]>([])
+    const recordedAudioMimeTypeRef = useRef("")
+
+    // -- Refs: Face landmark panel --
     const faceLandmarkPanelRef = useRef<FaceLandmarkPanelHandle | null>(null)
 
-    useEffect(() => {
-        connectionStatusRef.current = connectionStatus
-    }, [connectionStatus])
-
-    useEffect(() => {
-        transcriptEntriesRef.current = transcriptEntries
-    }, [transcriptEntries])
-
-    useEffect(() => {
-        postCallCandidateTranscriptRef.current = postCallCandidateTranscript
-    }, [postCallCandidateTranscript])
-
-    useEffect(() => {
-        postCallTranscriptStatusRef.current = postCallTranscriptStatus
-    }, [postCallTranscriptStatus])
-
-    useEffect(() => {
-        postCallTranscriptErrorRef.current = postCallTranscriptError
-    }, [postCallTranscriptError])
+    // -- State-to-ref sync effects --
+    // These keep refs in sync so stale closures always read fresh values.
+    useEffect(() => { connectionStatusRef.current = connectionStatus }, [connectionStatus])
+    useEffect(() => { transcriptEntriesRef.current = transcriptEntries }, [transcriptEntries])
+    useEffect(() => { postCallCandidateTranscriptRef.current = postCallCandidateTranscript }, [postCallCandidateTranscript])
+    useEffect(() => { postCallTranscriptStatusRef.current = postCallTranscriptStatus }, [postCallTranscriptStatus])
+    useEffect(() => { postCallTranscriptErrorRef.current = postCallTranscriptError }, [postCallTranscriptError])
 
     useEffect(() => {
         const secureMic = typeof window !== "undefined" && window.isSecureContext && !!navigator.mediaDevices?.getUserMedia
@@ -293,6 +204,8 @@ function VoiceInterview({ role }: { role: string }) {
             postCallTranscriptError,
         })
     }, [role, transcriptEntries, postCallCandidateTranscript, postCallTranscriptStatus, postCallTranscriptError])
+
+    // -- State update helpers --
 
     function updateConnectionStatus(nextStatus: ConnectionStatus) {
         connectionStatusRef.current = nextStatus
@@ -313,6 +226,8 @@ function VoiceInterview({ role }: { role: string }) {
         const remainingMs = Math.max(0, targetEndAtMs - Date.now())
         setSecondsLeft(Math.ceil(remainingMs / 1_000))
     }, [])
+
+    // -- Transcript helpers --
 
     const appendTranscript = useCallback((speaker: Speaker, text: string, options?: { mergeWithPrevious?: boolean }) => {
         const normalized = normalizeTranscriptText(text)
@@ -373,6 +288,8 @@ function VoiceInterview({ role }: { role: string }) {
         [flushFinishedTranscript]
     )
 
+    // -- Local speech synthesis (used during closing sequence) --
+
     const cancelLocalSpeech = useCallback(() => {
         localSpeechUtteranceRef.current = null
         if (typeof window === "undefined" || !("speechSynthesis" in window)) return
@@ -410,6 +327,8 @@ function VoiceInterview({ role }: { role: string }) {
         },
         [appendTranscript, cancelLocalSpeech]
     )
+
+    // -- Closing sequence --
 
     const detachRealtimeSession = useCallback(() => {
         if (realtimeSessionDetachedRef.current) return
@@ -476,6 +395,8 @@ function VoiceInterview({ role }: { role: string }) {
         [appendTranscript, cancelLocalSpeech, detachRealtimeSession, speakLocally, updateClosingPhase]
     )
 
+    // -- Audio playback --
+
     function stopScheduledPlayback() {
         for (const source of scheduledSourcesRef.current) {
             try {
@@ -513,6 +434,8 @@ function VoiceInterview({ role }: { role: string }) {
         }
     }
 
+    // -- Gemini session event handlers --
+
     function handleServerMessage(message: LiveServerMessage) {
         if (message.serverContent?.interrupted) {
             stopScheduledPlayback()
@@ -546,6 +469,8 @@ function VoiceInterview({ role }: { role: string }) {
             if (closingPhaseRef.current !== "finalizing") beginClosingSequence("goAway")
         }
     }
+
+    // -- Microphone pipeline --
 
     function sendRealtimeAudioChunk(session: Session, input: Float32Array, sampleRate: number) {
         if (connectionStatusRef.current === "error" || connectionStatusRef.current === "idle") return
@@ -605,6 +530,8 @@ function VoiceInterview({ role }: { role: string }) {
         setPostCallTranscriptStatus("recording")
         setPostCallTranscriptError("")
     }
+
+    // -- Post-call processing --
 
     async function stopCandidateRecording() {
         const recorder = mediaRecorderRef.current
@@ -667,6 +594,8 @@ function VoiceInterview({ role }: { role: string }) {
 
         return data.transcriptText
     }
+
+    // -- Start / Stop call --
 
     async function stopCall(options?: { terminalStatus?: ConnectionStatus; closeSession?: boolean }) {
         if (stopCallInFlightRef.current) return
@@ -911,6 +840,8 @@ function VoiceInterview({ role }: { role: string }) {
             startCallInFlightRef.current = false
         }
     }
+
+    // -- Render --
 
     return (
         <main className="min-h-screen bg-slate-50 text-slate-900">
