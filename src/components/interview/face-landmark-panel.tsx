@@ -1,6 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
+import type {
+    FaceAnalysisParameterReport,
+    FaceAnalysisReport,
+    FaceAnalysisStatus as FaceScoreStatus,
+    FaceLandmarkExportSnapshot,
+} from "@/lib/face-analysis"
 
 type RunningMode = "IMAGE" | "VIDEO"
 type ModelStatus = "idle" | "loading" | "ready" | "error"
@@ -139,26 +145,12 @@ type FaceBodyLanguageSummary = {
     recentSamples: FaceBodyLanguageSample[]
 }
 
-type FaceLandmarkExportSnapshot = {
-    snapshot: number
-    ts: number
-    isoTime: string
-    role: string | null
-    faceDetected: boolean
-    frontalFacingScore: number
-    headYaw: number
-    headPitch: number
-    headMovement: number
-    eyeOpenness: number
-    blink: boolean
-    mouthOpenness: number
-    speakingLikelihood: number
-}
-
 type ComputeBodyLanguageResult = {
     sample: FaceBodyLanguageSample
     nextState: FaceBodyMetricState
 }
+
+type FaceAnalysisRequestStatus = "idle" | "analyzing" | "ready" | "error"
 
 function shouldIgnoreMediapipeConsoleMessage(args: unknown[]) {
     const text = args
@@ -257,10 +249,6 @@ function persistBodyLanguageSummary(summary: FaceBodyLanguageSummary) {
     if (process.env.NODE_ENV !== "production") {
         console.log("[faceBodyLanguageMetrics]", summary)
     }
-}
-
-function createSessionId() {
-    return `face-session-${Date.now()}`
 }
 
 function buildFaceLandmarkExportSnapshot(args: {
@@ -502,6 +490,153 @@ function scoreWidth(score: number) {
     return `${Math.max(0, Math.min(100, score * 100))}%`
 }
 
+function scoreToneClasses(status: FaceScoreStatus) {
+    switch (status) {
+        case "strong":
+            return "border-emerald-200 bg-emerald-50 text-emerald-700"
+        case "okay":
+            return "border-sky-200 bg-sky-50 text-sky-700"
+        case "watch":
+            return "border-amber-200 bg-amber-50 text-amber-800"
+        case "critical":
+            return "border-red-200 bg-red-50 text-red-700"
+    }
+}
+
+function renderSummaryList(items: string[]) {
+    return items.length > 0 ? (
+        <ul className="mt-2 space-y-2 text-sm text-slate-700">
+            {items.map((item, index) => (
+                <li key={`${item}-${index}`} className="rounded-2xl bg-white px-3 py-2">
+                    {item}
+                </li>
+            ))}
+        </ul>
+    ) : (
+        <p className="mt-2 text-sm text-slate-500">Keine Punkte fuer diesen Block vorhanden.</p>
+    )
+}
+
+function FaceAnalysisParameterRow({ parameter }: { parameter: FaceAnalysisParameterReport }) {
+    return (
+        <div className="rounded-2xl bg-white px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <p className="text-sm font-medium text-slate-900">{parameter.label}</p>
+                    <p className="text-xs text-slate-500">{parameter.valueLabel}</p>
+                </div>
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreToneClasses(parameter.status)}`}>
+                    {parameter.score.toFixed(1)}/100
+                </span>
+            </div>
+
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-slate-900" style={{ width: scoreWidth(parameter.score / 100) }} />
+            </div>
+
+            <p className="mt-2 text-xs leading-5 text-slate-600">{parameter.summary}</p>
+        </div>
+    )
+}
+
+function FaceAnalysisSummary(args: {
+    report: FaceAnalysisReport | null
+    status: FaceAnalysisRequestStatus
+    error: string
+    minimal: boolean
+}) {
+    const { report, status, error, minimal } = args
+
+    return (
+        <section className="mt-4 rounded-[20px] border bg-slate-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Face Analyse</p>
+                    <h3 className={`mt-1 font-semibold tracking-tight text-slate-950 ${minimal ? "text-base" : "text-lg"}`}>
+                        Automatische Video-Auswertung
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                        Nach dem Stop wird die Session direkt an die Analyse-API geschickt und ohne TXT im UI ausgewertet.
+                    </p>
+                </div>
+
+                {report ? (
+                    <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${scoreToneClasses(report.overallStatus)}`}>
+                        {report.overallScore.toFixed(1)}/100
+                    </span>
+                ) : (
+                    <span className="rounded-full border bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">{status}</span>
+                )}
+            </div>
+
+            {status === "analyzing" ? (
+                <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                    Die Face-Daten werden gerade ausgewertet.
+                </div>
+            ) : null}
+
+            {error ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            ) : null}
+
+            {!report && status === "idle" ? (
+                <p className="mt-4 text-sm text-slate-600">Noch keine abgeschlossene Session analysiert.</p>
+            ) : null}
+
+            {report ? (
+                <>
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
+                        <span className="rounded-full border bg-white px-3 py-1.5">Dauer: {report.durationLabel}</span>
+                        <span className="rounded-full border bg-white px-3 py-1.5">Samples: {report.sampleCount}</span>
+                        <span className="rounded-full border bg-white px-3 py-1.5">Fenster: {report.windowCount}</span>
+                        <span className="rounded-full border bg-white px-3 py-1.5">
+                            Gesicht: {(report.globalMetrics.faceDetectedPct * 100).toFixed(1)}%
+                        </span>
+                        <span className="rounded-full border bg-white px-3 py-1.5">
+                            Sprechaktivitaet: {(report.globalMetrics.speakingActivityPct * 100).toFixed(1)}%
+                        </span>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl bg-white px-4 py-3">
+                        <p className="text-sm font-medium text-slate-900">{report.summary.headline}</p>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                        <div className="rounded-[18px] border border-slate-200 bg-slate-100/70 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Staerken</p>
+                            {renderSummaryList(report.summary.strengths)}
+                        </div>
+
+                        <div className="rounded-[18px] border border-slate-200 bg-slate-100/70 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Naechste Schritte</p>
+                            {renderSummaryList(report.summary.nextSteps)}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                        {report.parameters.map((parameter) => (
+                            <FaceAnalysisParameterRow key={parameter.key} parameter={parameter} />
+                        ))}
+                    </div>
+
+                    {report.alerts.length > 0 ? (
+                        <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">Zeitfenster mit Auffaelligkeiten</p>
+                            <ul className="mt-2 space-y-2 text-sm text-amber-900">
+                                {report.alerts.map((alert, index) => (
+                                    <li key={`${alert.type}-${alert.startedAt}-${index}`} className="rounded-2xl bg-white/80 px-3 py-2">
+                                        {alert.message}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : null}
+                </>
+            ) : null}
+        </section>
+    )
+}
+
 function BlendShapeList({ shapes }: { shapes: BlendShapeCategory[] }) {
     return (
         <div className="rounded-[20px] border bg-slate-50 p-4">
@@ -542,14 +677,19 @@ type FaceLandmarkPanelProps = {
     description?: string
 }
 
-export function FaceLandmarkPanel({
+export type FaceLandmarkPanelHandle = {
+    stopAndAnalyze: () => Promise<FaceAnalysisReport | null>
+    isWebcamRunning: () => boolean
+}
+
+export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmarkPanelProps>(function FaceLandmarkPanel({
     role,
     compact = false,
     minimal = false,
     showBlendShapes = false,
     title = "Face Landmark",
     description = "Kamera aktivieren und Landmarken direkt im Video sehen.",
-}: FaceLandmarkPanelProps) {
+}: FaceLandmarkPanelProps, ref) {
     const videoWidth = compact ? 320 : 480
 
     const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -569,7 +709,6 @@ export function FaceLandmarkPanel({
     const recentMetricsSamplesRef = useRef<FaceBodyLanguageSample[]>([])
     const metricStateRef = useRef<FaceBodyMetricState>(createEmptyMetricState())
     const sessionExportSnapshotsRef = useRef<FaceLandmarkExportSnapshot[]>([])
-    const sessionIdRef = useRef(createSessionId())
     const sessionSnapshotCounterRef = useRef(0)
 
     const [modelStatus, setModelStatus] = useState<ModelStatus>("idle")
@@ -579,24 +718,11 @@ export function FaceLandmarkPanel({
     const [cameraError, setCameraError] = useState("")
     const [videoBlendShapes, setVideoBlendShapes] = useState<BlendShapeCategory[]>([])
     const [exportSnapshotCount, setExportSnapshotCount] = useState(0)
+    const [analysisStatus, setAnalysisStatus] = useState<FaceAnalysisRequestStatus>("idle")
+    const [analysisError, setAnalysisError] = useState("")
+    const [analysisReport, setAnalysisReport] = useState<FaceAnalysisReport | null>(null)
 
-    const stopWebcam = useCallback(() => {
-        webcamRunningRef.current = false
-        setWebcamRunning(false)
-
-        if (allMetricsSamplesRef.current.length > 0) {
-            persistBodyLanguageSummary(
-                summarizeBodyLanguageSamples({
-                    allSamples: allMetricsSamplesRef.current,
-                    recentSamples: recentMetricsSamplesRef.current,
-                    role,
-                    webcamActive: false,
-                })
-            )
-        } else {
-            persistBodyLanguageSummary(createEmptyBodyLanguageSummary(role))
-        }
-
+    const resetTrackingState = useCallback(() => {
         if (animationFrameRef.current !== null) {
             window.cancelAnimationFrame(animationFrameRef.current)
             animationFrameRef.current = null
@@ -621,21 +747,87 @@ export function FaceLandmarkPanel({
         lastMetricsWriteAtRef.current = 0
         allMetricsSamplesRef.current = []
         recentMetricsSamplesRef.current = []
+        sessionExportSnapshotsRef.current = []
+        sessionSnapshotCounterRef.current = 0
         setVideoBlendShapes([])
-    }, [role])
-
-    const exportSessionAsTxt = useCallback(() => {
-        if (typeof window === "undefined" || sessionExportSnapshotsRef.current.length === 0) return
-
-        const content = JSON.stringify(sessionExportSnapshotsRef.current, null, 2)
-        const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
-        const url = window.URL.createObjectURL(blob)
-        const anchor = document.createElement("a")
-        anchor.href = url
-        anchor.download = `${sessionIdRef.current}.txt`
-        anchor.click()
-        window.URL.revokeObjectURL(url)
+        setExportSnapshotCount(0)
     }, [])
+
+    const analyzeSession = useCallback(
+        async (snapshots: FaceLandmarkExportSnapshot[]) => {
+            if (snapshots.length === 0) return null
+
+            setAnalysisStatus("analyzing")
+            setAnalysisError("")
+            setAnalysisReport(null)
+
+            try {
+                const response = await fetch("/api/simulate/face-analysis", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        role,
+                        snapshots,
+                    }),
+                })
+                const data = (await response.json()) as FaceAnalysisReport | { error?: string }
+
+                if (!response.ok || !("overallScore" in data)) {
+                    throw new Error(("error" in data && data.error) || "Face-Analyse fehlgeschlagen.")
+                }
+
+                setAnalysisReport(data)
+                setAnalysisStatus("ready")
+                return data
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Face-Analyse fehlgeschlagen."
+                setAnalysisError(message)
+                setAnalysisStatus("error")
+                setAnalysisReport(null)
+                return null
+            }
+        },
+        [role]
+    )
+
+    const stopWebcam = useCallback(async (options?: { analyze?: boolean }) => {
+        const shouldAnalyze = options?.analyze ?? true
+        const snapshots = [...sessionExportSnapshotsRef.current]
+        const allSamples = [...allMetricsSamplesRef.current]
+        const recentSamples = [...recentMetricsSamplesRef.current]
+
+        webcamRunningRef.current = false
+        setWebcamRunning(false)
+
+        if (allSamples.length > 0) {
+            persistBodyLanguageSummary(
+                summarizeBodyLanguageSamples({
+                    allSamples,
+                    recentSamples,
+                    role,
+                    webcamActive: false,
+                })
+            )
+        } else {
+            persistBodyLanguageSummary(createEmptyBodyLanguageSummary(role))
+        }
+
+        resetTrackingState()
+
+        if (!shouldAnalyze || snapshots.length === 0) return null
+        return analyzeSession(snapshots)
+    }, [analyzeSession, resetTrackingState, role])
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            stopAndAnalyze: async () => stopWebcam({ analyze: true }),
+            isWebcamRunning: () => webcamRunningRef.current,
+        }),
+        [stopWebcam]
+    )
 
     useEffect(() => {
         setWebcamSupported(typeof window !== "undefined" && window.isSecureContext && !!navigator.mediaDevices?.getUserMedia)
@@ -710,7 +902,7 @@ export function FaceLandmarkPanel({
 
         return () => {
             cancelled = true
-            stopWebcam()
+            void stopWebcam({ analyze: false })
             faceLandmarkerRef.current?.close?.()
             faceLandmarkerRef.current = null
         }
@@ -821,7 +1013,7 @@ export function FaceLandmarkPanel({
 
     const toggleWebcam = useCallback(async () => {
         if (webcamRunningRef.current) {
-            stopWebcam()
+            await stopWebcam({ analyze: true })
             return
         }
 
@@ -839,13 +1031,15 @@ export function FaceLandmarkPanel({
             setCameraError("")
             const stream = await navigator.mediaDevices.getUserMedia({ video: true })
             webcamStreamRef.current = stream
-            sessionIdRef.current = createSessionId()
             sessionSnapshotCounterRef.current = 0
             sessionExportSnapshotsRef.current = []
             allMetricsSamplesRef.current = []
             recentMetricsSamplesRef.current = []
             metricStateRef.current = createEmptyMetricState()
             setExportSnapshotCount(0)
+            setAnalysisStatus("idle")
+            setAnalysisError("")
+            setAnalysisReport(null)
 
             if (!videoRef.current) return
 
@@ -884,7 +1078,7 @@ export function FaceLandmarkPanel({
                     {role ? <span className="rounded-full border bg-slate-50 px-3 py-1.5">{role}</span> : null}
                     <span className="rounded-full border bg-slate-50 px-3 py-1.5">Modell: {modelStatus}</span>
                     <span className="rounded-full border bg-slate-50 px-3 py-1.5">Kamera: {webcamRunning ? "aktiv" : "aus"}</span>
-                    <span className="rounded-full border bg-slate-50 px-3 py-1.5">Snapshots: {exportSnapshotCount}</span>
+                    <span className="rounded-full border bg-slate-50 px-3 py-1.5">Samples: {exportSnapshotCount}</span>
                 </div>
             ) : null}
 
@@ -909,18 +1103,7 @@ export function FaceLandmarkPanel({
                 {showBlendShapes ? <BlendShapeList shapes={videoBlendShapes} /> : null}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                    onClick={exportSessionAsTxt}
-                    disabled={exportSnapshotCount === 0}
-                    className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                >
-                    TXT Export
-                </button>
-                <p className="self-center text-xs text-slate-500">
-                    Exportiert die berechneten Metriken dieser Kamera-Session als einzelnes Array in einer `.txt` Datei.
-                </p>
-            </div>
+            <FaceAnalysisSummary report={analysisReport} status={analysisStatus} error={analysisError} minimal={minimal} />
         </section>
     )
-}
+})

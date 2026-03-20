@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { GoogleGenAI, LiveServerMessage, MediaResolution, Modality, Session } from "@google/genai"
-import { FaceLandmarkPanel } from "@/components/interview/face-landmark-panel"
+import { FaceLandmarkPanel, type FaceLandmarkPanelHandle } from "@/components/interview/face-landmark-panel"
 import { formatCountdown, getInterviewQuestionPool } from "@/lib/interview"
 
 // Gemini Live model used for the realtime voice interviewer.
@@ -15,7 +15,7 @@ const OUTPUT_SAMPLE_RATE_FALLBACK = 24_000
 // Microphone audio is downsampled to this rate before being sent upstream.
 const INPUT_SAMPLE_RATE = 16_000
 // Total target call length in seconds.
-const CALL_DURATION_SECONDS = 200
+const CALL_DURATION_SECONDS = 300
 // How many seconds before call end the interviewer asks the final question.
 const LAST_QUESTION_LEAD_SECONDS = 40
 // How many seconds before call end the interviewer cuts off and closes verbally.
@@ -256,6 +256,7 @@ function VoiceInterview({ role }: { role: string }) {
     const finalQuestionTriggeredRef = useRef(false)
     const finalInterruptTriggeredRef = useRef(false)
     const silentTailTriggeredRef = useRef(false)
+    const faceLandmarkPanelRef = useRef<FaceLandmarkPanelHandle | null>(null)
 
     useEffect(() => {
         connectionStatusRef.current = connectionStatus
@@ -724,6 +725,7 @@ function VoiceInterview({ role }: { role: string }) {
             finalInterruptTriggeredRef.current = false
             silentTailTriggeredRef.current = false
             startCallInFlightRef.current = false
+            const faceAnalysisPromise = faceLandmarkPanelRef.current?.stopAndAnalyze().catch(() => null)
 
             if (recordedAudioBlob && recordedAudioBlob.size > 0) {
                 try {
@@ -741,6 +743,8 @@ function VoiceInterview({ role }: { role: string }) {
                     })
                 }
             }
+
+            await faceAnalysisPromise
         } finally {
             stopCallInFlightRef.current = false
         }
@@ -921,6 +925,7 @@ function VoiceInterview({ role }: { role: string }) {
 
                 <div className="space-y-4">
                     <FaceLandmarkPanel
+                        ref={faceLandmarkPanelRef}
                         role={role}
                         compact
                         minimal
