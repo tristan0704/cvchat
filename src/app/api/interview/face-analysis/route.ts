@@ -1,3 +1,11 @@
+/**
+ * Voice interview face-analysis endpoint.
+ *
+ * This route is called after a voice session ends. It accepts either the raw
+ * face-landmark export or already structured snapshots and returns the final
+ * body-language report used by the interview feedback flow.
+ */
+
 import { analyzeFaceLandmarkSession, parseFaceLandmarkSnapshots, parseFaceLandmarkTxt } from "@/lib/face-analysis"
 
 export const runtime = "nodejs"

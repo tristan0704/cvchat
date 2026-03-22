@@ -42,7 +42,7 @@ Nicht enthalten:
 - `src/app/simulate/coding-feedback/page.tsx`
 - `src/app/simulate/analysis/page.tsx`
 - `src/app/api/upload/route.ts`
-- `src/app/api/simulate/interview/route.ts`
+- `src/app/api/interview/transcript/route.ts`
 
 ## Setup
 

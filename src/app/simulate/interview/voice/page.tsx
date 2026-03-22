@@ -8,8 +8,9 @@
  *    - Opens an AudioContext and connects to Gemini Live via WebSocket
  *    - Starts the microphone pipeline (MediaStream -> ScriptProcessor -> Gemini)
  *    - Starts a parallel MediaRecorder for the post-call transcription
- *    - Sends the initial prompt so the AI interviewer begins
- *    - Starts the countdown timer (default 5 min)
+ *    - Plays a deterministic host-owned greeting from a pre-generated asset
+ *    - Sends the initial prompt only after the greeting has completed
+ *    - Starts the countdown timer (default 5 min) after the greeting
  *
  * 2. During the call:
  *    - Mic audio is downsampled to 16 kHz, converted to PCM16, and sent as base64
@@ -18,17 +19,17 @@
  *    - Transcription events are buffered and flushed into the transcript log
  *
  * 3. Closing sequence (time-based phases):
- *    - T-40s: "last-question" -> detach realtime session, speak final question locally
- *    - T-15s: "finalizing" -> interrupt, speak closing line locally
- *    - T-5s:  "silent" -> suppress all audio, wait for timer to expire
- *    - T-0s:  stopCall() -> full teardown + post-call transcription
+ *    - T-40s: host detaches the realtime session and asks one fixed final question
+ *    - T-15s: every end reason funnels through requestGracefulStop()
+ *    - Host-owned farewell plays from a pre-generated asset
+ *    - stopCall() runs only after farewell completion or hard timeout
  *
  * 4. stopCall() teardown:
  *    - Stops MediaRecorder, collects recorded blob
  *    - Closes Gemini session and disconnects audio nodes
  *    - Stops mic tracks, closes AudioContext
  *    - Triggers face analysis via FaceLandmarkPanel.stopAndAnalyze()
- *    - Sends recorded audio to /api/simulate/interview-transcript for transcription
+ *    - Sends recorded audio to /api/interview/transcript for transcription
  *    - Persists all state to sessionStorage for feedback page handoff
  */
 
@@ -36,7 +37,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { GoogleGenAI, LiveServerMessage, MediaResolution, Modality, Session } from "@google/genai"
+import { GoogleGenAI, LiveServerMessage, MediaResolution, Modality, Session, type LiveCallbacks } from "@google/genai"
 import { FaceLandmarkPanel, type FaceLandmarkPanelHandle } from "@/components/interview/face-landmark-panel"
 import { formatCountdown, getInterviewQuestionPool } from "@/lib/interview"
 import {
@@ -57,6 +58,16 @@ import {
     type Speaker,
     type TranscriptEntry,
 } from "@/lib/transcript"
+import {
+    getFarewellPhrase,
+    getLastQuestionPhrase,
+    getTechnicalErrorFarewellPhrase,
+    HOST_ASSET_LOAD_FALLBACK_TIMEOUT_MS,
+    resolveGreetingPhrase,
+    resolveOpeningQuestionPhrase,
+    HOST_CLOSING_HARD_STOP_TIMEOUT_MS,
+    type HostVoicePhrase,
+} from "@/lib/voice-host"
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -64,32 +75,26 @@ import {
 
 const LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 const LIVE_VOICE = "Zephyr"
+const AUDIO_INPUT_WORKLET_PATH = "/audio/voice-host/pcm-input-worklet.js"
 const CALL_DURATION_SECONDS = 300
 const LAST_QUESTION_LEAD_SECONDS = 40
 const FINAL_INTERRUPT_LEAD_SECONDS = 15
-const SILENT_TAIL_SECONDS = 5
-/**
- * Deterministic local fallback for the final question.
- * Spoken via browser SpeechSynthesis after the realtime session is detached,
- * ensuring the closing question is always delivered reliably.
- */
-const LOCAL_FINAL_QUESTION = "Zum Abschluss noch eine letzte kurze Frage: Warum bist du fuer diese Rolle jetzt konkret die richtige Besetzung?"
-const LOCAL_FINAL_CLOSING = "Ich unterbreche kurz, die Zeit ist vorbei. Vielen Dank fuer das Gespraech."
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "error"
-type ClosingPhase = "idle" | "armed" | "last-question" | "finalizing" | "silent"
-type ClosingMode = "lastQuestion" | "finalInterrupt" | "goAway"
+type CallLifecyclePhase = "idle" | "opening" | "interviewing" | "closing" | "stopping"
+type ClosingPhase = "idle" | "armed" | "last-question" | "finalizing"
+type StopReason = "timer" | "manual" | "goAway" | "technicalError"
 type LiveTokenResponse = { token: string; model: string; voiceName: string }
+type AsyncResult<T> = { ok: true; value: T } | { ok: false; error: string }
 type CallTiming = {
     startedAtMs: number
     targetEndAtMs: number
     lastQuestionAtMs: number
     finalInterruptAtMs: number
-    silentTailAtMs: number
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +107,6 @@ function createCallTiming(startedAtMs = Date.now()): CallTiming {
         targetEndAtMs: startedAtMs + CALL_DURATION_SECONDS * 1_000,
         lastQuestionAtMs: startedAtMs + (CALL_DURATION_SECONDS - LAST_QUESTION_LEAD_SECONDS) * 1_000,
         finalInterruptAtMs: startedAtMs + (CALL_DURATION_SECONDS - FINAL_INTERRUPT_LEAD_SECONDS) * 1_000,
-        silentTailAtMs: startedAtMs + (CALL_DURATION_SECONDS - SILENT_TAIL_SECONDS) * 1_000,
     }
 }
 
@@ -121,7 +125,7 @@ function VoiceInterview({ role }: { role: string }) {
     const [postCallCandidateTranscript, setPostCallCandidateTranscript] = useState("")
     const [postCallTranscriptStatus, setPostCallTranscriptStatus] = useState<PostCallTranscriptStatus>("idle")
     const [postCallTranscriptError, setPostCallTranscriptError] = useState("")
-    const [callStarted, setCallStarted] = useState(false)
+    const [callLifecyclePhase, setCallLifecyclePhase] = useState<CallLifecyclePhase>("idle")
     const [secondsLeft, setSecondsLeft] = useState(CALL_DURATION_SECONDS)
     // Memoize Q&A pairs to avoid recomputing on every render
     const transcriptQaPairs = useMemo(() => buildTranscriptQaPairs(transcriptEntries), [transcriptEntries])
@@ -131,7 +135,7 @@ function VoiceInterview({ role }: { role: string }) {
     const audioContextRef = useRef<AudioContext | null>(null)
     const microphoneStreamRef = useRef<MediaStream | null>(null)
     const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
-    const processorNodeRef = useRef<ScriptProcessorNode | null>(null)
+    const processorNodeRef = useRef<AudioWorkletNode | null>(null)
     const silentGainRef = useRef<GainNode | null>(null)
 
     // -- Refs: Audio playback scheduling --
@@ -150,14 +154,18 @@ function VoiceInterview({ role }: { role: string }) {
     const closingPhaseRef = useRef<ClosingPhase>("idle")
     const finalQuestionTriggeredRef = useRef(false)
     const finalInterruptTriggeredRef = useRef(false)
-    const silentTailTriggeredRef = useRef(false)
     const candidateAudioSuppressedRef = useRef(false)
     const realtimeSessionDetachedRef = useRef(false)
     const localSpeechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+    const fixedPhraseAudioRef = useRef<HTMLAudioElement | null>(null)
+    const hostPlaybackSequenceRef = useRef(0)
+    const gracefulStopInFlightRef = useRef(false)
+    const closingHardStopTimerRef = useRef<number | null>(null)
 
     // -- Refs: Call lifecycle guards --
-    const stopCallRef = useRef<(() => Promise<void>) | null>(null)
+    const stopCallRef = useRef<((options?: { terminalStatus?: ConnectionStatus; closeSession?: boolean }) => Promise<void>) | null>(null)
     const connectionStatusRef = useRef<ConnectionStatus>("idle")
+    const callLifecyclePhaseRef = useRef<CallLifecyclePhase>("idle")
     const startCallInFlightRef = useRef(false)
     const stopCallInFlightRef = useRef(false)
     const callTimingRef = useRef<CallTiming | null>(null)
@@ -182,8 +190,9 @@ function VoiceInterview({ role }: { role: string }) {
     const faceLandmarkPanelRef = useRef<FaceLandmarkPanelHandle | null>(null)
 
     // -- State-to-ref sync effects --
-    // These keep refs in sync so stale closures always read fresh values.
+    // These keep refs in sync - so stale closures always read fresh values.
     useEffect(() => { connectionStatusRef.current = connectionStatus }, [connectionStatus])
+    useEffect(() => { callLifecyclePhaseRef.current = callLifecyclePhase }, [callLifecyclePhase])
     useEffect(() => { transcriptEntriesRef.current = transcriptEntries }, [transcriptEntries])
     useEffect(() => { postCallCandidateTranscriptRef.current = postCallCandidateTranscript }, [postCallCandidateTranscript])
     useEffect(() => { postCallTranscriptStatusRef.current = postCallTranscriptStatus }, [postCallTranscriptStatus])
@@ -212,8 +221,19 @@ function VoiceInterview({ role }: { role: string }) {
         setConnectionStatus(nextStatus)
     }
 
+    function updateCallLifecyclePhase(nextPhase: CallLifecyclePhase) {
+        callLifecyclePhaseRef.current = nextPhase
+        setCallLifecyclePhase(nextPhase)
+    }
+
     const updateClosingPhase = useCallback((nextPhase: ClosingPhase) => {
         closingPhaseRef.current = nextPhase
+    }, [])
+
+    const clearClosingHardStopTimer = useCallback(() => {
+        if (closingHardStopTimerRef.current === null || typeof window === "undefined") return
+        window.clearTimeout(closingHardStopTimerRef.current)
+        closingHardStopTimerRef.current = null
     }, [])
 
     const syncCountdown = useCallback(() => {
@@ -225,6 +245,36 @@ function VoiceInterview({ role }: { role: string }) {
 
         const remainingMs = Math.max(0, targetEndAtMs - Date.now())
         setSecondsLeft(Math.ceil(remainingMs / 1_000))
+    }, [])
+
+    /**
+     * Disconnect the active microphone processing graph and clear the refs so
+     * later lifecycle transitions can safely rebuild it from scratch.
+     */
+    const resetRealtimeAudioPipeline = useCallback(() => {
+        processorNodeRef.current?.port.close()
+        processorNodeRef.current?.disconnect()
+        sourceNodeRef.current?.disconnect()
+        silentGainRef.current?.disconnect()
+        processorNodeRef.current = null
+        sourceNodeRef.current = null
+        silentGainRef.current = null
+    }, [])
+
+    const resetTranscriptTrackingRefs = useCallback(() => {
+        pendingCandidateTranscriptRef.current = ""
+        pendingInterviewerTranscriptRef.current = ""
+        lastCandidateTranscriptRef.current = ""
+        lastInterviewerTranscriptRef.current = ""
+    }, [])
+
+    const resetClosingStateRefs = useCallback((candidateAudioSuppressed: boolean) => {
+        closingRequestedRef.current = false
+        candidateAudioSuppressedRef.current = candidateAudioSuppressed
+        realtimeSessionDetachedRef.current = false
+        finalQuestionTriggeredRef.current = false
+        finalInterruptTriggeredRef.current = false
+        gracefulStopInFlightRef.current = false
     }, [])
 
     // -- Transcript helpers --
@@ -288,7 +338,7 @@ function VoiceInterview({ role }: { role: string }) {
         [flushFinishedTranscript]
     )
 
-    // -- Local speech synthesis (used during closing sequence) --
+    // -- Host-owned fixed phrase playback --
 
     const cancelLocalSpeech = useCallback(() => {
         localSpeechUtteranceRef.current = null
@@ -297,35 +347,160 @@ function VoiceInterview({ role }: { role: string }) {
         setPlaybackActive(false)
     }, [])
 
-    const speakLocally = useCallback(
-        (text: string) => {
-            cancelLocalSpeech()
-            appendTranscript("interviewer", text, { mergeWithPrevious: false })
+    const cancelFixedPhraseAudio = useCallback(() => {
+        const activeAudio = fixedPhraseAudioRef.current
+        fixedPhraseAudioRef.current = null
 
-            if (typeof window === "undefined" || !("speechSynthesis" in window)) return
+        if (!activeAudio) {
+            setPlaybackActive(false)
+            return
+        }
 
-            const utterance = new SpeechSynthesisUtterance(text)
-            utterance.lang = "de-DE"
-            utterance.rate = 1
-            utterance.pitch = 1
-            utterance.onstart = () => {
-                if (localSpeechUtteranceRef.current === utterance) setPlaybackActive(true)
-            }
-            utterance.onend = () => {
-                if (localSpeechUtteranceRef.current !== utterance) return
-                localSpeechUtteranceRef.current = null
-                setPlaybackActive(false)
-            }
-            utterance.onerror = () => {
-                if (localSpeechUtteranceRef.current !== utterance) return
-                localSpeechUtteranceRef.current = null
-                setPlaybackActive(false)
-            }
+        try {
+            activeAudio.pause()
+            activeAudio.src = ""
+            activeAudio.load()
+        } catch {}
 
-            localSpeechUtteranceRef.current = utterance
-            window.speechSynthesis.speak(utterance)
+        setPlaybackActive(false)
+    }, [])
+
+    /**
+     * Bump the playback sequence and stop every host-owned audio source.
+     * This ensures that a newer lifecycle transition can never overlap with
+     * an older greeting/farewell playback promise.
+     */
+    const cancelHostPlayback = useCallback(() => {
+        hostPlaybackSequenceRef.current += 1
+        cancelFixedPhraseAudio()
+        cancelLocalSpeech()
+    }, [cancelFixedPhraseAudio, cancelLocalSpeech])
+
+    const playSpeechFallback = useCallback(
+        (text: string, playbackSequence: number) =>
+            new Promise<boolean>((resolve) => {
+                if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+                    resolve(false)
+                    return
+                }
+
+                window.speechSynthesis.cancel()
+                const utterance = new SpeechSynthesisUtterance(text)
+                utterance.lang = "de-DE"
+                utterance.rate = 1
+                utterance.pitch = 1
+
+                const finish = (result: boolean) => {
+                    if (localSpeechUtteranceRef.current === utterance) {
+                        localSpeechUtteranceRef.current = null
+                    }
+                    setPlaybackActive(false)
+                    resolve(result)
+                }
+
+                utterance.onstart = () => {
+                    if (hostPlaybackSequenceRef.current !== playbackSequence) {
+                        window.speechSynthesis.cancel()
+                        finish(false)
+                        return
+                    }
+
+                    setPlaybackActive(true)
+                }
+                utterance.onend = () => finish(hostPlaybackSequenceRef.current === playbackSequence)
+                utterance.onerror = () => finish(false)
+
+                localSpeechUtteranceRef.current = utterance
+                window.speechSynthesis.speak(utterance)
+            }),
+        []
+    )
+
+    /**
+     * Try the pre-generated local asset first. If the browser cannot start
+     * playback within a short timeout, we intentionally fall back to the
+     * browser TTS so the call can still progress.
+     */
+    const playFixedPhraseAsset = useCallback(
+        (assetPath: string, playbackSequence: number) =>
+            new Promise<boolean>((resolve) => {
+                if (typeof window === "undefined") {
+                    resolve(false)
+                    return
+                }
+
+                const audio = new Audio(assetPath)
+                fixedPhraseAudioRef.current = audio
+                audio.preload = "auto"
+
+                let settled = false
+                let playbackStarted = false
+                const startTimeoutId = window.setTimeout(() => finish(false), HOST_ASSET_LOAD_FALLBACK_TIMEOUT_MS)
+
+                const cleanup = () => {
+                    window.clearTimeout(startTimeoutId)
+                    audio.onplaying = null
+                    audio.onended = null
+                    audio.onerror = null
+                }
+
+                const finish = (result: boolean) => {
+                    if (settled) return
+                    settled = true
+                    cleanup()
+
+                    if (fixedPhraseAudioRef.current === audio) {
+                        fixedPhraseAudioRef.current = null
+                    }
+
+                    try {
+                        if (!audio.ended) {
+                            audio.pause()
+                        }
+                        audio.src = ""
+                        audio.load()
+                    } catch {}
+
+                    setPlaybackActive(false)
+                    resolve(result)
+                }
+
+                audio.onplaying = () => {
+                    if (hostPlaybackSequenceRef.current !== playbackSequence) {
+                        finish(false)
+                        return
+                    }
+
+                    // The timeout is only meant to detect assets that never
+                    // begin playback. Once the browser confirms playback, the
+                    // host must not fall back to browser TTS anymore.
+                    window.clearTimeout(startTimeoutId)
+                    playbackStarted = true
+                    setPlaybackActive(true)
+                }
+                audio.onended = () => finish(playbackStarted && hostPlaybackSequenceRef.current === playbackSequence)
+                audio.onerror = () => finish(false)
+
+                void audio.play().catch(() => finish(false))
+            }),
+        []
+    )
+
+    const playHostPhrase = useCallback(
+        async (phrase: HostVoicePhrase, options?: { appendTranscriptSpeaker?: Speaker }) => {
+            const transcriptSpeaker = options?.appendTranscriptSpeaker ?? "interviewer"
+            appendTranscript(transcriptSpeaker, phrase.text, { mergeWithPrevious: false })
+
+            const playbackSequence = hostPlaybackSequenceRef.current + 1
+            hostPlaybackSequenceRef.current = playbackSequence
+
+            const assetPlayed = await playFixedPhraseAsset(phrase.assetPath, playbackSequence)
+            if (assetPlayed) return true
+            if (hostPlaybackSequenceRef.current !== playbackSequence) return false
+
+            return await playSpeechFallback(phrase.text, playbackSequence)
         },
-        [appendTranscript, cancelLocalSpeech]
+        [appendTranscript, playFixedPhraseAsset, playSpeechFallback]
     )
 
     // -- Closing sequence --
@@ -341,58 +516,70 @@ function VoiceInterview({ role }: { role: string }) {
 
         sessionRef.current?.close()
         sessionRef.current = null
-
-        processorNodeRef.current?.disconnect()
-        sourceNodeRef.current?.disconnect()
-        silentGainRef.current?.disconnect()
-        processorNodeRef.current = null
-        sourceNodeRef.current = null
-        silentGainRef.current = null
-
+        resetRealtimeAudioPipeline()
         stopScheduledPlayback()
-    }, [])
+    }, [resetRealtimeAudioPipeline])
 
-    const beginSilentTail = useCallback(() => {
-        if (closingPhaseRef.current === "silent") return
+    const beginLastQuestionPhase = useCallback(() => {
+        if (finalQuestionTriggeredRef.current || finalInterruptTriggeredRef.current) return
 
-        candidateAudioSuppressedRef.current = true
-        cancelLocalSpeech()
-        stopScheduledPlayback()
-        updateClosingPhase("silent")
-        appendTranscript("system", "Die letzten 5 Sekunden bleiben still. Danach wird der Call beendet.")
-    }, [appendTranscript, cancelLocalSpeech, updateClosingPhase])
+        finalQuestionTriggeredRef.current = true
+        closingRequestedRef.current = true
+        detachRealtimeSession()
+        updateClosingPhase("last-question")
+        appendTranscript("system", "Noch rund 40 Sekunden. Der Host stellt jetzt genau eine letzte Frage.")
+        void playHostPhrase(getLastQuestionPhrase())
+    }, [appendTranscript, detachRealtimeSession, playHostPhrase, updateClosingPhase])
 
-    const beginClosingSequence = useCallback(
-        (mode: ClosingMode) => {
-            if (mode === "lastQuestion") {
-                if (finalQuestionTriggeredRef.current || closingPhaseRef.current === "silent") return
-                finalQuestionTriggeredRef.current = true
-                closingRequestedRef.current = true
-                detachRealtimeSession()
-                updateClosingPhase("last-question")
-                appendTranscript("system", "Noch rund 40 Sekunden. Der Interviewer stellt jetzt genau eine letzte Frage.")
-                speakLocally(LOCAL_FINAL_QUESTION)
-                return
-            }
+    const requestGracefulStop = useCallback(
+        async (reason: StopReason) => {
+            if (gracefulStopInFlightRef.current || stopCallInFlightRef.current) return
 
-            if (finalInterruptTriggeredRef.current || closingPhaseRef.current === "silent") return
+            gracefulStopInFlightRef.current = true
             finalInterruptTriggeredRef.current = true
             closingRequestedRef.current = true
             candidateAudioSuppressedRef.current = true
-            detachRealtimeSession()
-            cancelLocalSpeech()
-            stopScheduledPlayback()
+            updateCallLifecyclePhase("closing")
             updateClosingPhase("finalizing")
+            clearClosingHardStopTimer()
+            cancelHostPlayback()
+            stopScheduledPlayback()
+            detachRealtimeSession()
 
-            const systemMessage =
-                mode === "goAway"
-                      ? "Die Live-Session laeuft aus. Der Interviewer beendet den Call jetzt sauber."
-                      : "Noch 15 Sekunden. Der Interviewer unterbricht jetzt, beendet den Call und bedankt sich knapp."
+            const farewellPhrase = reason === "technicalError" ? getTechnicalErrorFarewellPhrase() : getFarewellPhrase()
+            const terminalStatus: ConnectionStatus = reason === "technicalError" ? "error" : "idle"
 
-            appendTranscript("system", systemMessage)
-            speakLocally(LOCAL_FINAL_CLOSING)
+            if (reason === "goAway") {
+                appendTranscript("system", "Die Live-Session meldet Restzeit. Der Host beendet den Call jetzt kontrolliert.")
+            }
+
+            if (reason === "technicalError") {
+                appendTranscript("system", "Die Live-Session hatte einen technischen Fehler. Der Host beendet den Call jetzt kontrolliert.")
+            }
+
+            if (typeof window !== "undefined") {
+                closingHardStopTimerRef.current = window.setTimeout(() => {
+                    cancelHostPlayback()
+                    void stopCallRef.current?.({ terminalStatus, closeSession: false })
+                }, HOST_CLOSING_HARD_STOP_TIMEOUT_MS)
+            }
+
+            try {
+                await playHostPhrase(farewellPhrase)
+            } finally {
+                clearClosingHardStopTimer()
+                await stopCallRef.current?.({ terminalStatus, closeSession: false })
+                gracefulStopInFlightRef.current = false
+            }
         },
-        [appendTranscript, cancelLocalSpeech, detachRealtimeSession, speakLocally, updateClosingPhase]
+        [
+            appendTranscript,
+            cancelHostPlayback,
+            clearClosingHardStopTimer,
+            detachRealtimeSession,
+            playHostPhrase,
+            updateClosingPhase,
+        ]
     )
 
     // -- Audio playback --
@@ -454,7 +641,7 @@ function VoiceInterview({ role }: { role: string }) {
 
         for (const part of message.serverContent?.modelTurn?.parts ?? []) {
             if (!part.inlineData?.data) continue
-            if (closingPhaseRef.current === "silent") continue
+            if (callLifecyclePhaseRef.current === "closing" || callLifecyclePhaseRef.current === "stopping") continue
 
             playAudioChunk(part.inlineData.data, part.inlineData.mimeType)
         }
@@ -466,7 +653,9 @@ function VoiceInterview({ role }: { role: string }) {
 
         if (message.goAway?.timeLeft) {
             setError(`Live-Session laeuft aus. Verbleibende Zeit: ${message.goAway.timeLeft}`)
-            if (closingPhaseRef.current !== "finalizing") beginClosingSequence("goAway")
+            if (callLifecyclePhaseRef.current !== "closing" && callLifecyclePhaseRef.current !== "stopping") {
+                void requestGracefulStop("goAway")
+            }
         }
     }
 
@@ -484,51 +673,72 @@ function VoiceInterview({ role }: { role: string }) {
         } catch {}
     }
 
-    async function startMicrophone(audioContext: AudioContext, session: Session) {
+    async function startMicrophone(audioContext: AudioContext, session: Session): Promise<AsyncResult<void>> {
         if (!navigator.mediaDevices?.getUserMedia) {
-            throw new Error("Mikrofonzugriff ist in diesem Browser oder Kontext nicht verfuegbar. Nutze localhost oder HTTPS und pruefe die Browser-Berechtigung.")
+            return {
+                ok: false,
+                error: "Mikrofonzugriff ist in diesem Browser oder Kontext nicht verfuegbar. Nutze localhost oder HTTPS und pruefe die Browser-Berechtigung.",
+            }
         }
 
         const recordingMimeType = getSupportedRecordingMimeType()
         if (!recordingMimeType || typeof MediaRecorder === "undefined") {
-            throw new Error("MediaRecorder wird in diesem Browser nicht ausreichend unterstuetzt.")
+            return {
+                ok: false,
+                error: "MediaRecorder wird in diesem Browser nicht ausreichend unterstuetzt.",
+            }
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        })
+        try {
+            await audioContext.audioWorklet.addModule(AUDIO_INPUT_WORKLET_PATH)
 
-        const source = audioContext.createMediaStreamSource(stream)
-        const processor = audioContext.createScriptProcessor(4096, 1, 1)
-        const silentGain = audioContext.createGain()
-        silentGain.gain.value = 0
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            })
 
-        processor.onaudioprocess = (event) => {
-            const input = event.inputBuffer.getChannelData(0)
-            sendRealtimeAudioChunk(session, input, audioContext.sampleRate)
+            const source = audioContext.createMediaStreamSource(stream)
+            const processor = new AudioWorkletNode(audioContext, "pcm-input-processor", {
+                numberOfInputs: 1,
+                numberOfOutputs: 1,
+                channelCount: 1,
+                outputChannelCount: [1],
+            })
+            const silentGain = audioContext.createGain()
+            silentGain.gain.value = 0
+
+            processor.port.onmessage = (event: MessageEvent<Float32Array>) => {
+                if (!(event.data instanceof Float32Array)) return
+                sendRealtimeAudioChunk(session, event.data, audioContext.sampleRate)
+            }
+
+            source.connect(processor)
+            processor.connect(silentGain)
+            silentGain.connect(audioContext.destination)
+
+            microphoneStreamRef.current = stream
+            sourceNodeRef.current = source
+            processorNodeRef.current = processor
+            silentGainRef.current = silentGain
+
+            recordedAudioChunksRef.current = []
+            recordedAudioMimeTypeRef.current = recordingMimeType
+
+            const recorder = new MediaRecorder(stream, { mimeType: recordingMimeType })
+            recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) recordedAudioChunksRef.current.push(event.data)
+            }
+            recorder.start(1_000)
+
+            mediaRecorderRef.current = recorder
+            setPostCallTranscriptStatus("recording")
+            setPostCallTranscriptError("")
+            return { ok: true, value: undefined }
+        } catch (error) {
+            return {
+                ok: false,
+                error: error instanceof Error ? error.message : "Der Mikrofon- oder AudioWorklet-Start ist fehlgeschlagen.",
+            }
         }
-
-        source.connect(processor)
-        processor.connect(silentGain)
-        silentGain.connect(audioContext.destination)
-
-        microphoneStreamRef.current = stream
-        sourceNodeRef.current = source
-        processorNodeRef.current = processor
-        silentGainRef.current = silentGain
-
-        recordedAudioChunksRef.current = []
-        recordedAudioMimeTypeRef.current = recordingMimeType
-
-        const recorder = new MediaRecorder(stream, { mimeType: recordingMimeType })
-        recorder.ondataavailable = (event) => {
-            if (event.data.size > 0) recordedAudioChunksRef.current.push(event.data)
-        }
-        recorder.start(1_000)
-
-        mediaRecorderRef.current = recorder
-        setPostCallTranscriptStatus("recording")
-        setPostCallTranscriptError("")
     }
 
     // -- Post-call processing --
@@ -556,7 +766,7 @@ function VoiceInterview({ role }: { role: string }) {
         })
     }
 
-    async function transcribeCandidateAudio(audioBlob: Blob) {
+    async function transcribeCandidateAudio(audioBlob: Blob): Promise<AsyncResult<string>> {
         setPostCallTranscriptStatus("transcribing")
         setPostCallTranscriptError("")
         persistVoiceFeedbackDraft({
@@ -571,14 +781,17 @@ function VoiceInterview({ role }: { role: string }) {
         formData.append("role", role)
         formData.append("audio", new File([audioBlob], `voice-interview.${audioBlob.type.includes("mp4") ? "mp4" : "webm"}`, { type: audioBlob.type || "audio/webm" }))
 
-        const response = await fetch("/api/simulate/interview-transcript", {
+        const response = await fetch("/api/interview/transcript", {
             method: "POST",
             body: formData,
         })
         const data = (await response.json()) as { transcriptText?: string; error?: string }
 
         if (!response.ok || !data.transcriptText) {
-            throw new Error(data.error || "Post-Call-Transkription fehlgeschlagen.")
+            return {
+                ok: false,
+                error: data.error || "Post-Call-Transkription fehlgeschlagen.",
+            }
         }
 
         setPostCallCandidateTranscript(data.transcriptText)
@@ -592,7 +805,10 @@ function VoiceInterview({ role }: { role: string }) {
             postCallTranscriptError: "",
         })
 
-        return data.transcriptText
+        return {
+            ok: true,
+            value: data.transcriptText,
+        }
     }
 
     // -- Start / Stop call --
@@ -602,8 +818,11 @@ function VoiceInterview({ role }: { role: string }) {
 
         stopCallInFlightRef.current = true
         const { terminalStatus = "idle", closeSession = true } = options ?? {}
+        updateCallLifecyclePhase("stopping")
 
         try {
+            clearClosingHardStopTimer()
+            cancelHostPlayback()
             persistVoiceFeedbackDraft({
                 role,
                 transcriptEntries: transcriptEntriesRef.current,
@@ -615,7 +834,6 @@ function VoiceInterview({ role }: { role: string }) {
             const recordedAudioBlob = await stopCandidateRecording().catch(() => null)
 
             if (closeSession) {
-                cancelLocalSpeech()
                 try {
                     sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true })
                 } catch {}
@@ -624,12 +842,7 @@ function VoiceInterview({ role }: { role: string }) {
             }
 
             sessionRef.current = null
-            processorNodeRef.current?.disconnect()
-            sourceNodeRef.current?.disconnect()
-            silentGainRef.current?.disconnect()
-            processorNodeRef.current = null
-            sourceNodeRef.current = null
-            silentGainRef.current = null
+            resetRealtimeAudioPipeline()
 
             for (const track of microphoneStreamRef.current?.getTracks() ?? []) track.stop()
             microphoneStreamRef.current = null
@@ -639,28 +852,19 @@ function VoiceInterview({ role }: { role: string }) {
             audioContextRef.current = null
             nextPlaybackTimeRef.current = 0
             updateConnectionStatus(terminalStatus)
-            setCallStarted(false)
+            updateCallLifecyclePhase("idle")
             callTimingRef.current = null
             setSecondsLeft(CALL_DURATION_SECONDS)
             updateClosingPhase("idle")
-            closingRequestedRef.current = false
-            candidateAudioSuppressedRef.current = false
-            pendingCandidateTranscriptRef.current = ""
-            pendingInterviewerTranscriptRef.current = ""
-            lastCandidateTranscriptRef.current = ""
-            lastInterviewerTranscriptRef.current = ""
-            realtimeSessionDetachedRef.current = false
-            finalQuestionTriggeredRef.current = false
-            finalInterruptTriggeredRef.current = false
-            silentTailTriggeredRef.current = false
+            resetClosingStateRefs(false)
+            resetTranscriptTrackingRefs()
             startCallInFlightRef.current = false
             const faceAnalysisPromise = faceLandmarkPanelRef.current?.stopAndAnalyze().catch(() => null)
 
             if (recordedAudioBlob && recordedAudioBlob.size > 0) {
-                try {
-                    await transcribeCandidateAudio(recordedAudioBlob)
-                } catch (transcriptionError) {
-                    const message = transcriptionError instanceof Error ? transcriptionError.message : "Post-Call-Transkription fehlgeschlagen."
+                const transcriptionResult = await transcribeCandidateAudio(recordedAudioBlob)
+                if (!transcriptionResult.ok) {
+                    const message = transcriptionResult.error
                     setPostCallTranscriptStatus("error")
                     setPostCallTranscriptError(message)
                     persistVoiceFeedbackDraft({
@@ -683,14 +887,13 @@ function VoiceInterview({ role }: { role: string }) {
 
     useEffect(() => {
         return () => {
-            cancelLocalSpeech()
+            clearClosingHardStopTimer()
+            cancelHostPlayback()
             try {
                 sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true })
             } catch {}
             sessionRef.current?.close()
-            processorNodeRef.current?.disconnect()
-            sourceNodeRef.current?.disconnect()
-            silentGainRef.current?.disconnect()
+            resetRealtimeAudioPipeline()
             for (const track of microphoneStreamRef.current?.getTracks() ?? []) track.stop()
             for (const source of scheduledSourcesRef.current) {
                 try {
@@ -701,10 +904,10 @@ function VoiceInterview({ role }: { role: string }) {
                 void audioContextRef.current.close().catch(() => undefined)
             }
         }
-    }, [cancelLocalSpeech])
+    }, [cancelHostPlayback, clearClosingHardStopTimer, resetRealtimeAudioPipeline])
 
     useEffect(() => {
-        if (!callStarted || connectionStatus !== "connected") return
+        if (callLifecyclePhase !== "interviewing") return
 
         syncCountdown()
         const intervalId = window.setInterval(() => {
@@ -714,31 +917,25 @@ function VoiceInterview({ role }: { role: string }) {
 
             const now = Date.now()
             if (now >= timing.targetEndAtMs) {
-                void stopCallRef.current?.()
-                return
-            }
-
-            if (!silentTailTriggeredRef.current && now >= timing.silentTailAtMs) {
-                silentTailTriggeredRef.current = true
-                beginSilentTail()
+                void requestGracefulStop("timer")
                 return
             }
 
             if (!finalInterruptTriggeredRef.current && now >= timing.finalInterruptAtMs) {
-                beginClosingSequence("finalInterrupt")
+                void requestGracefulStop("timer")
                 return
             }
 
             if (!finalQuestionTriggeredRef.current && now >= timing.lastQuestionAtMs) {
-                beginClosingSequence("lastQuestion")
+                beginLastQuestionPhase()
             }
         }, 250)
 
         return () => window.clearInterval(intervalId)
-    }, [beginClosingSequence, beginSilentTail, callStarted, connectionStatus, syncCountdown])
+    }, [beginLastQuestionPhase, callLifecyclePhase, requestGracefulStop, syncCountdown])
 
     async function startCall() {
-        if (startCallInFlightRef.current || connectionStatusRef.current === "connected") return
+        if (startCallInFlightRef.current || callLifecyclePhaseRef.current !== "idle") return
 
         startCallInFlightRef.current = true
         setError("")
@@ -746,28 +943,33 @@ function VoiceInterview({ role }: { role: string }) {
         setPostCallTranscriptError("")
         setPostCallTranscriptStatus("idle")
         setTranscriptEntries([])
-        setCallStarted(false)
+        updateCallLifecyclePhase("opening")
         setSecondsLeft(CALL_DURATION_SECONDS)
         updateClosingPhase("idle")
-        closingRequestedRef.current = false
-        candidateAudioSuppressedRef.current = false
-        pendingCandidateTranscriptRef.current = ""
-        pendingInterviewerTranscriptRef.current = ""
-        lastCandidateTranscriptRef.current = ""
-        lastInterviewerTranscriptRef.current = ""
-        realtimeSessionDetachedRef.current = false
-        finalQuestionTriggeredRef.current = false
-        finalInterruptTriggeredRef.current = false
-        silentTailTriggeredRef.current = false
+        resetClosingStateRefs(true)
+        resetTranscriptTrackingRefs()
         callTimingRef.current = null
         recordedAudioChunksRef.current = []
         recordedAudioMimeTypeRef.current = ""
+        clearClosingHardStopTimer()
+        cancelHostPlayback()
         updateConnectionStatus("connecting")
 
         try {
-            if (!window.isSecureContext) throw new Error("Mikrofonzugriff funktioniert nur auf localhost oder HTTPS.")
-            if (!navigator.mediaDevices?.getUserMedia) throw new Error("Dieser Browser stellt keine getUserMedia-API bereit.")
-            if (!getSupportedRecordingMimeType()) throw new Error("MediaRecorder ist fuer diese Aufnahme-Konfiguration nicht verfuegbar.")
+            const startValidationError = !window.isSecureContext
+                ? "Mikrofonzugriff funktioniert nur auf localhost oder HTTPS."
+                : !navigator.mediaDevices?.getUserMedia
+                    ? "Dieser Browser stellt keine getUserMedia-API bereit."
+                    : !getSupportedRecordingMimeType()
+                        ? "MediaRecorder ist fuer diese Aufnahme-Konfiguration nicht verfuegbar."
+                        : ""
+
+            if (startValidationError) {
+                await stopCall()
+                updateConnectionStatus("error")
+                setError(startValidationError)
+                return
+            }
 
             const tokenResponse = await fetch("/api/gemini/live-token", {
                 method: "POST",
@@ -775,12 +977,30 @@ function VoiceInterview({ role }: { role: string }) {
                 body: JSON.stringify({ role }),
             })
             const tokenData = (await tokenResponse.json()) as Partial<LiveTokenResponse> & { error?: string }
-            if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.error || "Live-Token konnte nicht erstellt werden.")
+            if (!tokenResponse.ok || !tokenData.token) {
+                await stopCall()
+                updateConnectionStatus("error")
+                setError(tokenData.error || "Live-Token konnte nicht erstellt werden.")
+                return
+            }
 
             const audioContext = new AudioContext()
             audioContextRef.current = audioContext
 
             const ai = new GoogleGenAI({ apiKey: tokenData.token, httpOptions: { apiVersion: "v1alpha" } })
+            const liveCallbacks: LiveCallbacks = {
+                onopen: () => updateConnectionStatus("connected"),
+                onmessage: (message: LiveServerMessage) => handleServerMessage(message),
+                onerror: (event: ErrorEvent) => {
+                    setError(event.message || "Fehler in der Live-Session.")
+                    void requestGracefulStop("technicalError")
+                },
+                onclose: () => {
+                    if (realtimeSessionDetachedRef.current) return
+                    if (stopCallInFlightRef.current) return
+                    void requestGracefulStop("technicalError")
+                },
+            }
             const session = await ai.live.connect({
                 model: tokenData.model || LIVE_MODEL,
                 config: {
@@ -790,28 +1010,38 @@ function VoiceInterview({ role }: { role: string }) {
                     inputAudioTranscription: {},
                     outputAudioTranscription: {},
                 },
-                callbacks: {
-                    onopen: () => updateConnectionStatus("connected"),
-                    onmessage: (message: LiveServerMessage) => handleServerMessage(message),
-                    onerror: (event: ErrorEvent) => {
-                        setError(event.message || "Fehler in der Live-Session.")
-                        void stopCall({ terminalStatus: "error" })
-                    },
-                    onclose: () => {
-                        if (realtimeSessionDetachedRef.current) return
-                        if (stopCallInFlightRef.current) return
-                        void stopCall({ terminalStatus: connectionStatusRef.current === "error" ? "error" : "idle", closeSession: false })
-                    },
-                },
+                callbacks: liveCallbacks,
             })
 
             sessionRef.current = session
-            await startMicrophone(audioContext, session)
+            const microphoneStartResult = await startMicrophone(audioContext, session)
+            if (!microphoneStartResult.ok) {
+                await stopCall()
+                updateConnectionStatus("error")
+                setError(microphoneStartResult.error)
+                return
+            }
+            updateCallLifecyclePhase("opening")
 
-            const firstCoreQuestion = questionPlan[0]?.text || `Warum passt du aus deiner Sicht gut zur Rolle ${role}?`
             const plannedQuestionContext = questionPlan.map((question, index) => `${index + 1}. ${question.text}`).join(" ")
+            const openingQuestionPhrase = resolveOpeningQuestionPhrase(role)
 
             appendTranscript("system", `Interviewrahmen fuer ${role}: ${plannedQuestionContext}`)
+            const greetingPlayed = await playHostPhrase(resolveGreetingPhrase(role))
+            if (!greetingPlayed) {
+                await stopCall()
+                updateConnectionStatus("error")
+                setError("Die feste Begruessung konnte nicht abgespielt werden.")
+                return
+            }
+
+            const openingQuestionPlayed = await playHostPhrase(openingQuestionPhrase)
+            if (!openingQuestionPlayed) {
+                await stopCall()
+                updateConnectionStatus("error")
+                setError("Die feste erste Frage konnte nicht abgespielt werden.")
+                return
+            }
 
             callTimingRef.current = createCallTiming()
             syncCountdown()
@@ -819,18 +1049,19 @@ function VoiceInterview({ role }: { role: string }) {
             session.sendClientContent({
                 turns: [
                     {
-                        role: "user",
+                        role: "model",
                         parts: [
                             {
-                                text: `Starte jetzt das Interview fuer die Rolle ${role}. Begruesse mich kurz in einem Satz und stelle dann sofort diese erste Kernfrage: "${firstCoreQuestion}".`,
+                                text: openingQuestionPhrase.text,
                             },
                         ],
                     },
                 ],
-                turnComplete: true,
+                turnComplete: false,
             })
 
-            setCallStarted(true)
+            candidateAudioSuppressedRef.current = false
+            updateCallLifecyclePhase("interviewing")
             updateClosingPhase("armed")
         } catch (startError) {
             await stopCall()
@@ -871,6 +1102,7 @@ function VoiceInterview({ role }: { role: string }) {
 
                             <div className="mt-4 flex flex-wrap gap-2 text-xs">
                                 <span className="rounded-full border bg-slate-50 px-3 py-1.5">{connectionStatus}</span>
+                                <span className="rounded-full border bg-slate-50 px-3 py-1.5">{callLifecyclePhase}</span>
                                 <span className={`rounded-full border px-3 py-1.5 ${secondsLeft <= LAST_QUESTION_LEAD_SECONDS ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-700"}`}>
                                     {formatCountdown(secondsLeft)}
                                 </span>
@@ -890,14 +1122,14 @@ function VoiceInterview({ role }: { role: string }) {
                             <div className="mt-4 flex gap-2">
                                 <button
                                     onClick={() => void startCall()}
-                                    disabled={connectionStatus === "connecting" || connectionStatus === "connected" || !microphoneSupported || !recorderSupported}
+                                    disabled={callLifecyclePhase !== "idle" || connectionStatus === "connecting" || !microphoneSupported || !recorderSupported}
                                     className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
                                 >
-                                    {connectionStatus === "connecting" ? "Verbinde..." : "Start"}
+                                    {callLifecyclePhase === "opening" || connectionStatus === "connecting" ? "Verbinde..." : "Start"}
                                 </button>
                                 <button
-                                    onClick={() => void stopCall()}
-                                    disabled={connectionStatus !== "connected" && connectionStatus !== "error"}
+                                    onClick={() => void requestGracefulStop("manual")}
+                                    disabled={callLifecyclePhase === "idle" || callLifecyclePhase === "stopping"}
                                     className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-50"
                                 >
                                     Stop

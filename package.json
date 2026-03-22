@@ -6,12 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
+    "generate:voice-assets": "node scripts/generate-fixed-voice-assets.mjs",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
-    "next": "16.1.6",
+    "next": "^16.2.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -22,8 +23,11 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "^16.2.1",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "flatted": "3.4.2"
   }
 }

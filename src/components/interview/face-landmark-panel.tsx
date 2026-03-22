@@ -450,7 +450,7 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
             setAnalysisReport(null)
 
             try {
-                const response = await fetch("/api/simulate/face-analysis", {
+                const response = await fetch("/api/interview/face-analysis", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -463,7 +463,11 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
                 const data = (await response.json()) as FaceAnalysisReport | { error?: string }
 
                 if (!response.ok || !("overallScore" in data)) {
-                    throw new Error(("error" in data && data.error) || "Face-Analyse fehlgeschlagen.")
+                    const message = ("error" in data && data.error) || "Face-Analyse fehlgeschlagen."
+                    setAnalysisError(message)
+                    setAnalysisStatus("error")
+                    setAnalysisReport(null)
+                    return null
                 }
 
                 setAnalysisReport(data)

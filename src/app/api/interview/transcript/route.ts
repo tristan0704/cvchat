@@ -1,3 +1,11 @@
+/**
+ * Voice interview transcript endpoint.
+ *
+ * After the live call ends, the client uploads the recorded candidate audio to
+ * this route. Gemini transcribes that single recording into the post-call
+ * transcript shown in the UI and persisted for the feedback handoff.
+ */
+
 import { createPartFromUri, GoogleGenAI } from "@google/genai"
 
 export const runtime = "nodejs"

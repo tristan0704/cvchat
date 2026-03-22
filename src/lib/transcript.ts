@@ -106,12 +106,18 @@ export function buildTranscriptQaPairs(entries: TranscriptEntry[]): TranscriptQa
 /** Build a plain-text export of the transcript in numbered Q&A format. */
 export function buildTranscriptQaExport(role: string, entries: TranscriptEntry[]): string {
     const pairs = buildTranscriptQaPairs(entries)
-    if (!pairs.length) return ""
+    const fullTranscriptEntries = entries.filter((entry) => entry.speaker !== "system")
+
+    if (!pairs.length && !fullTranscriptEntries.length) return ""
 
     return [
         `Rolle: ${role}`,
         `Exportiert: ${new Date().toISOString()}`,
         "",
+        "Volltranskript:",
+        ...fullTranscriptEntries.flatMap((entry) => [`${entry.speaker === "candidate" ? "Kandidat" : "Interviewer"}: ${entry.text}`]),
+        "",
+        "Q&A-Auszug:",
         ...pairs.flatMap((pair, index) => [
             `${index + 1}.`,
             `Frage: ${pair.question}`,
