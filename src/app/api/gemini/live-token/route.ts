@@ -42,6 +42,7 @@ function createSystemInstruction(role: string) {
         "Wenn die Antwort brauchbar und konkret ist, gehe ohne Umwege zur naechsten Kernfrage weiter.",
         "Unterbrich den Kandidaten nicht absichtlich. Bei kurzen Pausen wartest du kurz, statt sofort zu sprechen.",
         "Halte eigene Antworten knapp: meistens 1 bis 2 kurze Saetze plus genau eine Frage.",
+        "Der ausgegebene Textkanal muss den gesprochenen Interviewerinhalt wortgleich wiedergeben.",
         `Rollenspezifischer Interviewfokus: ${getRoleInterviewGuidance(role)}`,
         getRegionalTechContextGuidance(),
         "Vorgesehene Kernfragen fuer dieses Interview:",

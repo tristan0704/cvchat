@@ -2,10 +2,12 @@
  * Transcript management utilities for the voice interview flow.
  *
  * Transcript Flow:
- * 1. During the call, Gemini streams live transcription events for both
- *    the candidate (inputTranscription) and the interviewer (outputTranscription).
- * 2. Partial transcripts are buffered in pending refs until `finished` is true.
- * 3. Finished segments are normalized and appended to the transcript entries array.
+ * 1. During the call, Gemini streams live transcription events for the
+ *    candidate (inputTranscription) while recruiter turns are taken from the
+ *    model's canonical text output.
+ * 2. Partial transcripts are buffered in pending refs until the segment is
+ *    clearly complete, either through `finished` or a turn boundary.
+ * 3. Completed segments are normalized and appended to the transcript entries array.
  * 4. After the call ends, entries are paired into Q&A format for export.
  * 5. Separately, the full candidate audio recording is sent to the
  *    transcription API for a higher-quality post-call transcript.
@@ -36,6 +38,7 @@ export type VoiceFeedbackDraft = {
     role: string
     transcriptEntries: TranscriptEntry[]
     postCallCandidateTranscript: string
+    mappedTranscriptQaPairs?: TranscriptQaPair[]
     postCallTranscriptStatus: PostCallTranscriptStatus
     postCallTranscriptError: string
 }
@@ -62,16 +65,62 @@ export function normalizeTranscriptText(text: string): string {
 
 /**
  * Group transcript entries into interviewer-question / candidate-answer pairs.
- * System entries are skipped. A new pair starts whenever the interviewer speaks.
+ * System entries are skipped. Consecutive entries from the same speaker are
+ * collapsed into a single turn before pairing.
  */
-export function buildTranscriptQaPairs(entries: TranscriptEntry[]): TranscriptQaPair[] {
-    const pairs: TranscriptQaPair[] = []
-    let activeQuestion = ""
-    let activeAnswer = ""
+function collapseTranscriptTurns(entries: TranscriptEntry[]): TranscriptEntry[] {
+    const collapsedTurns: TranscriptEntry[] = []
 
     for (const entry of entries) {
         if (entry.speaker === "system") continue
 
+        const normalizedText = normalizeTranscriptText(entry.text)
+        if (!normalizedText) continue
+
+        const previousTurn = collapsedTurns[collapsedTurns.length - 1]
+        if (previousTurn?.speaker === entry.speaker) {
+            collapsedTurns[collapsedTurns.length - 1] = {
+                ...previousTurn,
+                text: `${previousTurn.text} ${normalizedText}`.trim(),
+            }
+            continue
+        }
+
+        collapsedTurns.push({
+            ...entry,
+            text: normalizedText,
+        })
+    }
+
+    return collapsedTurns
+}
+
+export function extractInterviewerQuestions(entries: TranscriptEntry[]): string[] {
+    return collapseTranscriptTurns(entries)
+        .filter((entry) => entry.speaker === "interviewer")
+        .map((entry) => entry.text)
+}
+
+export function normalizeTranscriptQaPairs(pairs: TranscriptQaPair[]): TranscriptQaPair[] {
+    return pairs
+        .map((pair) => ({
+            question: normalizeTranscriptText(pair.question),
+            answer: normalizeTranscriptText(pair.answer),
+        }))
+        .filter((pair) => !!pair.question)
+        .map((pair) => ({
+            ...pair,
+            answer: pair.answer || "(keine Antwort erfasst)",
+        }))
+}
+
+export function buildTranscriptQaPairs(entries: TranscriptEntry[]): TranscriptQaPair[] {
+    const turns = collapseTranscriptTurns(entries)
+    const pairs: TranscriptQaPair[] = []
+    let activeQuestion = ""
+    let activeAnswer = ""
+
+    for (const entry of turns) {
         if (entry.speaker === "interviewer") {
             if (activeQuestion) {
                 pairs.push({
@@ -103,19 +152,38 @@ export function buildTranscriptQaPairs(entries: TranscriptEntry[]): TranscriptQa
 // Export
 // ---------------------------------------------------------------------------
 
-/** Build a plain-text export of the transcript in numbered Q&A format. */
-export function buildTranscriptQaExport(role: string, entries: TranscriptEntry[]): string {
-    const pairs = buildTranscriptQaPairs(entries)
-    const fullTranscriptEntries = entries.filter((entry) => entry.speaker !== "system")
+type TranscriptQaExportOptions = {
+    qaPairs?: TranscriptQaPair[]
+    candidateTranscript?: string
+}
 
-    if (!pairs.length && !fullTranscriptEntries.length) return ""
+/** Build a plain-text export of the transcript in numbered Q&A format. */
+export function buildTranscriptQaExport(role: string, entries: TranscriptEntry[], options?: TranscriptQaExportOptions): string {
+    const pairs = normalizeTranscriptQaPairs(options?.qaPairs?.length ? options.qaPairs : buildTranscriptQaPairs(entries))
+    const fullTranscriptEntries = collapseTranscriptTurns(entries)
+    const interviewerEntries = fullTranscriptEntries.filter((entry) => entry.speaker === "interviewer")
+    const candidateTranscript = normalizeTranscriptText(options?.candidateTranscript || "")
+
+    if (!pairs.length && !fullTranscriptEntries.length && !candidateTranscript) return ""
+
+    const transcriptSection = candidateTranscript
+        ? [
+            "Interviewer-Verlauf:",
+            ...interviewerEntries.flatMap((entry) => [`Interviewer: ${entry.text}`]),
+            "",
+            "Kandidaten-Volltranskript:",
+            candidateTranscript,
+        ]
+        : [
+            "Volltranskript:",
+            ...fullTranscriptEntries.flatMap((entry) => [`${entry.speaker === "candidate" ? "Kandidat" : "Interviewer"}: ${entry.text}`]),
+        ]
 
     return [
         `Rolle: ${role}`,
         `Exportiert: ${new Date().toISOString()}`,
         "",
-        "Volltranskript:",
-        ...fullTranscriptEntries.flatMap((entry) => [`${entry.speaker === "candidate" ? "Kandidat" : "Interviewer"}: ${entry.text}`]),
+        ...transcriptSection,
         "",
         "Q&A-Auszug:",
         ...pairs.flatMap((pair, index) => [
@@ -146,6 +214,7 @@ export function persistVoiceFeedbackDraft(args: VoiceFeedbackDraft): void {
             mode: "voice",
             transcriptEntries: args.transcriptEntries,
             postCallCandidateTranscript: args.postCallCandidateTranscript,
+            mappedTranscriptQaPairs: args.mappedTranscriptQaPairs ?? [],
             postCallTranscriptStatus: args.postCallTranscriptStatus,
             postCallTranscriptError: args.postCallTranscriptError,
             updatedAt: new Date().toISOString(),

@@ -37,7 +37,18 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { GoogleGenAI, LiveServerMessage, MediaResolution, Modality, Session, type LiveCallbacks } from "@google/genai"
+import {
+    ActivityHandling,
+    EndSensitivity,
+    GoogleGenAI,
+    LiveServerMessage,
+    MediaResolution,
+    Modality,
+    Session,
+    StartSensitivity,
+    TurnCoverage,
+    type LiveCallbacks,
+} from "@google/genai"
 import { FaceLandmarkPanel, type FaceLandmarkPanelHandle } from "@/components/interview/face-landmark-panel"
 import { formatCountdown, getInterviewQuestionPool } from "@/lib/interview"
 import {
@@ -52,12 +63,16 @@ import {
 import {
     buildTranscriptQaPairs,
     buildTranscriptQaExport,
+    extractInterviewerQuestions,
+    normalizeTranscriptQaPairs,
     normalizeTranscriptText,
     persistVoiceFeedbackDraft,
     type PostCallTranscriptStatus,
     type Speaker,
     type TranscriptEntry,
+    type TranscriptQaPair,
 } from "@/lib/transcript"
+import { mergeModelTurnText, mergeStreamingTurnText } from "@/lib/live-interviewer-turns"
 import {
     getFarewellPhrase,
     getLastQuestionPhrase,
@@ -79,6 +94,8 @@ const AUDIO_INPUT_WORKLET_PATH = "/audio/voice-host/pcm-input-worklet.js"
 const CALL_DURATION_SECONDS = 300
 const LAST_QUESTION_LEAD_SECONDS = 40
 const FINAL_INTERRUPT_LEAD_SECONDS = 15
+const LIVE_INPUT_PREFIX_PADDING_MS = 120
+const LIVE_INPUT_SILENCE_DURATION_MS = 700
 
 // ---------------------------------------------------------------------------
 // Types
@@ -123,12 +140,20 @@ function VoiceInterview({ role }: { role: string }) {
     const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([])
     const [playbackActive, setPlaybackActive] = useState(false)
     const [postCallCandidateTranscript, setPostCallCandidateTranscript] = useState("")
+    const [mappedTranscriptQaPairs, setMappedTranscriptQaPairs] = useState<TranscriptQaPair[]>([])
     const [postCallTranscriptStatus, setPostCallTranscriptStatus] = useState<PostCallTranscriptStatus>("idle")
     const [postCallTranscriptError, setPostCallTranscriptError] = useState("")
     const [callLifecyclePhase, setCallLifecyclePhase] = useState<CallLifecyclePhase>("idle")
     const [secondsLeft, setSecondsLeft] = useState(CALL_DURATION_SECONDS)
     // Memoize Q&A pairs to avoid recomputing on every render
-    const transcriptQaPairs = useMemo(() => buildTranscriptQaPairs(transcriptEntries), [transcriptEntries])
+    const transcriptQaPairs = useMemo(
+        () => (mappedTranscriptQaPairs.length ? normalizeTranscriptQaPairs(mappedTranscriptQaPairs) : buildTranscriptQaPairs(transcriptEntries)),
+        [mappedTranscriptQaPairs, transcriptEntries]
+    )
+    const canExportTranscript = useMemo(
+        () => transcriptQaPairs.length > 0 || !!normalizeTranscriptText(postCallCandidateTranscript),
+        [postCallCandidateTranscript, transcriptQaPairs]
+    )
 
     // -- Refs: Gemini session & audio pipeline --
     const sessionRef = useRef<Session | null>(null)
@@ -157,10 +182,11 @@ function VoiceInterview({ role }: { role: string }) {
     const candidateAudioSuppressedRef = useRef(false)
     const realtimeSessionDetachedRef = useRef(false)
     const localSpeechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
-    const fixedPhraseAudioRef = useRef<HTMLAudioElement | null>(null)
+    const fixedPhraseSourceRef = useRef<AudioBufferSourceNode | null>(null)
     const hostPlaybackSequenceRef = useRef(0)
     const gracefulStopInFlightRef = useRef(false)
     const closingHardStopTimerRef = useRef<number | null>(null)
+    const sessionShutdownRequestedRef = useRef(false)
 
     // -- Refs: Call lifecycle guards --
     const stopCallRef = useRef<((options?: { terminalStatus?: ConnectionStatus; closeSession?: boolean }) => Promise<void>) | null>(null)
@@ -178,6 +204,7 @@ function VoiceInterview({ role }: { role: string }) {
      */
     const transcriptEntriesRef = useRef<TranscriptEntry[]>([])
     const postCallCandidateTranscriptRef = useRef("")
+    const mappedTranscriptQaPairsRef = useRef<TranscriptQaPair[]>([])
     const postCallTranscriptStatusRef = useRef<PostCallTranscriptStatus>("idle")
     const postCallTranscriptErrorRef = useRef("")
 
@@ -195,6 +222,7 @@ function VoiceInterview({ role }: { role: string }) {
     useEffect(() => { callLifecyclePhaseRef.current = callLifecyclePhase }, [callLifecyclePhase])
     useEffect(() => { transcriptEntriesRef.current = transcriptEntries }, [transcriptEntries])
     useEffect(() => { postCallCandidateTranscriptRef.current = postCallCandidateTranscript }, [postCallCandidateTranscript])
+    useEffect(() => { mappedTranscriptQaPairsRef.current = mappedTranscriptQaPairs }, [mappedTranscriptQaPairs])
     useEffect(() => { postCallTranscriptStatusRef.current = postCallTranscriptStatus }, [postCallTranscriptStatus])
     useEffect(() => { postCallTranscriptErrorRef.current = postCallTranscriptError }, [postCallTranscriptError])
 
@@ -209,10 +237,11 @@ function VoiceInterview({ role }: { role: string }) {
             role,
             transcriptEntries,
             postCallCandidateTranscript,
+            mappedTranscriptQaPairs,
             postCallTranscriptStatus,
             postCallTranscriptError,
         })
-    }, [role, transcriptEntries, postCallCandidateTranscript, postCallTranscriptStatus, postCallTranscriptError])
+    }, [role, transcriptEntries, postCallCandidateTranscript, mappedTranscriptQaPairs, postCallTranscriptStatus, postCallTranscriptError])
 
     // -- State update helpers --
 
@@ -234,6 +263,31 @@ function VoiceInterview({ role }: { role: string }) {
         if (closingHardStopTimerRef.current === null || typeof window === "undefined") return
         window.clearTimeout(closingHardStopTimerRef.current)
         closingHardStopTimerRef.current = null
+    }, [])
+
+    const closeRealtimeSession = useCallback((options?: { sendAudioStreamEnd?: boolean; markDetached?: boolean }) => {
+        const activeSession = sessionRef.current
+        sessionRef.current = null
+
+        if (options?.markDetached) {
+            realtimeSessionDetachedRef.current = true
+        }
+
+        if (!activeSession || sessionShutdownRequestedRef.current) return
+        sessionShutdownRequestedRef.current = true
+
+        const websocket = (activeSession.conn as { ws?: WebSocket }).ws
+        const canSendAudioStreamEnd = options?.sendAudioStreamEnd !== false && websocket?.readyState === WebSocket.OPEN
+
+        if (canSendAudioStreamEnd) {
+            try {
+                activeSession.sendRealtimeInput({ audioStreamEnd: true })
+            } catch {}
+        }
+
+        try {
+            activeSession.close()
+        } catch {}
     }, [])
 
     const syncCountdown = useCallback(() => {
@@ -283,21 +337,27 @@ function VoiceInterview({ role }: { role: string }) {
         const normalized = normalizeTranscriptText(text)
         if (!normalized) return
 
-        setTranscriptEntries((prev) => {
-            const lastEntry = prev[prev.length - 1]
-            if (options?.mergeWithPrevious !== false && lastEntry?.speaker === speaker) {
-                return [...prev.slice(0, -1), { ...lastEntry, text: `${lastEntry.text} ${normalized}`.trim() }]
-            }
+        const previousEntries = transcriptEntriesRef.current
+        const lastEntry = previousEntries[previousEntries.length - 1]
+        const nextEntries =
+            options?.mergeWithPrevious !== false && lastEntry?.speaker === speaker
+                ? [...previousEntries.slice(0, -1), { ...lastEntry, text: `${lastEntry.text} ${normalized}`.trim() }]
+                : (() => {
+                    transcriptCounterRef.current += 1
+                    return [...previousEntries, { id: `${speaker}-${transcriptCounterRef.current}`, speaker, text: normalized }]
+                })()
 
-            transcriptCounterRef.current += 1
-            return [...prev, { id: `${speaker}-${transcriptCounterRef.current}`, speaker, text: normalized }]
-        })
+        transcriptEntriesRef.current = nextEntries
+        setTranscriptEntries(nextEntries)
     }, [])
 
     const exportTranscriptAsTxt = useCallback(() => {
         if (typeof window === "undefined") return
 
-        const content = buildTranscriptQaExport(role, transcriptEntriesRef.current)
+        const content = buildTranscriptQaExport(role, transcriptEntriesRef.current, {
+            qaPairs: mappedTranscriptQaPairsRef.current,
+            candidateTranscript: postCallCandidateTranscriptRef.current,
+        })
         if (!content) return
 
         const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
@@ -309,9 +369,11 @@ function VoiceInterview({ role }: { role: string }) {
         window.URL.revokeObjectURL(url)
     }, [role])
 
-    const flushFinishedTranscript = useCallback(
-        (speaker: Extract<Speaker, "candidate" | "interviewer">, text: string) => {
-            const normalized = normalizeTranscriptText(text)
+    const flushPendingTranscript = useCallback(
+        (speaker: Extract<Speaker, "candidate" | "interviewer">, fallbackText?: string) => {
+            const pendingTranscriptRef = speaker === "candidate" ? pendingCandidateTranscriptRef : pendingInterviewerTranscriptRef
+            const normalized = normalizeTranscriptText(pendingTranscriptRef.current || fallbackText || "")
+            pendingTranscriptRef.current = ""
             if (!normalized) return
 
             const lastTranscriptRef = speaker === "candidate" ? lastCandidateTranscriptRef : lastInterviewerTranscriptRef
@@ -327,15 +389,22 @@ function VoiceInterview({ role }: { role: string }) {
         (speaker: Extract<Speaker, "candidate" | "interviewer">, text?: string, finished?: boolean) => {
             const pendingTranscriptRef = speaker === "candidate" ? pendingCandidateTranscriptRef : pendingInterviewerTranscriptRef
             if (typeof text === "string" && text.trim()) {
-                pendingTranscriptRef.current = text
+                if (speaker === "candidate" && pendingInterviewerTranscriptRef.current) {
+                    flushPendingTranscript("interviewer")
+                }
+
+                if (speaker === "interviewer" && pendingCandidateTranscriptRef.current) {
+                    flushPendingTranscript("candidate")
+                }
+
+                pendingTranscriptRef.current = mergeStreamingTurnText(pendingTranscriptRef.current, text)
             }
 
             if (finished) {
-                flushFinishedTranscript(speaker, pendingTranscriptRef.current || text || "")
-                pendingTranscriptRef.current = ""
+                flushPendingTranscript(speaker, text)
             }
         },
-        [flushFinishedTranscript]
+        [flushPendingTranscript]
     )
 
     // -- Host-owned fixed phrase playback --
@@ -348,18 +417,18 @@ function VoiceInterview({ role }: { role: string }) {
     }, [])
 
     const cancelFixedPhraseAudio = useCallback(() => {
-        const activeAudio = fixedPhraseAudioRef.current
-        fixedPhraseAudioRef.current = null
+        const activeSource = fixedPhraseSourceRef.current
+        fixedPhraseSourceRef.current = null
 
-        if (!activeAudio) {
+        if (!activeSource) {
             setPlaybackActive(false)
             return
         }
 
         try {
-            activeAudio.pause()
-            activeAudio.src = ""
-            activeAudio.load()
+            activeSource.onended = null
+            activeSource.stop()
+            activeSource.disconnect()
         } catch {}
 
         setPlaybackActive(false)
@@ -424,64 +493,72 @@ function VoiceInterview({ role }: { role: string }) {
     const playFixedPhraseAsset = useCallback(
         (assetPath: string, playbackSequence: number) =>
             new Promise<boolean>((resolve) => {
-                if (typeof window === "undefined") {
+                const audioContext = audioContextRef.current
+                if (typeof window === "undefined" || !audioContext) {
                     resolve(false)
                     return
                 }
 
-                const audio = new Audio(assetPath)
-                fixedPhraseAudioRef.current = audio
-                audio.preload = "auto"
-
                 let settled = false
-                let playbackStarted = false
+                let source: AudioBufferSourceNode | null = null
                 const startTimeoutId = window.setTimeout(() => finish(false), HOST_ASSET_LOAD_FALLBACK_TIMEOUT_MS)
 
                 const cleanup = () => {
                     window.clearTimeout(startTimeoutId)
-                    audio.onplaying = null
-                    audio.onended = null
-                    audio.onerror = null
+                    if (source) {
+                        source.onended = null
+                        if (fixedPhraseSourceRef.current === source) {
+                            fixedPhraseSourceRef.current = null
+                        }
+
+                        try {
+                            source.disconnect()
+                        } catch {}
+                    }
                 }
 
                 const finish = (result: boolean) => {
                     if (settled) return
                     settled = true
                     cleanup()
-
-                    if (fixedPhraseAudioRef.current === audio) {
-                        fixedPhraseAudioRef.current = null
-                    }
-
-                    try {
-                        if (!audio.ended) {
-                            audio.pause()
-                        }
-                        audio.src = ""
-                        audio.load()
-                    } catch {}
-
                     setPlaybackActive(false)
                     resolve(result)
                 }
 
-                audio.onplaying = () => {
-                    if (hostPlaybackSequenceRef.current !== playbackSequence) {
+                void (async () => {
+                    try {
+                        await audioContext.resume().catch(() => undefined)
+                        const response = await fetch(assetPath, { cache: "force-cache" })
+                        if (!response.ok || settled || hostPlaybackSequenceRef.current !== playbackSequence) {
+                            finish(false)
+                            return
+                        }
+
+                        const assetBytes = await response.arrayBuffer()
+                        if (settled || hostPlaybackSequenceRef.current !== playbackSequence) {
+                            finish(false)
+                            return
+                        }
+
+                        const decodedBuffer = await audioContext.decodeAudioData(assetBytes.slice(0))
+                        if (settled || hostPlaybackSequenceRef.current !== playbackSequence) {
+                            finish(false)
+                            return
+                        }
+
+                        source = audioContext.createBufferSource()
+                        source.buffer = decodedBuffer
+                        source.connect(audioContext.destination)
+                        source.onended = () => finish(hostPlaybackSequenceRef.current === playbackSequence)
+                        fixedPhraseSourceRef.current = source
+                        setPlaybackActive(true)
+                        window.clearTimeout(startTimeoutId)
+                        source.start(audioContext.currentTime + 0.01)
+                    } catch (error) {
+                        console.warn("Host asset playback failed:", assetPath, error)
                         finish(false)
-                        return
                     }
-
-                    // The timeout is only meant to detect assets that never
-                    // begin playback. Once the browser confirms playback, the
-                    // host must not fall back to browser TTS anymore.
-                    window.clearTimeout(startTimeoutId)
-                    playbackStarted = true
-                    setPlaybackActive(true)
-                }
-                audio.onended = () => finish(playbackStarted && hostPlaybackSequenceRef.current === playbackSequence)
-                audio.onerror = () => finish(false)
-
-                void audio.play().catch(() => finish(false))
+                })()
             }),
         []
     )
@@ -508,28 +585,23 @@ function VoiceInterview({ role }: { role: string }) {
     const detachRealtimeSession = useCallback(() => {
         if (realtimeSessionDetachedRef.current) return
 
-        realtimeSessionDetachedRef.current = true
-
-        try {
-            sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true })
-        } catch {}
-
-        sessionRef.current?.close()
-        sessionRef.current = null
+        closeRealtimeSession({ sendAudioStreamEnd: true, markDetached: true })
         resetRealtimeAudioPipeline()
         stopScheduledPlayback()
-    }, [resetRealtimeAudioPipeline])
+    }, [closeRealtimeSession, resetRealtimeAudioPipeline])
 
     const beginLastQuestionPhase = useCallback(() => {
         if (finalQuestionTriggeredRef.current || finalInterruptTriggeredRef.current) return
 
         finalQuestionTriggeredRef.current = true
         closingRequestedRef.current = true
+        flushPendingTranscript("candidate")
+        flushPendingTranscript("interviewer")
         detachRealtimeSession()
         updateClosingPhase("last-question")
         appendTranscript("system", "Noch rund 40 Sekunden. Der Host stellt jetzt genau eine letzte Frage.")
         void playHostPhrase(getLastQuestionPhrase())
-    }, [appendTranscript, detachRealtimeSession, playHostPhrase, updateClosingPhase])
+    }, [appendTranscript, detachRealtimeSession, flushPendingTranscript, playHostPhrase, updateClosingPhase])
 
     const requestGracefulStop = useCallback(
         async (reason: StopReason) => {
@@ -544,6 +616,8 @@ function VoiceInterview({ role }: { role: string }) {
             clearClosingHardStopTimer()
             cancelHostPlayback()
             stopScheduledPlayback()
+            flushPendingTranscript("candidate")
+            flushPendingTranscript("interviewer")
             detachRealtimeSession()
 
             const farewellPhrase = reason === "technicalError" ? getTechnicalErrorFarewellPhrase() : getFarewellPhrase()
@@ -565,7 +639,7 @@ function VoiceInterview({ role }: { role: string }) {
             }
 
             try {
-                await playHostPhrase(farewellPhrase)
+                await playHostPhrase(farewellPhrase, { appendTranscriptSpeaker: "system" })
             } finally {
                 clearClosingHardStopTimer()
                 await stopCallRef.current?.({ terminalStatus, closeSession: false })
@@ -577,6 +651,7 @@ function VoiceInterview({ role }: { role: string }) {
             cancelHostPlayback,
             clearClosingHardStopTimer,
             detachRealtimeSession,
+            flushPendingTranscript,
             playHostPhrase,
             updateClosingPhase,
         ]
@@ -633,22 +708,32 @@ function VoiceInterview({ role }: { role: string }) {
             message.serverContent?.inputTranscription?.text,
             message.serverContent?.inputTranscription?.finished
         )
+
         handleLiveTranscription(
             "interviewer",
             message.serverContent?.outputTranscription?.text,
             message.serverContent?.outputTranscription?.finished
         )
 
-        for (const part of message.serverContent?.modelTurn?.parts ?? []) {
+        const modelTurnParts = message.serverContent?.modelTurn?.parts ?? []
+        if (!message.serverContent?.outputTranscription?.text && modelTurnParts.length) {
+            if (pendingCandidateTranscriptRef.current) {
+                flushPendingTranscript("candidate")
+            }
+
+            pendingInterviewerTranscriptRef.current = mergeModelTurnText(pendingInterviewerTranscriptRef.current, modelTurnParts)
+        }
+
+        for (const part of modelTurnParts) {
             if (!part.inlineData?.data) continue
             if (callLifecyclePhaseRef.current === "closing" || callLifecyclePhaseRef.current === "stopping") continue
 
             playAudioChunk(part.inlineData.data, part.inlineData.mimeType)
         }
 
-        if (message.serverContent?.turnComplete && pendingInterviewerTranscriptRef.current) {
-            flushFinishedTranscript("interviewer", pendingInterviewerTranscriptRef.current)
-            pendingInterviewerTranscriptRef.current = ""
+        if (message.serverContent?.turnComplete || message.serverContent?.waitingForInput) {
+            flushPendingTranscript("interviewer")
+            flushPendingTranscript("candidate")
         }
 
         if (message.goAway?.timeLeft) {
@@ -766,13 +851,14 @@ function VoiceInterview({ role }: { role: string }) {
         })
     }
 
-    async function transcribeCandidateAudio(audioBlob: Blob): Promise<AsyncResult<string>> {
+    async function transcribeCandidateAudio(audioBlob: Blob): Promise<AsyncResult<{ transcriptText: string; qaPairs: TranscriptQaPair[] }>> {
         setPostCallTranscriptStatus("transcribing")
         setPostCallTranscriptError("")
         persistVoiceFeedbackDraft({
             role,
             transcriptEntries: transcriptEntriesRef.current,
             postCallCandidateTranscript: postCallCandidateTranscriptRef.current,
+            mappedTranscriptQaPairs: mappedTranscriptQaPairsRef.current,
             postCallTranscriptStatus: "transcribing",
             postCallTranscriptError: "",
         })
@@ -780,34 +866,49 @@ function VoiceInterview({ role }: { role: string }) {
         const formData = new FormData()
         formData.append("role", role)
         formData.append("audio", new File([audioBlob], `voice-interview.${audioBlob.type.includes("mp4") ? "mp4" : "webm"}`, { type: audioBlob.type || "audio/webm" }))
+        formData.append("interviewerQuestions", JSON.stringify(extractInterviewerQuestions(transcriptEntriesRef.current)))
 
         const response = await fetch("/api/interview/transcript", {
             method: "POST",
             body: formData,
         })
-        const data = (await response.json()) as { transcriptText?: string; error?: string }
+        const rawResponseText = await response.text()
+        const data = (() => {
+            try {
+                return JSON.parse(rawResponseText) as { transcriptText?: string; qaPairs?: TranscriptQaPair[]; error?: string; stage?: string }
+            } catch {
+                return { error: rawResponseText || "Post-Call-Transkription fehlgeschlagen." }
+            }
+        })()
 
         if (!response.ok || !data.transcriptText) {
             return {
                 ok: false,
-                error: data.error || "Post-Call-Transkription fehlgeschlagen.",
+                error: data.stage && data.error ? `[${data.stage}] ${data.error}` : data.error || "Post-Call-Transkription fehlgeschlagen.",
             }
         }
 
+        const resolvedQaPairs = Array.isArray(data.qaPairs) ? data.qaPairs : []
         setPostCallCandidateTranscript(data.transcriptText)
+        mappedTranscriptQaPairsRef.current = resolvedQaPairs
+        setMappedTranscriptQaPairs(resolvedQaPairs)
         setPostCallTranscriptStatus("ready")
         setPostCallTranscriptError("")
         persistVoiceFeedbackDraft({
             role,
             transcriptEntries: transcriptEntriesRef.current,
             postCallCandidateTranscript: data.transcriptText,
+            mappedTranscriptQaPairs: resolvedQaPairs,
             postCallTranscriptStatus: "ready",
             postCallTranscriptError: "",
         })
 
         return {
             ok: true,
-            value: data.transcriptText,
+            value: {
+                transcriptText: data.transcriptText,
+                qaPairs: resolvedQaPairs,
+            },
         }
     }
 
@@ -823,10 +924,13 @@ function VoiceInterview({ role }: { role: string }) {
         try {
             clearClosingHardStopTimer()
             cancelHostPlayback()
+            flushPendingTranscript("candidate")
+            flushPendingTranscript("interviewer")
             persistVoiceFeedbackDraft({
                 role,
                 transcriptEntries: transcriptEntriesRef.current,
                 postCallCandidateTranscript: postCallCandidateTranscriptRef.current,
+                mappedTranscriptQaPairs: mappedTranscriptQaPairsRef.current,
                 postCallTranscriptStatus: postCallTranscriptStatusRef.current,
                 postCallTranscriptError: postCallTranscriptErrorRef.current,
             })
@@ -834,14 +938,10 @@ function VoiceInterview({ role }: { role: string }) {
             const recordedAudioBlob = await stopCandidateRecording().catch(() => null)
 
             if (closeSession) {
-                try {
-                    sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true })
-                } catch {}
-
-                sessionRef.current?.close()
+                closeRealtimeSession({ sendAudioStreamEnd: true })
+            } else {
+                sessionRef.current = null
             }
-
-            sessionRef.current = null
             resetRealtimeAudioPipeline()
 
             for (const track of microphoneStreamRef.current?.getTracks() ?? []) track.stop()
@@ -871,6 +971,7 @@ function VoiceInterview({ role }: { role: string }) {
                         role,
                         transcriptEntries: transcriptEntriesRef.current,
                         postCallCandidateTranscript: postCallCandidateTranscriptRef.current,
+                        mappedTranscriptQaPairs: mappedTranscriptQaPairsRef.current,
                         postCallTranscriptStatus: "error",
                         postCallTranscriptError: message,
                     })
@@ -889,10 +990,7 @@ function VoiceInterview({ role }: { role: string }) {
         return () => {
             clearClosingHardStopTimer()
             cancelHostPlayback()
-            try {
-                sessionRef.current?.sendRealtimeInput({ audioStreamEnd: true })
-            } catch {}
-            sessionRef.current?.close()
+            closeRealtimeSession({ sendAudioStreamEnd: true })
             resetRealtimeAudioPipeline()
             for (const track of microphoneStreamRef.current?.getTracks() ?? []) track.stop()
             for (const source of scheduledSourcesRef.current) {
@@ -904,7 +1002,7 @@ function VoiceInterview({ role }: { role: string }) {
                 void audioContextRef.current.close().catch(() => undefined)
             }
         }
-    }, [cancelHostPlayback, clearClosingHardStopTimer, resetRealtimeAudioPipeline])
+    }, [cancelHostPlayback, clearClosingHardStopTimer, closeRealtimeSession, flushPendingTranscript, resetRealtimeAudioPipeline])
 
     useEffect(() => {
         if (callLifecyclePhase !== "interviewing") return
@@ -940,9 +1038,17 @@ function VoiceInterview({ role }: { role: string }) {
         startCallInFlightRef.current = true
         setError("")
         setPostCallCandidateTranscript("")
+        setMappedTranscriptQaPairs([])
         setPostCallTranscriptError("")
         setPostCallTranscriptStatus("idle")
         setTranscriptEntries([])
+        transcriptEntriesRef.current = []
+        postCallCandidateTranscriptRef.current = ""
+        mappedTranscriptQaPairsRef.current = []
+        postCallTranscriptErrorRef.current = ""
+        postCallTranscriptStatusRef.current = "idle"
+        transcriptCounterRef.current = 0
+        sessionShutdownRequestedRef.current = false
         updateCallLifecyclePhase("opening")
         setSecondsLeft(CALL_DURATION_SECONDS)
         updateClosingPhase("idle")
@@ -971,6 +1077,10 @@ function VoiceInterview({ role }: { role: string }) {
                 return
             }
 
+            const audioContext = new AudioContext()
+            audioContextRef.current = audioContext
+            await audioContext.resume().catch(() => undefined)
+
             const tokenResponse = await fetch("/api/gemini/live-token", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -983,9 +1093,6 @@ function VoiceInterview({ role }: { role: string }) {
                 setError(tokenData.error || "Live-Token konnte nicht erstellt werden.")
                 return
             }
-
-            const audioContext = new AudioContext()
-            audioContextRef.current = audioContext
 
             const ai = new GoogleGenAI({ apiKey: tokenData.token, httpOptions: { apiVersion: "v1alpha" } })
             const liveCallbacks: LiveCallbacks = {
@@ -1006,6 +1113,16 @@ function VoiceInterview({ role }: { role: string }) {
                 config: {
                     responseModalities: [Modality.AUDIO],
                     mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+                    realtimeInputConfig: {
+                        activityHandling: ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
+                        turnCoverage: TurnCoverage.TURN_INCLUDES_ONLY_ACTIVITY,
+                        automaticActivityDetection: {
+                            startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
+                            endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
+                            prefixPaddingMs: LIVE_INPUT_PREFIX_PADDING_MS,
+                            silenceDurationMs: LIVE_INPUT_SILENCE_DURATION_MS,
+                        },
+                    },
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: tokenData.voiceName || LIVE_VOICE } } },
                     inputAudioTranscription: {},
                     outputAudioTranscription: {},
@@ -1027,12 +1144,10 @@ function VoiceInterview({ role }: { role: string }) {
             const openingQuestionPhrase = resolveOpeningQuestionPhrase(role)
 
             appendTranscript("system", `Interviewrahmen fuer ${role}: ${plannedQuestionContext}`)
-            const greetingPlayed = await playHostPhrase(resolveGreetingPhrase(role))
+            const greetingPlayed = await playHostPhrase(resolveGreetingPhrase(role), { appendTranscriptSpeaker: "system" })
             if (!greetingPlayed) {
-                await stopCall()
-                updateConnectionStatus("error")
-                setError("Die feste Begruessung konnte nicht abgespielt werden.")
-                return
+                appendTranscript("system", "Die feste Begruessung konnte lokal nicht abgespielt werden. Das Interview startet ohne Intro.")
+                console.warn("Greeting playback failed. Continuing with opening question.")
             }
 
             const openingQuestionPlayed = await playHostPhrase(openingQuestionPhrase)
@@ -1151,7 +1266,7 @@ function VoiceInterview({ role }: { role: string }) {
                                     <button
                                         type="button"
                                         onClick={exportTranscriptAsTxt}
-                                        disabled={transcriptQaPairs.length === 0}
+                                        disabled={!canExportTranscript}
                                         className="rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
                                     >
                                         TXT Export

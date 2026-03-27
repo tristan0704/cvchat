@@ -7,11 +7,36 @@
  */
 
 import { createPartFromUri, GoogleGenAI } from "@google/genai"
+import { mapPostCallTranscriptToQaPairs } from "@/lib/post-call-qa-mapping"
+import { normalizeTranscriptText, type TranscriptQaPair } from "@/lib/transcript"
 
 export const runtime = "nodejs"
 
 const PRIMARY_TRANSCRIPTION_MODEL = process.env.GEMINI_TRANSCRIPTION_MODEL || "gemini-2.5-flash"
 const TRANSCRIPTION_MODEL_FALLBACKS = ["gemini-2.5-flash"]
+
+function logTranscriptRouteError(stage: string, details: Record<string, unknown>) {
+    console.error("[interview/transcript]", {
+        stage,
+        ...details,
+    })
+}
+
+function parseInterviewerQuestions(rawValue: FormDataEntryValue | null): string[] {
+    if (typeof rawValue !== "string" || !rawValue.trim()) return []
+
+    try {
+        const parsed = JSON.parse(rawValue) as unknown
+        if (!Array.isArray(parsed)) return []
+
+        return parsed
+            .filter((value): value is string => typeof value === "string")
+            .map((question) => normalizeTranscriptText(question))
+            .filter((question) => !!question)
+    } catch {
+        return []
+    }
+}
 
 export async function POST(req: Request) {
     const apiKey = process.env.GEMINI_API_KEY?.trim()
@@ -22,6 +47,7 @@ export async function POST(req: Request) {
     const formData = await req.formData().catch(() => null)
     const audio = formData?.get("audio")
     const role = typeof formData?.get("role") === "string" ? String(formData.get("role")).trim() : "Backend Developer"
+    const interviewerQuestions = parseInterviewerQuestions(formData?.get("interviewerQuestions") ?? null)
 
     if (!(audio instanceof File) || audio.size === 0) {
         return Response.json({ error: "Missing audio file" }, { status: 400 })
@@ -36,11 +62,21 @@ export async function POST(req: Request) {
             },
         })
         .catch((error) => {
+            logTranscriptRouteError("upload", {
+                role,
+                audioType: audio.type || "audio/webm",
+                audioSize: audio.size,
+                message: error instanceof Error ? error.message : "Gemini file upload failed",
+            })
             throw new Error(error instanceof Error ? error.message : "Gemini file upload failed")
         })
 
     try {
         if (!uploadedFile.uri || !uploadedFile.mimeType) {
+            logTranscriptRouteError("upload_metadata", {
+                role,
+                uploadedFile,
+            })
             return Response.json({ error: "Gemini file upload returned no usable file metadata" }, { status: 502 })
         }
 
@@ -73,22 +109,70 @@ export async function POST(req: Request) {
                 const transcriptText = response.text?.trim()
                 if (!transcriptText) {
                     lastError = `Gemini returned no transcript text for model ${model}`
+                    logTranscriptRouteError("transcribe_empty", {
+                        role,
+                        model,
+                        interviewerQuestionCount: interviewerQuestions.length,
+                    })
                     continue
+                }
+
+                let qaPairs: TranscriptQaPair[] = []
+                let qaMappingModel = ""
+                let qaMappingError = ""
+
+                if (interviewerQuestions.length) {
+                    try {
+                        const qaMappingResult = await mapPostCallTranscriptToQaPairs({
+                            ai,
+                            role,
+                            interviewerQuestions,
+                            candidateTranscript: transcriptText,
+                        })
+                        qaPairs = qaMappingResult.qaPairs
+                        qaMappingModel = qaMappingResult.model
+                    } catch (error) {
+                        qaMappingError = error instanceof Error ? error.message : "Gemini QA mapping failed"
+                        logTranscriptRouteError("qa_mapping", {
+                            role,
+                            model,
+                            interviewerQuestionCount: interviewerQuestions.length,
+                            message: qaMappingError,
+                        })
+                    }
                 }
 
                 return Response.json({
                     transcriptText,
+                    qaPairs,
+                    qaMappingModel,
+                    qaMappingError,
                     model,
                 })
             } catch (error) {
                 lastError = error instanceof Error ? error.message : `Gemini transcription failed for model ${model}`
+                logTranscriptRouteError("transcribe", {
+                    role,
+                    model,
+                    interviewerQuestionCount: interviewerQuestions.length,
+                    audioType: audio.type || "audio/webm",
+                    audioSize: audio.size,
+                    message: lastError,
+                })
             }
         }
 
-        return Response.json({ error: lastError }, { status: 502 })
+        return Response.json({ error: lastError, stage: "transcribe" }, { status: 502 })
     } catch (error) {
         const message = error instanceof Error ? error.message : "Gemini transcription failed"
-        return Response.json({ error: message }, { status: 502 })
+        logTranscriptRouteError("fatal", {
+            role,
+            interviewerQuestionCount: interviewerQuestions.length,
+            audioType: audio.type || "audio/webm",
+            audioSize: audio.size,
+            message,
+        })
+        return Response.json({ error: message, stage: "fatal" }, { status: 502 })
     } finally {
         if (uploadedFile.name) {
             await ai.files.delete({ name: uploadedFile.name }).catch(() => undefined)
