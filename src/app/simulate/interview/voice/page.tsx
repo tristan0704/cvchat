@@ -629,9 +629,10 @@ function VoiceInterview({ role }: { role: string }) {
         if (realtimeSessionDetachedRef.current) return
 
         closeRealtimeSession({ sendAudioStreamEnd: true, markDetached: true })
-        resetRealtimeAudioPipeline()
+        // Keep the local mic pipeline alive until stopCall() so the controlled
+        // ending can still observe when the candidate's final answer actually ends.
         stopScheduledPlayback()
-    }, [closeRealtimeSession, resetRealtimeAudioPipeline])
+    }, [closeRealtimeSession])
 
     const getEffectiveTurnState = useCallback((): InterviewTurnState => {
         if (turnStateRef.current === "interviewer-speaking") {
