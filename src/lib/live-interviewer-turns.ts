@@ -1,3 +1,4 @@
+
 import { type Part } from "@google/genai"
 
 function concatModelTextParts(parts: Part[]): string {

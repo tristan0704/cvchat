@@ -18,9 +18,11 @@
  *    - Audio chunks are decoded and scheduled for gapless playback
  *    - Transcription events are buffered and flushed into the transcript log
  *
- * 3. Closing sequence (time-based phases):
- *    - T-40s: host detaches the realtime session and asks one fixed final question
- *    - T-15s: every end reason funnels through requestGracefulStop()
+ * 3. Closing sequence (soft timebox):
+ *    - T-60s: the flow locks the interview into a controlled final minute
+ *    - If a question is still open, exactly that question may finish cleanly
+ *    - If no question is open, the host asks one short closing question
+ *    - The final candidate answer is detected locally from microphone activity
  *    - Host-owned farewell plays from a pre-generated asset
  *    - stopCall() runs only after farewell completion or hard timeout
  *
@@ -83,6 +85,22 @@ import {
     HOST_CLOSING_HARD_STOP_TIMEOUT_MS,
     type HostVoicePhrase,
 } from "@/lib/voice-host"
+import {
+    createCallTiming,
+    decideLastMinuteAction,
+    DEFAULT_CALL_DURATION_SECONDS,
+    FINAL_ANSWER_MAX_DURATION_MS,
+    FINAL_ANSWER_START_TIMEOUT_MS,
+    LAST_MINUTE_THRESHOLD_SECONDS,
+    type CallTiming,
+    type InterviewEndgameState,
+    type InterviewTurnState,
+} from "@/lib/interview-endgame"
+import {
+    createSpeechActivityState,
+    getChunkRms,
+    updateSpeechActivityState,
+} from "@/lib/speech-activity"
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -91,9 +109,7 @@ import {
 const LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 const LIVE_VOICE = "Zephyr"
 const AUDIO_INPUT_WORKLET_PATH = "/audio/voice-host/pcm-input-worklet.js"
-const CALL_DURATION_SECONDS = 300
-const LAST_QUESTION_LEAD_SECONDS = 40
-const FINAL_INTERRUPT_LEAD_SECONDS = 15
+const CALL_DURATION_SECONDS = DEFAULT_CALL_DURATION_SECONDS
 const LIVE_INPUT_PREFIX_PADDING_MS = 120
 const LIVE_INPUT_SILENCE_DURATION_MS = 700
 
@@ -103,29 +119,9 @@ const LIVE_INPUT_SILENCE_DURATION_MS = 700
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "error"
 type CallLifecyclePhase = "idle" | "opening" | "interviewing" | "closing" | "stopping"
-type ClosingPhase = "idle" | "armed" | "last-question" | "finalizing"
 type StopReason = "timer" | "manual" | "goAway" | "technicalError"
 type LiveTokenResponse = { token: string; model: string; voiceName: string }
 type AsyncResult<T> = { ok: true; value: T } | { ok: false; error: string }
-type CallTiming = {
-    startedAtMs: number
-    targetEndAtMs: number
-    lastQuestionAtMs: number
-    finalInterruptAtMs: number
-}
-
-// ---------------------------------------------------------------------------
-// Pure helpers
-// ---------------------------------------------------------------------------
-
-function createCallTiming(startedAtMs = Date.now()): CallTiming {
-    return {
-        startedAtMs,
-        targetEndAtMs: startedAtMs + CALL_DURATION_SECONDS * 1_000,
-        lastQuestionAtMs: startedAtMs + (CALL_DURATION_SECONDS - LAST_QUESTION_LEAD_SECONDS) * 1_000,
-        finalInterruptAtMs: startedAtMs + (CALL_DURATION_SECONDS - FINAL_INTERRUPT_LEAD_SECONDS) * 1_000,
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -175,10 +171,6 @@ function VoiceInterview({ role }: { role: string }) {
     const lastInterviewerTranscriptRef = useRef("")
 
     // -- Refs: Closing sequence coordination --
-    const closingRequestedRef = useRef(false)
-    const closingPhaseRef = useRef<ClosingPhase>("idle")
-    const finalQuestionTriggeredRef = useRef(false)
-    const finalInterruptTriggeredRef = useRef(false)
     const candidateAudioSuppressedRef = useRef(false)
     const realtimeSessionDetachedRef = useRef(false)
     const localSpeechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
@@ -186,7 +178,16 @@ function VoiceInterview({ role }: { role: string }) {
     const hostPlaybackSequenceRef = useRef(0)
     const gracefulStopInFlightRef = useRef(false)
     const closingHardStopTimerRef = useRef<number | null>(null)
+    const endgameAbsoluteStopTimerRef = useRef<number | null>(null)
+    const finalAnswerStartTimerRef = useRef<number | null>(null)
+    const finalAnswerMaxTimerRef = useRef<number | null>(null)
     const sessionShutdownRequestedRef = useRef(false)
+    const requestGracefulStopRef = useRef<((reason: StopReason) => Promise<void>) | null>(null)
+    const turnStateRef = useRef<InterviewTurnState>("between-questions")
+    const endgameStateRef = useRef<InterviewEndgameState>("normal")
+    const finalAnswerStartedAtMsRef = useRef<number | null>(null)
+    const candidateSpeechLiveRef = useRef(false)
+    const candidateSpeechActivityRef = useRef(createSpeechActivityState())
 
     // -- Refs: Call lifecycle guards --
     const stopCallRef = useRef<((options?: { terminalStatus?: ConnectionStatus; closeSession?: boolean }) => Promise<void>) | null>(null)
@@ -255,15 +256,35 @@ function VoiceInterview({ role }: { role: string }) {
         setCallLifecyclePhase(nextPhase)
     }
 
-    const updateClosingPhase = useCallback((nextPhase: ClosingPhase) => {
-        closingPhaseRef.current = nextPhase
-    }, [])
-
     const clearClosingHardStopTimer = useCallback(() => {
         if (closingHardStopTimerRef.current === null || typeof window === "undefined") return
         window.clearTimeout(closingHardStopTimerRef.current)
         closingHardStopTimerRef.current = null
     }, [])
+
+    const clearEndgameAbsoluteStopTimer = useCallback(() => {
+        if (endgameAbsoluteStopTimerRef.current === null || typeof window === "undefined") return
+        window.clearTimeout(endgameAbsoluteStopTimerRef.current)
+        endgameAbsoluteStopTimerRef.current = null
+    }, [])
+
+    const clearFinalAnswerStartTimer = useCallback(() => {
+        if (finalAnswerStartTimerRef.current === null || typeof window === "undefined") return
+        window.clearTimeout(finalAnswerStartTimerRef.current)
+        finalAnswerStartTimerRef.current = null
+    }, [])
+
+    const clearFinalAnswerMaxTimer = useCallback(() => {
+        if (finalAnswerMaxTimerRef.current === null || typeof window === "undefined") return
+        window.clearTimeout(finalAnswerMaxTimerRef.current)
+        finalAnswerMaxTimerRef.current = null
+    }, [])
+
+    const clearEndgameTimers = useCallback(() => {
+        clearEndgameAbsoluteStopTimer()
+        clearFinalAnswerStartTimer()
+        clearFinalAnswerMaxTimer()
+    }, [clearEndgameAbsoluteStopTimer, clearFinalAnswerMaxTimer, clearFinalAnswerStartTimer])
 
     const closeRealtimeSession = useCallback((options?: { sendAudioStreamEnd?: boolean; markDetached?: boolean }) => {
         const activeSession = sessionRef.current
@@ -322,14 +343,25 @@ function VoiceInterview({ role }: { role: string }) {
         lastInterviewerTranscriptRef.current = ""
     }, [])
 
+    const updateTurnState = useCallback((nextState: InterviewTurnState) => {
+        turnStateRef.current = nextState
+    }, [])
+
+    const updateEndgameState = useCallback((nextState: InterviewEndgameState) => {
+        endgameStateRef.current = nextState
+    }, [])
+
     const resetClosingStateRefs = useCallback((candidateAudioSuppressed: boolean) => {
-        closingRequestedRef.current = false
         candidateAudioSuppressedRef.current = candidateAudioSuppressed
         realtimeSessionDetachedRef.current = false
-        finalQuestionTriggeredRef.current = false
-        finalInterruptTriggeredRef.current = false
         gracefulStopInFlightRef.current = false
-    }, [])
+        finalAnswerStartedAtMsRef.current = null
+        candidateSpeechLiveRef.current = false
+        candidateSpeechActivityRef.current = createSpeechActivityState()
+        updateTurnState("between-questions")
+        updateEndgameState("normal")
+        clearEndgameTimers()
+    }, [clearEndgameTimers, updateEndgameState, updateTurnState])
 
     // -- Transcript helpers --
 
@@ -397,14 +429,25 @@ function VoiceInterview({ role }: { role: string }) {
                     flushPendingTranscript("candidate")
                 }
 
+                if (speaker === "interviewer") {
+                    updateTurnState("interviewer-speaking")
+                } else if (turnStateRef.current === "awaiting-candidate-answer" || turnStateRef.current === "candidate-speaking") {
+                    updateTurnState("candidate-speaking")
+                }
+
                 pendingTranscriptRef.current = mergeStreamingTurnText(pendingTranscriptRef.current, text)
             }
 
             if (finished) {
                 flushPendingTranscript(speaker, text)
+                if (speaker === "interviewer") {
+                    updateTurnState("awaiting-candidate-answer")
+                } else if (endgameStateRef.current === "normal") {
+                    updateTurnState("between-questions")
+                }
             }
         },
-        [flushPendingTranscript]
+        [flushPendingTranscript, updateTurnState]
     )
 
     // -- Host-owned fixed phrase playback --
@@ -590,30 +633,148 @@ function VoiceInterview({ role }: { role: string }) {
         stopScheduledPlayback()
     }, [closeRealtimeSession, resetRealtimeAudioPipeline])
 
-    const beginLastQuestionPhase = useCallback(() => {
-        if (finalQuestionTriggeredRef.current || finalInterruptTriggeredRef.current) return
+    const getEffectiveTurnState = useCallback((): InterviewTurnState => {
+        if (turnStateRef.current === "interviewer-speaking") {
+            return "interviewer-speaking"
+        }
 
-        finalQuestionTriggeredRef.current = true
-        closingRequestedRef.current = true
+        if (scheduledSourcesRef.current.length > 0 || !!normalizeTranscriptText(pendingInterviewerTranscriptRef.current)) {
+            return "interviewer-speaking"
+        }
+
+        if (
+            (turnStateRef.current === "awaiting-candidate-answer" || turnStateRef.current === "candidate-speaking") &&
+            (candidateSpeechLiveRef.current || !!normalizeTranscriptText(pendingCandidateTranscriptRef.current))
+        ) {
+            return "candidate-speaking"
+        }
+
+        return turnStateRef.current
+    }, [])
+
+    const scheduleEndgameAbsoluteStop = useCallback(() => {
+        if (endgameAbsoluteStopTimerRef.current !== null || typeof window === "undefined") return
+
+        const absoluteHardStopAtMs = callTimingRef.current?.absoluteHardStopAtMs
+        if (!absoluteHardStopAtMs) return
+
+        const delayMs = Math.max(0, absoluteHardStopAtMs - Date.now())
+        endgameAbsoluteStopTimerRef.current = window.setTimeout(() => {
+            appendTranscript("system", "Die Abschlussgrenze ist erreicht. Das Interview wird jetzt kontrolliert beendet.")
+            void requestGracefulStopRef.current?.("timer")
+        }, delayMs)
+    }, [appendTranscript])
+
+    const armFinalAnswerMaxTimer = useCallback(() => {
+        clearFinalAnswerMaxTimer()
+        finalAnswerStartedAtMsRef.current = Date.now()
+
+        if (typeof window === "undefined") return
+
+        finalAnswerMaxTimerRef.current = window.setTimeout(() => {
+            appendTranscript("system", "Die letzte Antwort erreicht das Zeitlimit. Das Interview wird jetzt beendet.")
+            void requestGracefulStopRef.current?.("timer")
+        }, FINAL_ANSWER_MAX_DURATION_MS)
+    }, [appendTranscript, clearFinalAnswerMaxTimer])
+
+    const armFinalAnswerWindow = useCallback(
+        (options?: { candidateAlreadySpeaking?: boolean }) => {
+            if (stopCallInFlightRef.current || gracefulStopInFlightRef.current) return
+
+            clearFinalAnswerStartTimer()
+            clearFinalAnswerMaxTimer()
+            updateEndgameState("awaiting-final-answer")
+
+            if (options?.candidateAlreadySpeaking) {
+                updateTurnState("candidate-speaking")
+                armFinalAnswerMaxTimer()
+                return
+            }
+
+            finalAnswerStartedAtMsRef.current = null
+            updateTurnState("awaiting-candidate-answer")
+            if (typeof window === "undefined") return
+
+            finalAnswerStartTimerRef.current = window.setTimeout(() => {
+                appendTranscript("system", "Auf die letzte Frage kam keine Antwort mehr. Das Interview wird jetzt beendet.")
+                void requestGracefulStopRef.current?.("timer")
+            }, FINAL_ANSWER_START_TIMEOUT_MS)
+        },
+        [appendTranscript, armFinalAnswerMaxTimer, clearFinalAnswerMaxTimer, clearFinalAnswerStartTimer, updateEndgameState, updateTurnState]
+    )
+
+    const detachForControlledEnding = useCallback(() => {
+        candidateAudioSuppressedRef.current = true
         flushPendingTranscript("candidate")
         flushPendingTranscript("interviewer")
         detachRealtimeSession()
-        updateClosingPhase("last-question")
-        appendTranscript("system", "Noch rund 40 Sekunden. Der Host stellt jetzt genau eine letzte Frage.")
-        void playHostPhrase(getLastQuestionPhrase())
-    }, [appendTranscript, detachRealtimeSession, flushPendingTranscript, playHostPhrase, updateClosingPhase])
+    }, [detachRealtimeSession, flushPendingTranscript])
+
+    const startClosingQuestionPhase = useCallback(async () => {
+        if (stopCallInFlightRef.current || gracefulStopInFlightRef.current) return
+        if (endgameStateRef.current === "asking-closing-question" || endgameStateRef.current === "awaiting-final-answer") return
+
+        detachForControlledEnding()
+        updateEndgameState("asking-closing-question")
+        appendTranscript("system", "Letzte Minute: Es ist noch Zeit fuer genau eine kurze Abschlussfrage.")
+        updateTurnState("interviewer-speaking")
+
+        const questionPlayed = await playHostPhrase(getLastQuestionPhrase())
+        if (!questionPlayed) {
+            void requestGracefulStopRef.current?.("timer")
+            return
+        }
+
+        armFinalAnswerWindow({ candidateAlreadySpeaking: candidateSpeechLiveRef.current })
+    }, [appendTranscript, armFinalAnswerWindow, detachForControlledEnding, playHostPhrase, updateEndgameState, updateTurnState])
+
+    const beginLastMinuteLock = useCallback(() => {
+        if (endgameStateRef.current !== "normal") return
+        if (stopCallInFlightRef.current || gracefulStopInFlightRef.current) return
+
+        scheduleEndgameAbsoluteStop()
+        updateEndgameState("last-minute-locked")
+
+        const effectiveTurnState = getEffectiveTurnState()
+        const action = decideLastMinuteAction(effectiveTurnState)
+
+        if (action === "ask-closing-question") {
+            appendTranscript("system", "Letzte Minute: Es wird keine neue Standardfrage mehr gestartet.")
+            void startClosingQuestionPhase()
+            return
+        }
+
+        updateEndgameState("finishing-current-question")
+        candidateAudioSuppressedRef.current = true
+
+        if (effectiveTurnState === "interviewer-speaking") {
+            appendTranscript("system", "Letzte Minute: Die laufende Frage wird noch fertig ausgesprochen und danach direkt beendet.")
+            return
+        }
+
+        appendTranscript("system", "Letzte Minute: Die laufende Frage darf noch sauber beantwortet werden. Danach wird direkt beendet.")
+        detachForControlledEnding()
+        armFinalAnswerWindow({ candidateAlreadySpeaking: effectiveTurnState === "candidate-speaking" })
+    }, [
+        appendTranscript,
+        armFinalAnswerWindow,
+        detachForControlledEnding,
+        getEffectiveTurnState,
+        scheduleEndgameAbsoluteStop,
+        startClosingQuestionPhase,
+        updateEndgameState,
+    ])
 
     const requestGracefulStop = useCallback(
         async (reason: StopReason) => {
             if (gracefulStopInFlightRef.current || stopCallInFlightRef.current) return
 
             gracefulStopInFlightRef.current = true
-            finalInterruptTriggeredRef.current = true
-            closingRequestedRef.current = true
             candidateAudioSuppressedRef.current = true
+            updateEndgameState("finalizing")
             updateCallLifecyclePhase("closing")
-            updateClosingPhase("finalizing")
             clearClosingHardStopTimer()
+            clearEndgameTimers()
             cancelHostPlayback()
             stopScheduledPlayback()
             flushPendingTranscript("candidate")
@@ -648,14 +809,54 @@ function VoiceInterview({ role }: { role: string }) {
         },
         [
             appendTranscript,
+            clearEndgameTimers,
             cancelHostPlayback,
             clearClosingHardStopTimer,
             detachRealtimeSession,
             flushPendingTranscript,
             playHostPhrase,
-            updateClosingPhase,
+            updateEndgameState,
         ]
     )
+
+    requestGracefulStopRef.current = requestGracefulStop
+
+    const handleCandidateSpeechStarted = useCallback(() => {
+        if (callLifecyclePhaseRef.current !== "interviewing") return
+        if (turnStateRef.current === "interviewer-speaking") return
+
+        candidateSpeechLiveRef.current = true
+
+        if (endgameStateRef.current === "awaiting-final-answer") {
+            clearFinalAnswerStartTimer()
+            updateTurnState("candidate-speaking")
+            if (finalAnswerStartedAtMsRef.current === null) {
+                armFinalAnswerMaxTimer()
+            }
+            return
+        }
+
+        if (endgameStateRef.current === "normal" && turnStateRef.current === "awaiting-candidate-answer") {
+            updateTurnState("candidate-speaking")
+        }
+    }, [armFinalAnswerMaxTimer, clearFinalAnswerStartTimer, updateTurnState])
+
+    const handleCandidateSpeechEnded = useCallback(() => {
+        candidateSpeechLiveRef.current = false
+
+        if (callLifecyclePhaseRef.current !== "interviewing") return
+        if (turnStateRef.current === "interviewer-speaking") return
+
+        if (endgameStateRef.current === "awaiting-final-answer" && turnStateRef.current === "candidate-speaking") {
+            updateTurnState("between-questions")
+            void requestGracefulStopRef.current?.("timer")
+            return
+        }
+
+        if (endgameStateRef.current === "normal" && turnStateRef.current === "candidate-speaking") {
+            updateTurnState("between-questions")
+        }
+    }, [updateTurnState])
 
     // -- Audio playback --
 
@@ -724,6 +925,10 @@ function VoiceInterview({ role }: { role: string }) {
             pendingInterviewerTranscriptRef.current = mergeModelTurnText(pendingInterviewerTranscriptRef.current, modelTurnParts)
         }
 
+        if (modelTurnParts.length) {
+            updateTurnState("interviewer-speaking")
+        }
+
         for (const part of modelTurnParts) {
             if (!part.inlineData?.data) continue
             if (callLifecyclePhaseRef.current === "closing" || callLifecyclePhaseRef.current === "stopping") continue
@@ -734,6 +939,16 @@ function VoiceInterview({ role }: { role: string }) {
         if (message.serverContent?.turnComplete || message.serverContent?.waitingForInput) {
             flushPendingTranscript("interviewer")
             flushPendingTranscript("candidate")
+            if (turnStateRef.current === "interviewer-speaking") {
+                updateTurnState("awaiting-candidate-answer")
+            } else if (endgameStateRef.current === "normal" && turnStateRef.current === "candidate-speaking" && !candidateSpeechLiveRef.current) {
+                updateTurnState("between-questions")
+            }
+        }
+
+        if (endgameStateRef.current === "finishing-current-question" && turnStateRef.current === "awaiting-candidate-answer" && !realtimeSessionDetachedRef.current) {
+            detachForControlledEnding()
+            armFinalAnswerWindow({ candidateAlreadySpeaking: candidateSpeechLiveRef.current })
         }
 
         if (message.goAway?.timeLeft) {
@@ -793,6 +1008,21 @@ function VoiceInterview({ role }: { role: string }) {
 
             processor.port.onmessage = (event: MessageEvent<Float32Array>) => {
                 if (!(event.data instanceof Float32Array)) return
+
+                if (callLifecyclePhaseRef.current === "interviewing" && turnStateRef.current !== "interviewer-speaking") {
+                    const transition = updateSpeechActivityState(candidateSpeechActivityRef.current, getChunkRms(event.data), Date.now())
+                    if (transition === "speech-started") {
+                        handleCandidateSpeechStarted()
+                    }
+
+                    if (transition === "speech-ended") {
+                        handleCandidateSpeechEnded()
+                    }
+                } else {
+                    candidateSpeechActivityRef.current = createSpeechActivityState()
+                    candidateSpeechLiveRef.current = false
+                }
+
                 sendRealtimeAudioChunk(session, event.data, audioContext.sampleRate)
             }
 
@@ -955,7 +1185,7 @@ function VoiceInterview({ role }: { role: string }) {
             updateCallLifecyclePhase("idle")
             callTimingRef.current = null
             setSecondsLeft(CALL_DURATION_SECONDS)
-            updateClosingPhase("idle")
+            clearEndgameTimers()
             resetClosingStateRefs(false)
             resetTranscriptTrackingRefs()
             startCallInFlightRef.current = false
@@ -989,6 +1219,7 @@ function VoiceInterview({ role }: { role: string }) {
     useEffect(() => {
         return () => {
             clearClosingHardStopTimer()
+            clearEndgameTimers()
             cancelHostPlayback()
             closeRealtimeSession({ sendAudioStreamEnd: true })
             resetRealtimeAudioPipeline()
@@ -1002,7 +1233,7 @@ function VoiceInterview({ role }: { role: string }) {
                 void audioContextRef.current.close().catch(() => undefined)
             }
         }
-    }, [cancelHostPlayback, clearClosingHardStopTimer, closeRealtimeSession, flushPendingTranscript, resetRealtimeAudioPipeline])
+    }, [cancelHostPlayback, clearClosingHardStopTimer, clearEndgameTimers, closeRealtimeSession, flushPendingTranscript, resetRealtimeAudioPipeline])
 
     useEffect(() => {
         if (callLifecyclePhase !== "interviewing") return
@@ -1014,23 +1245,18 @@ function VoiceInterview({ role }: { role: string }) {
             if (!timing) return
 
             const now = Date.now()
-            if (now >= timing.targetEndAtMs) {
+            if (now >= timing.absoluteHardStopAtMs) {
                 void requestGracefulStop("timer")
                 return
             }
 
-            if (!finalInterruptTriggeredRef.current && now >= timing.finalInterruptAtMs) {
-                void requestGracefulStop("timer")
-                return
-            }
-
-            if (!finalQuestionTriggeredRef.current && now >= timing.lastQuestionAtMs) {
-                beginLastQuestionPhase()
+            if (endgameStateRef.current === "normal" && now >= timing.lastMinuteAtMs) {
+                beginLastMinuteLock()
             }
         }, 250)
 
         return () => window.clearInterval(intervalId)
-    }, [beginLastQuestionPhase, callLifecyclePhase, requestGracefulStop, syncCountdown])
+    }, [beginLastMinuteLock, callLifecyclePhase, requestGracefulStop, syncCountdown])
 
     async function startCall() {
         if (startCallInFlightRef.current || callLifecyclePhaseRef.current !== "idle") return
@@ -1051,13 +1277,13 @@ function VoiceInterview({ role }: { role: string }) {
         sessionShutdownRequestedRef.current = false
         updateCallLifecyclePhase("opening")
         setSecondsLeft(CALL_DURATION_SECONDS)
-        updateClosingPhase("idle")
         resetClosingStateRefs(true)
         resetTranscriptTrackingRefs()
         callTimingRef.current = null
         recordedAudioChunksRef.current = []
         recordedAudioMimeTypeRef.current = ""
         clearClosingHardStopTimer()
+        clearEndgameTimers()
         cancelHostPlayback()
         updateConnectionStatus("connecting")
 
@@ -1150,6 +1376,7 @@ function VoiceInterview({ role }: { role: string }) {
                 console.warn("Greeting playback failed. Continuing with opening question.")
             }
 
+            updateTurnState("interviewer-speaking")
             const openingQuestionPlayed = await playHostPhrase(openingQuestionPhrase)
             if (!openingQuestionPlayed) {
                 await stopCall()
@@ -1177,7 +1404,7 @@ function VoiceInterview({ role }: { role: string }) {
 
             candidateAudioSuppressedRef.current = false
             updateCallLifecyclePhase("interviewing")
-            updateClosingPhase("armed")
+            updateTurnState("awaiting-candidate-answer")
         } catch (startError) {
             await stopCall()
             updateConnectionStatus("error")
@@ -1218,7 +1445,7 @@ function VoiceInterview({ role }: { role: string }) {
                             <div className="mt-4 flex flex-wrap gap-2 text-xs">
                                 <span className="rounded-full border bg-slate-50 px-3 py-1.5">{connectionStatus}</span>
                                 <span className="rounded-full border bg-slate-50 px-3 py-1.5">{callLifecyclePhase}</span>
-                                <span className={`rounded-full border px-3 py-1.5 ${secondsLeft <= LAST_QUESTION_LEAD_SECONDS ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-700"}`}>
+                                <span className={`rounded-full border px-3 py-1.5 ${secondsLeft <= LAST_MINUTE_THRESHOLD_SECONDS ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-700"}`}>
                                     {formatCountdown(secondsLeft)}
                                 </span>
                                 <span className="rounded-full border bg-slate-50 px-3 py-1.5">{playbackActive ? "AI spricht" : "wartet"}</span>
