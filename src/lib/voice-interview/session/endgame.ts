@@ -42,4 +42,3 @@ export function createCallTiming(
 export function decideLastMinuteAction(turnState: InterviewTurnState) {
     return turnState === "between-questions" ? "ask-closing-question" : "finish-current-question"
 }
-

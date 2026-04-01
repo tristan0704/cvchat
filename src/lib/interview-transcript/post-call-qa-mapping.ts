@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai"
-import { normalizeTranscriptText, type TranscriptQaPair } from "@/lib/transcript"
+import { normalizeTranscriptText } from "@/lib/interview-transcript/text"
+import type { TranscriptQaPair } from "@/lib/interview-transcript/types"
 
 const PRIMARY_QA_MAPPING_MODEL = process.env.GEMINI_QA_MAPPING_MODEL || "gemini-2.5-flash"
 const QA_MAPPING_MODEL_FALLBACKS = ["gemini-2.5-flash"]

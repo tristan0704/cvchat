@@ -11,6 +11,7 @@ export type SpeechActivityState = {
     isSpeaking: boolean
     aboveThresholdSinceMs: number | null
     belowThresholdSinceMs: number | null
+    lastNonSilentAtMs: number | null
 }
 
 export const DEFAULT_SPEECH_ACTIVITY_CONFIG: SpeechActivityConfig = {
@@ -25,6 +26,7 @@ export function createSpeechActivityState(): SpeechActivityState {
         isSpeaking: false,
         aboveThresholdSinceMs: null,
         belowThresholdSinceMs: null,
+        lastNonSilentAtMs: null,
     }
 }
 
@@ -48,6 +50,7 @@ export function updateSpeechActivityState(
 ): SpeechActivityTransition {
     if (!state.isSpeaking) {
         if (rms >= config.speakingThreshold) {
+            state.lastNonSilentAtMs = nowMs
             state.aboveThresholdSinceMs ??= nowMs
             if (nowMs - state.aboveThresholdSinceMs >= config.speechStartHoldMs) {
                 state.isSpeaking = true
@@ -71,6 +74,7 @@ export function updateSpeechActivityState(
             return "speech-ended"
         }
     } else {
+        state.lastNonSilentAtMs = nowMs
         state.belowThresholdSinceMs = null
     }
 

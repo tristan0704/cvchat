@@ -1,12 +1,3 @@
-/**
- * Shared helpers for host-controlled voice phrases.
- *
- * The host, not the live interview model, owns deterministic fixed phrases
- * such as the greeting, the last-question prompt, and the farewell. This
- * keeps start and stop behavior predictable even if the realtime model is
- * delayed, interrupted, or already closing.
- */
-
 import voiceHostPhraseManifest from "@/config/voice-host-phrases.json"
 
 type GreetingPhraseConfig = {
@@ -60,22 +51,10 @@ function resolveRolePhrase(role: string, roleSpecificPhrases: GreetingPhraseConf
     return fallbackPhrase
 }
 
-/**
- * Resolve the best matching pre-generated greeting asset for a role.
- *
- * The flow currently exposes a small fixed role set. If a route is opened
- * with an unexpected role string, we intentionally fall back to a generic
- * greeting instead of synthesizing a new runtime phrase.
- */
 export function resolveGreetingPhrase(role: string): HostVoicePhrase {
     return resolveRolePhrase(role, manifest.greetings, manifest.genericGreeting)
 }
 
-/**
- * Resolve the first spoken interview question that is owned by the host.
- * This avoids a "double opening" where the live model adds its own greeting
- * before the first real technical question.
- */
 export function resolveOpeningQuestionPhrase(role: string): HostVoicePhrase {
     return resolveRolePhrase(role, manifest.firstQuestions, manifest.genericFirstQuestion)
 }

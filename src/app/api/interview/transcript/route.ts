@@ -7,8 +7,11 @@
  */
 
 import { createPartFromUri, GoogleGenAI } from "@google/genai"
-import { mapPostCallTranscriptToQaPairs } from "@/lib/post-call-qa-mapping"
-import { normalizeTranscriptText, type TranscriptQaPair } from "@/lib/transcript"
+import {
+    mapPostCallTranscriptToQaPairs,
+    normalizeTranscriptText,
+    type TranscriptQaPair,
+} from "@/lib/interview-transcript"
 
 export const runtime = "nodejs"
 
