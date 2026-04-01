@@ -1,11 +1,23 @@
 
 import { type Part } from "@google/genai"
 
+function shouldInsertSpaceBetweenFragments(existingText: string, incomingText: string): boolean {
+    const leftChar = existingText.slice(-1)
+    const rightChar = incomingText.slice(0, 1)
+
+    if (!leftChar || !rightChar) return false
+    if (/\s/.test(leftChar) || /\s/.test(rightChar)) return false
+    if (/[\(\[\{\/"'`-]/.test(leftChar)) return false
+    if (/^[,.;:!?)\]\}\/"'`-]/.test(rightChar)) return false
+
+    return true
+}
+
 function concatModelTextParts(parts: Part[]): string {
     return parts
         .filter((part) => typeof part.text === "string" && !!part.text && !part.thought)
         .map((part) => part.text || "")
-        .join("")
+        .reduce((mergedText, partText) => mergeStreamingTurnText(mergedText, partText), "")
 }
 
 export function mergeStreamingTurnText(existingText: string, incomingText: string): string {
@@ -22,7 +34,8 @@ export function mergeStreamingTurnText(existingText: string, incomingText: strin
         }
     }
 
-    return `${existingText}${incomingText}`
+    const joiner = shouldInsertSpaceBetweenFragments(existingText, incomingText) ? " " : ""
+    return `${existingText}${joiner}${incomingText}`
 }
 
 export function mergeModelTurnText(existingText: string, parts: Part[]): string {

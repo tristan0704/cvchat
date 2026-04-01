@@ -59,6 +59,41 @@ export function normalizeTranscriptText(text: string): string {
     return text.replace(/\s+/g, " ").replace(/\s+([,.!?;:])/g, "$1").trim()
 }
 
+const INTERVIEWER_QUESTION_PREFIXES = [
+    "warum",
+    "wie",
+    "was",
+    "welche",
+    "welcher",
+    "welches",
+    "welchen",
+    "welchem",
+    "woran",
+    "wann",
+    "wo",
+    "wer",
+    "wieso",
+    "weshalb",
+    "inwiefern",
+    "beschreibe",
+    "erzaehl",
+    "erklaere",
+    "nimm",
+    "stell dir vor",
+    "kannst du",
+    "koennen sie",
+    "koennten sie",
+    "magst du",
+]
+
+function isLikelyInterviewerQuestion(text: string): boolean {
+    const normalized = normalizeTranscriptText(text).toLowerCase()
+    if (!normalized) return false
+    if (normalized.includes("?")) return true
+
+    return INTERVIEWER_QUESTION_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+}
+
 // ---------------------------------------------------------------------------
 // Q&A pairing
 // ---------------------------------------------------------------------------
@@ -96,9 +131,12 @@ function collapseTranscriptTurns(entries: TranscriptEntry[]): TranscriptEntry[] 
 }
 
 export function extractInterviewerQuestions(entries: TranscriptEntry[]): string[] {
-    return collapseTranscriptTurns(entries)
+    const interviewerTurns = collapseTranscriptTurns(entries)
         .filter((entry) => entry.speaker === "interviewer")
         .map((entry) => entry.text)
+
+    const likelyQuestions = interviewerTurns.filter((entry) => isLikelyInterviewerQuestion(entry))
+    return likelyQuestions.length ? likelyQuestions : interviewerTurns
 }
 
 export function normalizeTranscriptQaPairs(pairs: TranscriptQaPair[]): TranscriptQaPair[] {

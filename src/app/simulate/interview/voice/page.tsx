@@ -8,6 +8,7 @@
  *    - Opens an AudioContext and connects to Gemini Live via WebSocket
  *    - Starts the microphone pipeline (MediaStream -> ScriptProcessor -> Gemini)
  *    - Starts a parallel MediaRecorder for the post-call transcription
+ *    - Starts a second mixed MediaRecorder for the full interview recap
  *    - Plays a deterministic host-owned greeting from a pre-generated asset
  *    - Sends the initial prompt only after the greeting has completed
  *    - Starts the countdown timer (default 5 min) after the greeting
@@ -27,7 +28,7 @@
  *    - stopCall() runs only after farewell completion or hard timeout
  *
  * 4. stopCall() teardown:
- *    - Stops MediaRecorder, collects recorded blob
+ *    - Stops both MediaRecorder instances and collects their blobs
  *    - Closes Gemini session and disconnects audio nodes
  *    - Stops mic tracks, closes AudioContext
  *    - Triggers face analysis via FaceLandmarkPanel.stopAndAnalyze()
@@ -119,9 +120,53 @@ const LIVE_INPUT_SILENCE_DURATION_MS = 700
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "error"
 type CallLifecyclePhase = "idle" | "opening" | "interviewing" | "closing" | "stopping"
+type InterviewRecapStatus = "idle" | "recording" | "ready" | "error"
 type StopReason = "timer" | "manual" | "goAway" | "technicalError"
 type LiveTokenResponse = { token: string; model: string; voiceName: string }
 type AsyncResult<T> = { ok: true; value: T } | { ok: false; error: string }
+type InterviewTimingMetrics = {
+    answerCount: number
+    totalCandidateSpeechMs: number
+    averageAnswerDurationMs: number
+    longestAnswerDurationMs: number
+    shortestAnswerDurationMs: number
+    averageResponseLatencyMs: number
+    longestResponseLatencyMs: number
+    candidateWordsPerMinute: number | null
+}
+
+const METRIC_SECONDS_FORMATTER = new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+})
+
+const METRIC_INTEGER_FORMATTER = new Intl.NumberFormat("de-DE", {
+    maximumFractionDigits: 0,
+})
+
+function sumMetricValues(values: number[]): number {
+    return values.reduce((total, value) => total + value, 0)
+}
+
+function averageMetricValues(values: number[]): number {
+    return values.length ? sumMetricValues(values) / values.length : 0
+}
+
+function countTranscriptWords(text: string): number {
+    const normalized = normalizeTranscriptText(text)
+    if (!normalized) return 0
+
+    return normalized.split(/\s+/).filter((word) => !!word).length
+}
+
+function formatMetricSeconds(durationMs: number): string {
+    return `${METRIC_SECONDS_FORMATTER.format(durationMs / 1_000)} s`
+}
+
+function formatMetricWordsPerMinute(wordsPerMinute: number | null): string {
+    if (!Number.isFinite(wordsPerMinute)) return "-"
+    return `${METRIC_INTEGER_FORMATTER.format(wordsPerMinute || 0)} WPM`
+}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -139,6 +184,12 @@ function VoiceInterview({ role }: { role: string }) {
     const [mappedTranscriptQaPairs, setMappedTranscriptQaPairs] = useState<TranscriptQaPair[]>([])
     const [postCallTranscriptStatus, setPostCallTranscriptStatus] = useState<PostCallTranscriptStatus>("idle")
     const [postCallTranscriptError, setPostCallTranscriptError] = useState("")
+    const [interviewRecapUrl, setInterviewRecapUrl] = useState("")
+    const [interviewRecapStatus, setInterviewRecapStatus] = useState<InterviewRecapStatus>("idle")
+    const [interviewRecapError, setInterviewRecapError] = useState("")
+    const [interviewRecapCaptureNote, setInterviewRecapCaptureNote] = useState("")
+    const [candidateAnswerDurationsMs, setCandidateAnswerDurationsMs] = useState<number[]>([])
+    const [candidateResponseLatenciesMs, setCandidateResponseLatenciesMs] = useState<number[]>([])
     const [callLifecyclePhase, setCallLifecyclePhase] = useState<CallLifecyclePhase>("idle")
     const [secondsLeft, setSecondsLeft] = useState(CALL_DURATION_SECONDS)
     // Memoize Q&A pairs to avoid recomputing on every render
@@ -150,6 +201,35 @@ function VoiceInterview({ role }: { role: string }) {
         () => transcriptQaPairs.length > 0 || !!normalizeTranscriptText(postCallCandidateTranscript),
         [postCallCandidateTranscript, transcriptQaPairs]
     )
+    const candidateTranscriptWordSource = useMemo(
+        () =>
+            normalizeTranscriptText(postCallCandidateTranscript) ||
+            transcriptEntries
+                .filter((entry) => entry.speaker === "candidate")
+                .map((entry) => entry.text)
+                .join(" "),
+        [postCallCandidateTranscript, transcriptEntries]
+    )
+    const interviewTimingMetrics = useMemo<InterviewTimingMetrics>(() => {
+        const answerCount = candidateAnswerDurationsMs.length
+        const totalCandidateSpeechMs = sumMetricValues(candidateAnswerDurationsMs)
+        const candidateWordCount = countTranscriptWords(candidateTranscriptWordSource)
+
+        return {
+            answerCount,
+            totalCandidateSpeechMs,
+            averageAnswerDurationMs: averageMetricValues(candidateAnswerDurationsMs),
+            longestAnswerDurationMs: answerCount ? Math.max(...candidateAnswerDurationsMs) : 0,
+            shortestAnswerDurationMs: answerCount ? Math.min(...candidateAnswerDurationsMs) : 0,
+            averageResponseLatencyMs: averageMetricValues(candidateResponseLatenciesMs),
+            longestResponseLatencyMs: candidateResponseLatenciesMs.length ? Math.max(...candidateResponseLatenciesMs) : 0,
+            candidateWordsPerMinute:
+                totalCandidateSpeechMs > 0 && candidateWordCount > 0
+                    ? Math.round(candidateWordCount / (totalCandidateSpeechMs / 60_000))
+                    : null,
+        }
+    }, [candidateAnswerDurationsMs, candidateResponseLatenciesMs, candidateTranscriptWordSource])
+    const hasTimingMetrics = interviewTimingMetrics.answerCount > 0 || candidateResponseLatenciesMs.length > 0
 
     // -- Refs: Gemini session & audio pipeline --
     const sessionRef = useRef<Session | null>(null)
@@ -158,6 +238,7 @@ function VoiceInterview({ role }: { role: string }) {
     const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
     const processorNodeRef = useRef<AudioWorkletNode | null>(null)
     const silentGainRef = useRef<GainNode | null>(null)
+    const recapMixDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null)
 
     // -- Refs: Audio playback scheduling --
     const scheduledSourcesRef = useRef<AudioBufferSourceNode[]>([])
@@ -167,8 +248,8 @@ function VoiceInterview({ role }: { role: string }) {
     const transcriptCounterRef = useRef(0)
     const pendingCandidateTranscriptRef = useRef("")
     const pendingInterviewerTranscriptRef = useRef("")
-    const lastCandidateTranscriptRef = useRef("")
-    const lastInterviewerTranscriptRef = useRef("")
+    const activeCandidateAnswerStartedAtMsRef = useRef<number | null>(null)
+    const pendingCandidateResponseStartedAtMsRef = useRef<number | null>(null)
 
     // -- Refs: Closing sequence coordination --
     const candidateAudioSuppressedRef = useRef(false)
@@ -208,11 +289,17 @@ function VoiceInterview({ role }: { role: string }) {
     const mappedTranscriptQaPairsRef = useRef<TranscriptQaPair[]>([])
     const postCallTranscriptStatusRef = useRef<PostCallTranscriptStatus>("idle")
     const postCallTranscriptErrorRef = useRef("")
+    const interviewRecapStatusRef = useRef<InterviewRecapStatus>("idle")
 
     // -- Refs: MediaRecorder for post-call transcription --
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const recordedAudioChunksRef = useRef<Blob[]>([])
     const recordedAudioMimeTypeRef = useRef("")
+    const recapRecorderRef = useRef<MediaRecorder | null>(null)
+    const recapRecordedAudioChunksRef = useRef<Blob[]>([])
+    const recapRecordedAudioMimeTypeRef = useRef("")
+    const recapObjectUrlRef = useRef("")
+    const recapHasSpeechSynthesisGapRef = useRef(false)
 
     // -- Refs: Face landmark panel --
     const faceLandmarkPanelRef = useRef<FaceLandmarkPanelHandle | null>(null)
@@ -226,6 +313,7 @@ function VoiceInterview({ role }: { role: string }) {
     useEffect(() => { mappedTranscriptQaPairsRef.current = mappedTranscriptQaPairs }, [mappedTranscriptQaPairs])
     useEffect(() => { postCallTranscriptStatusRef.current = postCallTranscriptStatus }, [postCallTranscriptStatus])
     useEffect(() => { postCallTranscriptErrorRef.current = postCallTranscriptError }, [postCallTranscriptError])
+    useEffect(() => { interviewRecapStatusRef.current = interviewRecapStatus }, [interviewRecapStatus])
 
     useEffect(() => {
         const secureMic = typeof window !== "undefined" && window.isSecureContext && !!navigator.mediaDevices?.getUserMedia
@@ -255,6 +343,33 @@ function VoiceInterview({ role }: { role: string }) {
         callLifecyclePhaseRef.current = nextPhase
         setCallLifecyclePhase(nextPhase)
     }
+
+    const replaceInterviewRecapUrl = useCallback((nextUrl: string) => {
+        if (typeof window !== "undefined" && recapObjectUrlRef.current) {
+            URL.revokeObjectURL(recapObjectUrlRef.current)
+        }
+
+        recapObjectUrlRef.current = nextUrl
+        setInterviewRecapUrl(nextUrl)
+    }, [])
+
+    const clearInterviewRecap = useCallback(() => {
+        replaceInterviewRecapUrl("")
+        recapHasSpeechSynthesisGapRef.current = false
+        recapRecordedAudioChunksRef.current = []
+        recapRecordedAudioMimeTypeRef.current = ""
+        interviewRecapStatusRef.current = "idle"
+        setInterviewRecapStatus("idle")
+        setInterviewRecapError("")
+        setInterviewRecapCaptureNote("")
+    }, [replaceInterviewRecapUrl])
+
+    const markInterviewRecapCaptureGap = useCallback(() => {
+        if (recapHasSpeechSynthesisGapRef.current) return
+
+        recapHasSpeechSynthesisGapRef.current = true
+        setInterviewRecapCaptureNote("Falls der Browser-TTS-Fallback lief, fehlen einzelne feste Host-Phrasen im Recap.")
+    }, [])
 
     const clearClosingHardStopTimer = useCallback(() => {
         if (closingHardStopTimerRef.current === null || typeof window === "undefined") return
@@ -334,16 +449,46 @@ function VoiceInterview({ role }: { role: string }) {
         processorNodeRef.current = null
         sourceNodeRef.current = null
         silentGainRef.current = null
+        recapMixDestinationRef.current = null
     }, [])
 
     const resetTranscriptTrackingRefs = useCallback(() => {
         pendingCandidateTranscriptRef.current = ""
         pendingInterviewerTranscriptRef.current = ""
-        lastCandidateTranscriptRef.current = ""
-        lastInterviewerTranscriptRef.current = ""
+        activeCandidateAnswerStartedAtMsRef.current = null
+        pendingCandidateResponseStartedAtMsRef.current = null
     }, [])
 
+    const recordCandidateAnswerDuration = useCallback((durationMs: number) => {
+        if (durationMs <= 0) return
+        setCandidateAnswerDurationsMs((previousDurations) => [...previousDurations, durationMs])
+    }, [])
+
+    const recordCandidateResponseLatency = useCallback((latencyMs: number) => {
+        if (latencyMs < 0) return
+        setCandidateResponseLatenciesMs((previousLatencies) => [...previousLatencies, latencyMs])
+    }, [])
+
+    const finalizeActiveCandidateAnswer = useCallback(
+        (endedAtMs = Date.now()) => {
+            const startedAtMs = activeCandidateAnswerStartedAtMsRef.current
+            activeCandidateAnswerStartedAtMsRef.current = null
+            if (startedAtMs === null) return
+
+            recordCandidateAnswerDuration(Math.max(0, endedAtMs - startedAtMs))
+        },
+        [recordCandidateAnswerDuration]
+    )
+
     const updateTurnState = useCallback((nextState: InterviewTurnState) => {
+        if (nextState === "awaiting-candidate-answer" && turnStateRef.current !== "awaiting-candidate-answer") {
+            pendingCandidateResponseStartedAtMsRef.current = Date.now()
+        }
+
+        if (nextState === "interviewer-speaking") {
+            pendingCandidateResponseStartedAtMsRef.current = null
+        }
+
         turnStateRef.current = nextState
     }, [])
 
@@ -408,10 +553,9 @@ function VoiceInterview({ role }: { role: string }) {
             pendingTranscriptRef.current = ""
             if (!normalized) return
 
-            const lastTranscriptRef = speaker === "candidate" ? lastCandidateTranscriptRef : lastInterviewerTranscriptRef
-            if (lastTranscriptRef.current === normalized) return
+            const lastEntry = transcriptEntriesRef.current[transcriptEntriesRef.current.length - 1]
+            if (lastEntry?.speaker === speaker && lastEntry.text === normalized) return
 
-            lastTranscriptRef.current = normalized
             appendTranscript(speaker, normalized, { mergeWithPrevious: false })
         },
         [appendTranscript]
@@ -488,6 +632,14 @@ function VoiceInterview({ role }: { role: string }) {
         cancelLocalSpeech()
     }, [cancelFixedPhraseAudio, cancelLocalSpeech])
 
+    const connectPlaybackSource = useCallback((source: AudioNode, audioContext: AudioContext) => {
+        source.connect(audioContext.destination)
+        const recapMixDestination = recapMixDestinationRef.current
+        if (recapMixDestination) {
+            source.connect(recapMixDestination)
+        }
+    }, [])
+
     const playSpeechFallback = useCallback(
         (text: string, playbackSequence: number) =>
             new Promise<boolean>((resolve) => {
@@ -517,6 +669,7 @@ function VoiceInterview({ role }: { role: string }) {
                         return
                     }
 
+                    markInterviewRecapCaptureGap()
                     setPlaybackActive(true)
                 }
                 utterance.onend = () => finish(hostPlaybackSequenceRef.current === playbackSequence)
@@ -525,7 +678,7 @@ function VoiceInterview({ role }: { role: string }) {
                 localSpeechUtteranceRef.current = utterance
                 window.speechSynthesis.speak(utterance)
             }),
-        []
+        [markInterviewRecapCaptureGap]
     )
 
     /**
@@ -591,7 +744,7 @@ function VoiceInterview({ role }: { role: string }) {
 
                         source = audioContext.createBufferSource()
                         source.buffer = decodedBuffer
-                        source.connect(audioContext.destination)
+                        connectPlaybackSource(source, audioContext)
                         source.onended = () => finish(hostPlaybackSequenceRef.current === playbackSequence)
                         fixedPhraseSourceRef.current = source
                         setPlaybackActive(true)
@@ -603,7 +756,7 @@ function VoiceInterview({ role }: { role: string }) {
                     }
                 })()
             }),
-        []
+        [connectPlaybackSource]
     )
 
     const playHostPhrase = useCallback(
@@ -826,7 +979,17 @@ function VoiceInterview({ role }: { role: string }) {
         if (callLifecyclePhaseRef.current !== "interviewing") return
         if (turnStateRef.current === "interviewer-speaking") return
 
+        const startedAtMs = Date.now()
+
         candidateSpeechLiveRef.current = true
+        if (activeCandidateAnswerStartedAtMsRef.current === null) {
+            activeCandidateAnswerStartedAtMsRef.current = startedAtMs
+        }
+
+        if (pendingCandidateResponseStartedAtMsRef.current !== null) {
+            recordCandidateResponseLatency(Math.max(0, startedAtMs - pendingCandidateResponseStartedAtMsRef.current))
+            pendingCandidateResponseStartedAtMsRef.current = null
+        }
 
         if (endgameStateRef.current === "awaiting-final-answer") {
             clearFinalAnswerStartTimer()
@@ -840,10 +1003,11 @@ function VoiceInterview({ role }: { role: string }) {
         if (endgameStateRef.current === "normal" && turnStateRef.current === "awaiting-candidate-answer") {
             updateTurnState("candidate-speaking")
         }
-    }, [armFinalAnswerMaxTimer, clearFinalAnswerStartTimer, updateTurnState])
+    }, [armFinalAnswerMaxTimer, clearFinalAnswerStartTimer, recordCandidateResponseLatency, updateTurnState])
 
     const handleCandidateSpeechEnded = useCallback(() => {
         candidateSpeechLiveRef.current = false
+        finalizeActiveCandidateAnswer()
 
         if (callLifecyclePhaseRef.current !== "interviewing") return
         if (turnStateRef.current === "interviewer-speaking") return
@@ -857,7 +1021,7 @@ function VoiceInterview({ role }: { role: string }) {
         if (endgameStateRef.current === "normal" && turnStateRef.current === "candidate-speaking") {
             updateTurnState("between-questions")
         }
-    }, [updateTurnState])
+    }, [finalizeActiveCandidateAnswer, updateTurnState])
 
     // -- Audio playback --
 
@@ -884,7 +1048,7 @@ function VoiceInterview({ role }: { role: string }) {
 
         const source = audioContext.createBufferSource()
         source.buffer = audioBuffer
-        source.connect(audioContext.destination)
+        connectPlaybackSource(source, audioContext)
 
         const startTime = Math.max(audioContext.currentTime + 0.05, nextPlaybackTimeRef.current)
         source.start(startTime)
@@ -974,6 +1138,35 @@ function VoiceInterview({ role }: { role: string }) {
         } catch {}
     }
 
+    function startInterviewRecapRecording(audioContext: AudioContext, recordingMimeType: string): AsyncResult<void> {
+        try {
+            const recapMixDestination = audioContext.createMediaStreamDestination()
+            recapMixDestinationRef.current = recapMixDestination
+            recapRecordedAudioChunksRef.current = []
+            recapRecordedAudioMimeTypeRef.current = recordingMimeType
+
+            const recapRecorder = new MediaRecorder(recapMixDestination.stream, { mimeType: recordingMimeType })
+            recapRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) recapRecordedAudioChunksRef.current.push(event.data)
+            }
+            recapRecorder.start(1_000)
+
+            recapRecorderRef.current = recapRecorder
+            interviewRecapStatusRef.current = "recording"
+            setInterviewRecapStatus("recording")
+            setInterviewRecapError("")
+            return { ok: true, value: undefined }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Der Interview-Recap konnte nicht gestartet werden."
+            recapMixDestinationRef.current = null
+            recapRecorderRef.current = null
+            interviewRecapStatusRef.current = "error"
+            setInterviewRecapStatus("error")
+            setInterviewRecapError(message)
+            return { ok: false, error: message }
+        }
+    }
+
     async function startMicrophone(audioContext: AudioContext, session: Session): Promise<AsyncResult<void>> {
         if (!navigator.mediaDevices?.getUserMedia) {
             return {
@@ -1006,6 +1199,7 @@ function VoiceInterview({ role }: { role: string }) {
             })
             const silentGain = audioContext.createGain()
             silentGain.gain.value = 0
+            const recapRecordingResult = startInterviewRecapRecording(audioContext, recordingMimeType)
 
             processor.port.onmessage = (event: MessageEvent<Float32Array>) => {
                 if (!(event.data instanceof Float32Array)) return
@@ -1028,6 +1222,9 @@ function VoiceInterview({ role }: { role: string }) {
             }
 
             source.connect(processor)
+            if (recapMixDestinationRef.current) {
+                source.connect(recapMixDestinationRef.current)
+            }
             processor.connect(silentGain)
             silentGain.connect(audioContext.destination)
 
@@ -1048,6 +1245,9 @@ function VoiceInterview({ role }: { role: string }) {
             mediaRecorderRef.current = recorder
             setPostCallTranscriptStatus("recording")
             setPostCallTranscriptError("")
+            if (!recapRecordingResult.ok) {
+                console.warn("Interview recap recording failed:", recapRecordingResult.error)
+            }
             return { ok: true, value: undefined }
         } catch (error) {
             return {
@@ -1077,6 +1277,29 @@ function VoiceInterview({ role }: { role: string }) {
                 }
 
                 resolve(new Blob(recordedAudioChunksRef.current, { type: recordedAudioMimeTypeRef.current || recorder.mimeType || "audio/webm" }))
+            }
+            recorder.stop()
+        })
+    }
+
+    async function stopInterviewRecapRecording() {
+        const recorder = recapRecorderRef.current
+        recapRecorderRef.current = null
+
+        if (!recorder) return null
+        if (recorder.state === "inactive") {
+            if (recapRecordedAudioChunksRef.current.length === 0) return null
+            return new Blob(recapRecordedAudioChunksRef.current, { type: recapRecordedAudioMimeTypeRef.current || "audio/webm" })
+        }
+
+        return await new Promise<Blob | null>((resolve) => {
+            recorder.onstop = () => {
+                if (recapRecordedAudioChunksRef.current.length === 0) {
+                    resolve(null)
+                    return
+                }
+
+                resolve(new Blob(recapRecordedAudioChunksRef.current, { type: recapRecordedAudioMimeTypeRef.current || recorder.mimeType || "audio/webm" }))
             }
             recorder.stop()
         })
@@ -1157,6 +1380,8 @@ function VoiceInterview({ role }: { role: string }) {
             cancelHostPlayback()
             flushPendingTranscript("candidate")
             flushPendingTranscript("interviewer")
+            finalizeActiveCandidateAnswer()
+            pendingCandidateResponseStartedAtMsRef.current = null
             persistVoiceFeedbackDraft({
                 role,
                 transcriptEntries: transcriptEntriesRef.current,
@@ -1167,6 +1392,7 @@ function VoiceInterview({ role }: { role: string }) {
             })
 
             const recordedAudioBlob = await stopCandidateRecording().catch(() => null)
+            const interviewRecapBlob = await stopInterviewRecapRecording().catch(() => null)
 
             if (closeSession) {
                 closeRealtimeSession({ sendAudioStreamEnd: true })
@@ -1191,6 +1417,17 @@ function VoiceInterview({ role }: { role: string }) {
             resetTranscriptTrackingRefs()
             startCallInFlightRef.current = false
             const faceAnalysisPromise = faceLandmarkPanelRef.current?.stopAndAnalyze().catch(() => null)
+
+            if (interviewRecapBlob && interviewRecapBlob.size > 0) {
+                replaceInterviewRecapUrl(URL.createObjectURL(interviewRecapBlob))
+                interviewRecapStatusRef.current = "ready"
+                setInterviewRecapStatus("ready")
+                setInterviewRecapError("")
+            } else if (interviewRecapStatusRef.current === "recording") {
+                interviewRecapStatusRef.current = "error"
+                setInterviewRecapStatus("error")
+                setInterviewRecapError("Das komplette Interview konnte nicht als Recap-Datei gespeichert werden.")
+            }
 
             if (recordedAudioBlob && recordedAudioBlob.size > 0) {
                 const transcriptionResult = await transcribeCandidateAudio(recordedAudioBlob)
@@ -1223,6 +1460,13 @@ function VoiceInterview({ role }: { role: string }) {
             clearEndgameTimers()
             cancelHostPlayback()
             closeRealtimeSession({ sendAudioStreamEnd: true })
+            const recapRecorder = recapRecorderRef.current
+            recapRecorderRef.current = null
+            if (recapRecorder?.state === "recording") {
+                try {
+                    recapRecorder.stop()
+                } catch {}
+            }
             resetRealtimeAudioPipeline()
             for (const track of microphoneStreamRef.current?.getTracks() ?? []) track.stop()
             for (const source of scheduledSourcesRef.current) {
@@ -1232,6 +1476,10 @@ function VoiceInterview({ role }: { role: string }) {
             }
             if (audioContextRef.current && audioContextRef.current.state !== "closed") {
                 void audioContextRef.current.close().catch(() => undefined)
+            }
+            if (typeof window !== "undefined" && recapObjectUrlRef.current) {
+                URL.revokeObjectURL(recapObjectUrlRef.current)
+                recapObjectUrlRef.current = ""
             }
         }
     }, [cancelHostPlayback, clearClosingHardStopTimer, clearEndgameTimers, closeRealtimeSession, flushPendingTranscript, resetRealtimeAudioPipeline])
@@ -1263,12 +1511,15 @@ function VoiceInterview({ role }: { role: string }) {
         if (startCallInFlightRef.current || callLifecyclePhaseRef.current !== "idle") return
 
         startCallInFlightRef.current = true
+        clearInterviewRecap()
         setError("")
         setPostCallCandidateTranscript("")
         setMappedTranscriptQaPairs([])
         setPostCallTranscriptError("")
         setPostCallTranscriptStatus("idle")
         setTranscriptEntries([])
+        setCandidateAnswerDurationsMs([])
+        setCandidateResponseLatenciesMs([])
         transcriptEntriesRef.current = []
         postCallCandidateTranscriptRef.current = ""
         mappedTranscriptQaPairsRef.current = []
@@ -1283,6 +1534,8 @@ function VoiceInterview({ role }: { role: string }) {
         callTimingRef.current = null
         recordedAudioChunksRef.current = []
         recordedAudioMimeTypeRef.current = ""
+        recapRecorderRef.current = null
+        recapMixDestinationRef.current = null
         clearClosingHardStopTimer()
         clearEndgameTimers()
         cancelHostPlayback()
@@ -1487,7 +1740,7 @@ function VoiceInterview({ role }: { role: string }) {
                         <section className="rounded-[24px] border bg-white p-4">
                             <div className="flex items-center justify-between gap-3 border-b pb-3">
                                 <div>
-                                    <p className="text-sm font-medium text-slate-900">Aufnahme-Transkript</p>
+                                    <p className="text-sm font-medium text-slate-900">Transkript & Recap</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="rounded-full border bg-slate-50 px-3 py-1.5 text-xs text-slate-600">{postCallTranscriptStatus}</span>
@@ -1502,16 +1755,123 @@ function VoiceInterview({ role }: { role: string }) {
                                 </div>
                             </div>
 
-                            <div className="mt-4 rounded-[20px] border bg-slate-50 p-4">
-                                {postCallCandidateTranscript ? (
-                                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-900">{postCallCandidateTranscript}</p>
-                                ) : postCallTranscriptStatus === "transcribing" ? (
-                                    <p className="text-sm text-slate-600">Aufnahme wird gerade transkribiert.</p>
-                                ) : postCallTranscriptStatus === "recording" ? (
-                                    <p className="text-sm text-slate-600">Call laeuft. Das Transkript wird nach dem Beenden aus dem MediaRecorder erzeugt.</p>
-                                ) : (
-                                    <p className="text-sm text-slate-600">Nach dem Call erscheint hier nur das Aufnahme-Transkript des Kandidaten.</p>
-                                )}
+                            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]">
+                                <div className="rounded-[20px] border bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-sm font-medium text-slate-900">Aufnahme-Transkript</p>
+                                        <span className="rounded-full border bg-white px-3 py-1.5 text-xs text-slate-600">{postCallTranscriptStatus}</span>
+                                    </div>
+
+                                    <div className="mt-4">
+                                        {postCallCandidateTranscript ? (
+                                            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-900">{postCallCandidateTranscript}</p>
+                                        ) : postCallTranscriptStatus === "transcribing" ? (
+                                            <p className="text-sm text-slate-600">Aufnahme wird gerade transkribiert.</p>
+                                        ) : postCallTranscriptStatus === "recording" ? (
+                                            <p className="text-sm text-slate-600">Call laeuft. Das Transkript wird nach dem Beenden aus dem MediaRecorder erzeugt.</p>
+                                        ) : (
+                                            <p className="text-sm text-slate-600">Nach dem Call erscheint hier das Aufnahme-Transkript des Kandidaten.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="rounded-[20px] border bg-slate-50 p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-900">Gesamtes Interview</p>
+                                                <p className="text-xs text-slate-500">KI + Kandidat in einer Aufnahme</p>
+                                            </div>
+                                            <span className="rounded-full border bg-white px-3 py-1.5 text-xs text-slate-600">{interviewRecapStatus}</span>
+                                        </div>
+
+                                        <div className="mt-4">
+                                            {interviewRecapUrl ? (
+                                                <div className="space-y-3">
+                                                    <audio controls preload="metadata" src={interviewRecapUrl} className="w-full">
+                                                        Dein Browser unterstuetzt das Audio-Element nicht.
+                                                    </audio>
+                                                    <p className="text-xs text-slate-500">Der Recap mischt die Interviewer- und Kandidatenstimme in eine gemeinsame Datei.</p>
+                                                </div>
+                                            ) : interviewRecapStatus === "recording" ? (
+                                                <p className="text-sm text-slate-600">Das komplette Interview wird parallel mitgeschnitten und steht nach dem Beenden hier bereit.</p>
+                                            ) : interviewRecapStatus === "error" ? (
+                                                <p className="text-sm text-red-600">{interviewRecapError || "Der Interview-Recap konnte nicht erstellt werden."}</p>
+                                            ) : (
+                                                <p className="text-sm text-slate-600">Nach dem Call kannst du hier das gesamte Interview abspielen.</p>
+                                            )}
+
+                                            {interviewRecapCaptureNote ? (
+                                                <p className="mt-3 text-xs text-amber-700">{interviewRecapCaptureNote}</p>
+                                            ) : null}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-[20px] border bg-slate-50 p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-900">Timing-Analyse</p>
+                                                <p className="text-xs text-slate-500">Nur Metriken, die im Transkript nicht direkt sichtbar sind</p>
+                                            </div>
+                                            <span className="rounded-full border bg-white px-3 py-1.5 text-xs text-slate-600">
+                                                {hasTimingMetrics ? `${interviewTimingMetrics.answerCount} Antworten` : "noch leer"}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-4">
+                                            {hasTimingMetrics ? (
+                                                <dl className="grid gap-3 sm:grid-cols-2">
+                                                    <div className="rounded-2xl border bg-white p-3">
+                                                        <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Gesamte Sprechzeit</dt>
+                                                        <dd className="mt-1 text-lg font-semibold text-slate-900">
+                                                            {formatCountdown(Math.max(0, Math.round(interviewTimingMetrics.totalCandidateSpeechMs / 1_000)))}
+                                                        </dd>
+                                                    </div>
+                                                    <div className="rounded-2xl border bg-white p-3">
+                                                        <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Words per Minute</dt>
+                                                        <dd className="mt-1 text-lg font-semibold text-slate-900">
+                                                            {formatMetricWordsPerMinute(interviewTimingMetrics.candidateWordsPerMinute)}
+                                                        </dd>
+                                                    </div>
+                                                    <div className="rounded-2xl border bg-white p-3">
+                                                        <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Durchschn. Antwortdauer</dt>
+                                                        <dd className="mt-1 text-lg font-semibold text-slate-900">
+                                                            {formatMetricSeconds(interviewTimingMetrics.averageAnswerDurationMs)}
+                                                        </dd>
+                                                    </div>
+                                                    <div className="rounded-2xl border bg-white p-3">
+                                                        <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Laengste Antwort</dt>
+                                                        <dd className="mt-1 text-lg font-semibold text-slate-900">
+                                                            {formatMetricSeconds(interviewTimingMetrics.longestAnswerDurationMs)}
+                                                        </dd>
+                                                    </div>
+                                                    <div className="rounded-2xl border bg-white p-3">
+                                                        <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Kuerzeste Antwort</dt>
+                                                        <dd className="mt-1 text-lg font-semibold text-slate-900">
+                                                            {formatMetricSeconds(interviewTimingMetrics.shortestAnswerDurationMs)}
+                                                        </dd>
+                                                    </div>
+                                                    <div className="rounded-2xl border bg-white p-3">
+                                                        <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Durchschn. Reaktionszeit</dt>
+                                                        <dd className="mt-1 text-lg font-semibold text-slate-900">
+                                                            {formatMetricSeconds(interviewTimingMetrics.averageResponseLatencyMs)}
+                                                        </dd>
+                                                    </div>
+                                                    <div className="rounded-2xl border bg-white p-3 sm:col-span-2">
+                                                        <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Laengste Denkpause vor einer Antwort</dt>
+                                                        <dd className="mt-1 text-lg font-semibold text-slate-900">
+                                                            {formatMetricSeconds(interviewTimingMetrics.longestResponseLatencyMs)}
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                            ) : callLifecyclePhase === "interviewing" ? (
+                                                <p className="text-sm text-slate-600">Sobald der Kandidat auf eine Frage antwortet, erscheinen hier Antwortdauer, Reaktionszeit und Sprechtempo.</p>
+                                            ) : (
+                                                <p className="text-sm text-slate-600">Nach dem ersten beantworteten Interviewturn erscheinen hier reine Timing-Metriken.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     </div>
