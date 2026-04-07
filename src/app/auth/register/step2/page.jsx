@@ -7,7 +7,6 @@ export default function RegisterStep2() {
 
   return (
     <div className="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
-
       {/* HEADER */}
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         <img
@@ -28,7 +27,6 @@ export default function RegisterStep2() {
       {/* FORM */}
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
         <form className="space-y-6">
-
           {/* USERNAME */}
           <div>
             <label className="block text-sm font-medium text-gray-100">
@@ -46,10 +44,7 @@ export default function RegisterStep2() {
 
           {/* CV UPLOAD */}
           <div className="border border-dashed border-white/20 rounded-lg p-6 text-center">
-
-            <p className="mb-3 text-sm text-gray-400">
-              Lebenslauf hochladen
-            </p>
+            <p className="mb-3 text-sm text-gray-400">Lebenslauf hochladen</p>
 
             <input
               type="file"
@@ -65,16 +60,11 @@ export default function RegisterStep2() {
               Datei auswählen
             </label>
 
-            {file && (
-              <p className="mt-3 text-xs text-gray-300">
-                {file.name}
-              </p>
-            )}
+            {file && <p className="mt-3 text-xs text-gray-300">{file.name}</p>}
           </div>
 
           {/* BUTTONS */}
           <div className="flex gap-4">
-
             <button
               type="button"
               onClick={() => window.history.back()}
@@ -89,9 +79,7 @@ export default function RegisterStep2() {
             >
               Fertig
             </button>
-
           </div>
-
         </form>
       </div>
     </div>

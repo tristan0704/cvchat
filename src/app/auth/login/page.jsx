@@ -67,7 +67,7 @@ export default function LoginPage() {
               Zurück
             </Link>
             <Link
-              href="/protected/home"
+              href="/home"
               className="flex w-full items-center justify-center rounded-md bg-indigo-500 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
             >
               Anmelden

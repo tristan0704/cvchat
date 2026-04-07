@@ -2,17 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <nav className="relative bg-gray-800/50 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-white/10">
-      
       <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
         <div className="relative flex h-16 items-center justify-between">
-
           {/* MOBILE BUTTON */}
           <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
             <button
@@ -23,12 +23,30 @@ export default function Navbar() {
               <span className="absolute -inset-0.5"></span>
 
               {!mobileOpen ? (
-                <svg className="size-6" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  className="size-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path
+                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               ) : (
-                <svg className="size-6" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M6 18 18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  className="size-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <path
+                    d="M6 18 18 6M6 6l12 12"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               )}
             </button>
@@ -46,13 +64,34 @@ export default function Navbar() {
 
             <div className="hidden sm:ml-6 sm:block">
               <div className="flex space-x-4">
-                <Link href="/home" className="rounded-md bg-gray-950/50 px-3 py-2 text-sm font-medium text-white">
-                  Dashboard
+                <Link
+                  href="/home"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    pathname.startsWith("/home")
+                      ? "bg-gray-950/50 text-white"
+                      : "text-gray-300 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  Home
                 </Link>
-                <Link href="#" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">
+                <Link
+                  href="/interviews"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    pathname.startsWith("/interviews")
+                      ? "bg-gray-950/50 text-white"
+                      : "text-gray-300 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
                   Interviews
                 </Link>
-                <Link href="#" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">
+                <Link
+                  href="/learn"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    pathname.startsWith("/learn")
+                      ? "bg-gray-950/50 text-white"
+                      : "text-gray-300 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
                   Lernen
                 </Link>
               </div>
@@ -61,12 +100,20 @@ export default function Navbar() {
 
           {/* RIGHT */}
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
-            
             {/* NOTIFICATION */}
             <button className="relative rounded-full p-1 text-gray-400 hover:text-white focus:outline-2 focus:outline-offset-2 focus:outline-indigo-500">
               <span className="absolute -inset-1.5"></span>
-              <svg className="size-6" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M14.857 17.082a23.848..." strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                className="size-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path
+                  d="M14.857 17.082a23.848 23.848 0 0 1-5.714 0M15 17a3 3 0 1 1-6 0m9-5a6 6 0 1 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
 
@@ -86,13 +133,22 @@ export default function Navbar() {
 
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-gray-800 py-1 outline outline-white/10">
-                  <Link href="#" className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5">
+                  <Link
+                    href="/profile"
+                    className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5"
+                  >
                     Profil
                   </Link>
-                  <Link href="#" className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5">
+                  <Link
+                    href="/settings"
+                    className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5"
+                  >
                     Einstellungen
                   </Link>
-                  <Link href="/" className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5">
+                  <Link
+                    href="/logout"
+                    className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5"
+                  >
                     Abmelden
                   </Link>
                 </div>
@@ -106,13 +162,34 @@ export default function Navbar() {
       {mobileOpen && (
         <div className="block sm:hidden">
           <div className="space-y-1 px-2 pt-2 pb-3">
-            <Link href="/home" className="block rounded-md bg-gray-950/50 px-3 py-2 text-base font-medium text-white">
-              Dashboard
+            <Link
+              href="/home"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname.startsWith("/home")
+                  ? "bg-gray-950/50 text-white"
+                  : "text-gray-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              Home
             </Link>
-            <Link href="#" className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-white/5 hover:text-white">
+            <Link
+              href="/interviews"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname.startsWith("/interviews")
+                  ? "bg-gray-950/50 text-white"
+                  : "text-gray-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
               Interviews
             </Link>
-            <Link href="#" className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-white/5 hover:text-white">
+            <Link
+              href="/learn"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname.startsWith("/learn")
+                  ? "bg-gray-950/50 text-white"
+                  : "text-gray-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
               Lernen
             </Link>
           </div>
