@@ -68,3 +68,20 @@ export function buildTranscriptQaExport(role: string, entries: TranscriptEntry[]
         ]),
     ].join("\n")
 }
+
+
+//### Einfach erklärt:
+// 1. **Nimmt:** Rohe Interview-Aufzeichnung (wer hat was wann gesagt)
+// 2. **Räumt auf:**
+//     - Entfernt System-Nachrichten
+//     - Verbindet zusammengehörige Sätze derselben Person
+//     - Bereinigt den Text
+//
+// 3. **Erstellt:** Einen strukturierten deutschen Report mit:
+//     - Datum und Rolle
+//     - Vollständiges Gespräch
+//     - Saubere Frage-Antwort-Liste
+//
+// ### Das Ergebnis:
+// Aus wirren Chat-Daten wird ein professioneller Interview-Bericht, den HR-Mitarbeiter gut lesen und archivieren können.
+// **Kurz:** Interview-Chaos → Ordentlicher deutscher Beri

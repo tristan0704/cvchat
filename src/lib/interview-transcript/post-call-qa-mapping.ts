@@ -39,6 +39,8 @@ function normalizeQuestions(interviewerQuestions: string[]): string[] {
 function buildQaMappingPrompt(role: string, interviewerQuestions: string[], candidateTranscript: string): string {
     const serializedQuestions = interviewerQuestions.map((question, index) => `${index + 1}. ${question}`).join("\n")
 
+    //Gemini Prompt für QA Mapping
+
     return [
         "Ordne fuer ein deutsches technisches Interview jede gestellte Recruiter-Frage der passendsten Kandidatenantwort zu.",
         `Die Zielrolle ist: ${role || "Backend Developer"}.`,

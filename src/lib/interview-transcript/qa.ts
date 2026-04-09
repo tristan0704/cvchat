@@ -28,6 +28,22 @@ const INTERVIEWER_QUESTION_PREFIXES = [
     "magst du",
 ]
 
+//## Zusammenfassung
+//
+// Dieser TypeScript-Code **verarbeitet Interview-Transkripte** und wandelt sie in strukturierte Frage-Antwort-Paare um.
+//
+// **Hauptfunktionen:**
+//
+// 1. **Erkennt Fragen** anhand deutscher Fragewörter (warum, wie, was, etc.) und Fragezeichen
+// 2. **Fasst zusammen** - kombiniert aufeinanderfolgende Aussagen derselben Person zu einem Text
+// 3. **Extrahiert Interviewer-Fragen** aus dem gesamten Transkript
+// 4. **Erstellt Frage-Antwort-Paare** - ordnet jeder Interviewer-Frage die nachfolgenden Antworten zu
+// 5. **Normalisiert Text** - bereinigt und formatiert den Text einheitlich
+//
+// **Zweck:** Automatische Strukturierung ungeordneter Interview-Aufzeichnungen in übersichtliche Q&A-Formate für weitere Analyse oder Dokumentation.
+
+
+
 function isLikelyInterviewerQuestion(text: string): boolean {
     const normalized = normalizeTranscriptText(text).toLowerCase()
     if (!normalized) return false

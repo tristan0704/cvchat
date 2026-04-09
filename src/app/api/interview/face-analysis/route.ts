@@ -3,8 +3,15 @@
  *
  * This route is called after a voice session ends. It accepts either the raw
  * face-landmark export or already structured snapshots and returns the final
- * body-language report used by the interview feedback flow.
+ * body-language report used by the interview feedback flow
+ *
+ * **Einfach gesagt**: Der Code nimmt Daten entgegen (egal in welchem Format), bereitet sie auf, analysiert sie und gibt ein Ergebnis zurück.
+ * Die eigentliche Analyse passiert in den importierten Funktionen - dieser Code hier ist nur der "Empfänger" und "Koordinator".
+ * .
  */
+
+
+
 
 import { analyzeFaceLandmarkSession, parseFaceLandmarkSnapshots, parseFaceLandmarkTxt } from "@/lib/face-analysis"
 

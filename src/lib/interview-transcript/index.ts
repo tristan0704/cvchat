@@ -10,3 +10,5 @@ export type {
     TranscriptQaPair,
     VoiceFeedbackDraft,
 } from "@/lib/interview-transcript/types"
+
+//Typensammlung

@@ -3,7 +3,9 @@ export type InterviewQuestion = {
     text: string
     priority: number
 }
+//Question Pool
 
+//TODO: durch DB ersetzen (später)
 const GENERAL_QUESTIONS: InterviewQuestion[] = [
     {
         id: "motivation",

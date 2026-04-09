@@ -19,3 +19,5 @@ export function persistVoiceFeedbackDraft(args: VoiceFeedbackDraft): void {
         })
     )
 }
+
+//Daten in SessionStorage geben

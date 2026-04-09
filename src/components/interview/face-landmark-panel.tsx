@@ -325,6 +325,8 @@ function FaceAnalysisSummary(args: {
     )
 }
 
+//TODO: BlendShapeList richtig einbauen für bessere Analse
+
 function BlendShapeList({ shapes }: { shapes: BlendShapeCategory[] }) {
     return (
         <div className="rounded-[20px] border bg-slate-50 p-4">

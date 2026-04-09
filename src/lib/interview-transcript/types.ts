@@ -11,6 +11,8 @@ export type TranscriptQaPair = {
     answer: string
 }
 
+//Typen und States
+
 export type PostCallTranscriptStatus = "idle" | "recording" | "transcribing" | "ready" | "error"
 
 export type VoiceFeedbackDraft = {

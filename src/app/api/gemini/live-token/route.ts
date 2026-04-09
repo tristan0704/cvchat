@@ -11,6 +11,9 @@ type LiveTokenBody = {
     role?: string
 }
 
+//Initiale Prompts für alle Arten von Rollen
+
+
 function getRoleInterviewGuidance(role: string) {
     const normalized = role.toLowerCase()
 
@@ -21,6 +24,7 @@ function getRoleInterviewGuidance(role: string) {
     return "Fokussiere auf konkrete technische Entscheidungen, nachvollziehbare Beispiele, klaren Eigenbeitrag und saubere Kommunikation."
 }
 
+//Questions aus Pool holen und in System-Prompt packen
 function createSystemInstruction(role: string) {
     const questionPlan = getInterviewQuestionPool(role)
     const serializedPlan = questionPlan.map((question, index) => `${index + 1}. [${question.id}] ${question.text}`).join("\n")
