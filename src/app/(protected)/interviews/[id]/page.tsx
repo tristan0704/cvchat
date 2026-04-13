@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import CvFeedbackStep from "@/components/cv/CvFeedbackStep";
+import CodingChallengeEditor from "@/components/coding-challenge/coding-challenge-editor";
+import CodingChallengeFeedback from "@/components/coding-challenge/coding-challenge-feedback";
 import InterviewFeedback from "@/components/interviews/InterviewFeedback";
 import { InterviewSessionProvider } from "@/components/interviews/interview-session-context";
 import InterviewVoiceStep from "@/components/interviews/InterviewVoiceStep";
@@ -67,7 +69,7 @@ function FeedbackBlock({
         <p className="mb-2 text-sm font-medium text-green-300">Positiv</p>
         <ul className="space-y-1 text-sm text-green-200">
           {positives.map((positive, index) => (
-            <li key={index}>â€¢ {positive}</li>
+            <li key={index}>Ã¢â‚¬Â¢ {positive}</li>
           ))}
         </ul>
       </div>
@@ -76,7 +78,7 @@ function FeedbackBlock({
         <p className="mb-2 text-sm font-medium text-red-300">Verbesserung</p>
         <ul className="space-y-1 text-sm text-red-200">
           {negatives.map((negative, index) => (
-            <li key={index}>â€¢ {negative}</li>
+            <li key={index}>Ã¢â‚¬Â¢ {negative}</li>
           ))}
         </ul>
       </div>
@@ -107,30 +109,9 @@ function InterviewDetailPageContent() {
 
             {step === 3 && <InterviewFeedback />}
 
-            {step === 4 && (
-              <div>
-                <h2 className="text-lg font-semibold">Code Aufgabe</h2>
+            {step === 4 && <CodingChallengeEditor />}
 
-                <div className="mt-4 rounded-md bg-gray-900 p-4 text-sm">
-                  Implementiere eine Funktion, die ein Array reversed.
-                </div>
-
-                <textarea className="mt-4 w-full rounded-md bg-gray-900 p-3 font-mono" />
-              </div>
-            )}
-
-            {step === 5 && (
-              <div>
-                <h2 className="text-lg font-semibold">Code Feedback</h2>
-
-                <FeedbackBlock
-                  score={68}
-                  summary="Die LÃ¶sung funktioniert, ist aber nicht optimal umgesetzt."
-                  positives={["Logik korrekt", "Grundidee richtig"]}
-                  negatives={["Built-in reverse genutzt", "Keine eigene LÃ¶sung"]}
-                />
-              </div>
-            )}
+            {step === 5 && <CodingChallengeFeedback />}
 
             {step === 6 && (
               <div>
@@ -147,7 +128,7 @@ function InterviewDetailPageContent() {
                       label: "Interview",
                       score: 74,
                       summary:
-                        "Gutes VerstÃ¤ndnis, aber zu oberflÃ¤chlich erklÃ¤rt.",
+                        "Gutes VerstÃƒÂ¤ndnis, aber zu oberflÃƒÂ¤chlich erklÃƒÂ¤rt.",
                     },
                     {
                       label: "Code",
@@ -198,8 +179,8 @@ function InterviewDetailPageContent() {
 
                 <FeedbackBlock
                   score={75}
-                  summary="Solides Interview mit Verbesserungspotenzial in Tiefe und CodequalitÃ¤t."
-                  positives={["Gutes VerstÃ¤ndnis", "Strukturierte Antworten"]}
+                  summary="Solides Interview mit Verbesserungspotenzial in Tiefe und CodequalitÃƒÂ¤t."
+                  positives={["Gutes VerstÃƒÂ¤ndnis", "Strukturierte Antworten"]}
                   negatives={["Zu wenig Tiefe", "Code nicht optimal"]}
                 />
               </div>
@@ -211,7 +192,7 @@ function InterviewDetailPageContent() {
                 disabled={step === 1}
                 className="text-sm text-gray-400 disabled:opacity-30"
               >
-                ZurÃ¼ck
+                ZurÃƒÂ¼ck
               </button>
 
               {step < 6 ? (
@@ -236,7 +217,7 @@ function InterviewDetailPageContent() {
                     onClick={() => router.push("/interviews")}
                     className="rounded-md bg-indigo-500 px-4 py-2 text-sm hover:bg-indigo-400"
                   >
-                    AbschlieÃŸen
+                    AbschlieÃƒÅ¸en
                   </button>
                 </div>
               )}
