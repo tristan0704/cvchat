@@ -131,8 +131,14 @@ export default function NewInterviewPage() {
               <button
                 onClick={() => {
                   const id = crypto.randomUUID(); // einfache ID erzeugen
+                  const params = new URLSearchParams({
+                    role,
+                    experience,
+                    companySize,
+                    type,
+                  });
 
-                  router.push(`/interviews/${id}`);
+                  router.push(`/interviews/${id}?${params.toString()}`);
                 }}
                 className="rounded-md bg-green-500 px-4 py-2 text-sm font-medium hover:bg-green-400"
               >
