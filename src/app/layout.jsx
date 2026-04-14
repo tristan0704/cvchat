@@ -1,4 +1,5 @@
 import "./globals.css";
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata = {
   title: "CareerPitch",
@@ -26,6 +27,7 @@ export default function RootLayout({ children }) {
 
         </div>
 
+        <Analytics />
       </body>
     </html>
   );
