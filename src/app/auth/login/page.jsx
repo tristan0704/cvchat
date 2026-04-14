@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { login } from "./actions";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/db-backend/auth/server-client";
 
 export default async function LoginPage({ searchParams }) {
   const params = await searchParams;

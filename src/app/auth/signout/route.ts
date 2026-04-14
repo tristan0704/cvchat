@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/db-backend/auth/server-client";
 
 export async function POST(request: NextRequest) {
     const supabase = await createClient();

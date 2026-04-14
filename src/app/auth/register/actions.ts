@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/db-backend/auth/server-client";
 
 function redirectWithError(message: string) {
     redirect(`/auth/register?error=${encodeURIComponent(message)}`);

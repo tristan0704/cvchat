@@ -9,64 +9,443 @@ datasource db {
 }
 
 enum InterviewStatus {
-  DRAFT
-  IN_PROGRESS
-  COMPLETED
-  FAILED
+  draft
+  ready
+  in_progress
+  analyzing
+  completed
+  failed
+  archived
+  cancelled
+}
+
+enum InterviewTranscriptStatus {
+  idle
+  recording
+  transcribing
+  ready
+  error
+}
+
+enum InterviewRecapStatus {
+  idle
+  recording
+  ready
+  error
+}
+
+enum TranscriptSpeaker {
+  candidate
+  interviewer
+  system
+}
+
+enum InterviewQaPairSource {
+  derived
+  ai_mapped
+}
+
+enum FaceAnalysisOverallStatus {
+  strong
+  okay
+  watch
+  critical
+}
+
+enum CodingChallengeRole {
+  frontend
+  fullstack
+  backend
+}
+
+enum CodingChallengeLanguage {
+  javascript
+  python
+  java
+}
+
+enum CodingChallengeDifficulty {
+  easy
+  medium
+  hard
+}
+
+enum CodingChallengeAttemptStatus {
+  assigned
+  draft
+  submitted
+  evaluated
+  error
+  abandoned
 }
 
 model User {
-  id         String      @id @db.Uuid
-  email      String      @unique
-  profile    Profile?
-  cvVersions CvVersion[]
-  interviews Interview[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id                      String                  @id @db.Uuid
+  email                   String                  @unique
+  profile                 Profile?
+  settings                UserSettings?
+  cvVersions              CvVersion[]
+  interviews              Interview[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 }
 
 model Profile {
-  id              String   @id @default(uuid()) @db.Uuid
-  userId          String   @unique @db.Uuid
-  displayName     String?
-  targetRole      String?
-  experienceLevel String?
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                      String                  @id @default(uuid()) @db.Uuid
+  userId                  String                  @unique @db.Uuid
+  username                String?                 @unique
+  displayName             String?
+  avatarUrl               String?
+  targetRole              String?
+  experienceLevel         String?
+  onboardingCompletedAt   DateTime?
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+}
+
+model UserSettings {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  userId                  String                  @unique @db.Uuid
+  language                String                  @default("de")
+  emailNotifications      Boolean                 @default(true)
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 }
 
 model CvVersion {
-  id                String      @id @default(uuid()) @db.Uuid
-  userId            String      @db.Uuid
-  sourceFileName    String?
-  extractedText     String
-  extractedTextHash String
-  isActive          Boolean     @default(true)
-  uploadedAt        DateTime    @default(now())
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  interviews        Interview[]
+  id                      String                  @id @default(uuid()) @db.Uuid
+  userId                  String                  @db.Uuid
+  fileName                String?
+  mimeType                String?                 @default("application/pdf")
+  fileSizeBytes           Int?
+  storageBucket           String?
+  storagePath             String?
+  extractedText           String?                 @db.Text
+  extractedTextHash       String?
+  browserFingerprint      String?
+  /// Enforced via a partial unique index in the SQL migrations.
+  isActive                Boolean                 @default(true)
+  uploadedAt              DateTime                @default(now())
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedbackAnalyses        CvFeedbackAnalysis[]
+  interviews              Interview[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 
-  @@index([userId, uploadedAt(sort: Desc)])
+  @@index([userId, uploadedAt])
+  @@index([userId, isActive])
   @@index([userId, extractedTextHash])
 }
 
-model Interview {
-  id            String          @id @default(uuid()) @db.Uuid
-  userId        String          @db.Uuid
-  cvVersionId   String?         @db.Uuid
-  role          String
-  experience    String?
-  companySize   String?
-  interviewType String?
-  status        InterviewStatus @default(DRAFT)
-  startedAt     DateTime?
-  completedAt   DateTime?
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cvVersion     CvVersion?      @relation(fields: [cvVersionId], references: [id], onDelete: SetNull)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+model CvFeedbackAnalysis {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  cvVersionId             String                  @db.Uuid
+  role                    String
+  experience              String                  @default("")
+  companySize             String                  @default("")
+  interviewType           String                  @default("")
+  analyzedAt              DateTime                @default(now())
+  fileName                String?
+  overallScore            Int
+  keywordScore            Int
+  llmScore                Int
+  blendedScore            Int
+  keywordWeight           Float
+  llmWeight               Float
+  sectionsScore           Int
+  sectionsFeedback        String                  @db.Text
+  impactScore             Int
+  impactFeedback          String                  @db.Text
+  lengthScore             Int
+  lengthFeedback          String                  @db.Text
+  contactScore            Int
+  contactFeedback         String                  @db.Text
+  clarityScore            Int
+  clarityFeedback         String                  @db.Text
+  improvements            String[]                @default([])
+  roleMatchScore          Int
+  matchedKeywords         String[]                @default([])
+  missingMustHaveKeywords String[]                @default([])
+  niceToHaveMatches       String[]                @default([])
+  bonusMatches            String[]                @default([])
+  roleSummary             String                  @db.Text
+  cvVersion               CvVersion               @relation(fields: [cvVersionId], references: [id], onDelete: Cascade)
+  interviews              Interview[]             @relation("InterviewCvFeedbackAnalysis")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 
-  @@index([userId, createdAt(sort: Desc)])
+  @@unique([cvVersionId, role, experience, companySize, interviewType])
+  @@index([cvVersionId, analyzedAt])
+  @@index([role, analyzedAt])
+}
+
+model Interview {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  userId                  String                  @db.Uuid
+  cvVersionId             String?                 @db.Uuid
+  cvFeedbackAnalysisId    String?                 @db.Uuid
+  title                   String?
+  role                    String
+  experience              String                  @default("")
+  companySize             String                  @default("")
+  interviewType           String                  @default("")
+  currentStep             Int                     @default(1)
+  status                  InterviewStatus         @default(draft)
+  startedAt               DateTime?
+  completedAt             DateTime?
+  archivedAt              DateTime?
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cvVersion               CvVersion?              @relation(fields: [cvVersionId], references: [id], onDelete: SetNull)
+  cvFeedbackAnalysis      CvFeedbackAnalysis?     @relation("InterviewCvFeedbackAnalysis", fields: [cvFeedbackAnalysisId], references: [id], onDelete: SetNull)
+  plannedQuestions        InterviewPlannedQuestion[]
+  transcript              InterviewTranscript?
+  timingMetrics           InterviewTimingMetrics?
+  feedback                InterviewFeedback?
+  faceAnalysis            InterviewFaceAnalysis?
+  codingChallengeAttempts CodingChallengeAttempt[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
   @@index([cvVersionId])
+  @@index([cvFeedbackAnalysisId])
+}
+
+model InterviewPlannedQuestion {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewId             String                  @db.Uuid
+  sequence                Int
+  questionKey             String?
+  text                    String                  @db.Text
+  priority                Int?
+  interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+
+  @@unique([interviewId, sequence])
+  @@index([interviewId, priority])
+}
+
+model InterviewTranscript {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewId             String                  @unique @db.Uuid
+  transcriptStatus        InterviewTranscriptStatus @default(idle)
+  transcriptError         String?                 @db.Text
+  candidateTranscript     String?                 @db.Text
+  transcriptExport        String?                 @db.Text
+  transcriptFingerprint   String?
+  interviewerQuestions    String[]                @default([])
+  qaMappingModel          String?
+  candidateAudioBucket    String?
+  candidateAudioPath      String?
+  candidateAudioMimeType  String?
+  candidateAudioBytes     Int?
+  recapStatus             InterviewRecapStatus    @default(idle)
+  recapError              String?                 @db.Text
+  recapCaptureNote        String?                 @db.Text
+  recapAudioBucket        String?
+  recapAudioPath          String?
+  recapAudioMimeType      String?
+  recapAudioBytes         Int?
+  interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  entries                 InterviewTranscriptEntry[]
+  qaPairs                 InterviewTranscriptQaPair[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([transcriptStatus, updatedAt])
+  @@index([recapStatus, updatedAt])
+  @@index([transcriptFingerprint])
+}
+
+model InterviewTranscriptEntry {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewTranscriptId   String                  @db.Uuid
+  sequence                Int
+  speaker                 TranscriptSpeaker
+  text                    String                  @db.Text
+  interviewTranscript     InterviewTranscript     @relation(fields: [interviewTranscriptId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+
+  @@unique([interviewTranscriptId, sequence])
+  @@index([interviewTranscriptId, speaker])
+}
+
+model InterviewTranscriptQaPair {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewTranscriptId   String                  @db.Uuid
+  sequence                Int
+  question                String                  @db.Text
+  answer                  String                  @db.Text
+  source                  InterviewQaPairSource   @default(derived)
+  interviewTranscript     InterviewTranscript     @relation(fields: [interviewTranscriptId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+
+  @@unique([interviewTranscriptId, sequence])
+}
+
+model InterviewTimingMetrics {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewId             String                  @unique @db.Uuid
+  answerCount             Int                     @default(0)
+  totalCandidateSpeechMs  Int                     @default(0)
+  averageAnswerDurationMs Int                     @default(0)
+  longestAnswerDurationMs Int                     @default(0)
+  shortestAnswerDurationMs Int                    @default(0)
+  averageResponseLatencyMs Int                    @default(0)
+  longestResponseLatencyMs Int                    @default(0)
+  candidateWordsPerMinute Int?
+  interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+}
+
+model InterviewFeedback {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewId             String                  @unique @db.Uuid
+  analyzedAt              DateTime                @default(now())
+  role                    String
+  transcriptFingerprint   String
+  overallScore            Int
+  passedLikely            Boolean
+  summary                 String                  @db.Text
+  communicationScore      Int
+  communicationFeedback   String                  @db.Text
+  answerQualityScore      Int
+  answerQualityFeedback   String                  @db.Text
+  roleFitScore            Int
+  roleFitFeedback         String                  @db.Text
+  strengths               String[]                @default([])
+  issues                  String[]                @default([])
+  improvements            String[]                @default([])
+  interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([role, analyzedAt])
+  @@index([transcriptFingerprint])
+}
+
+model InterviewFaceAnalysis {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewId             String                  @unique @db.Uuid
+  analyzedAt              DateTime                @default(now())
+  analysisVersion         String
+  mode                    String
+  role                    String?
+  startedAt               DateTime
+  endedAt                 DateTime
+  durationMs              Int
+  durationLabel           String
+  sampleCount             Int
+  windowCount             Int
+  overallScore            Float
+  overallStatus           FaceAnalysisOverallStatus
+  faceDetectedPct         Float
+  avgFrontalFacingScore   Float
+  avgHeadMovement         Float
+  avgEyeOpenness          Float
+  avgMouthOpenness        Float
+  avgSpeakingLikelihood   Float
+  speakingActivityPct     Float
+  blinkCount              Int
+  blinkRatePerMin         Float
+  stableWindowPct         Float
+  headline                String                  @db.Text
+  strengths               String[]                @default([])
+  risks                   String[]                @default([])
+  nextSteps               String[]                @default([])
+  limitations             String[]                @default([])
+  parameters              Json
+  alerts                  Json
+  windows                 Json
+  sourceBucket            String?
+  sourcePath              String?
+  interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([overallStatus, analyzedAt])
+  @@index([overallScore, analyzedAt])
+}
+
+model CodingChallengeTask {
+  id                      String                  @id
+  name                    String
+  role                    CodingChallengeRole
+  language                CodingChallengeLanguage
+  difficulty              CodingChallengeDifficulty
+  estimatedMinutes        Int
+  description             String                  @db.Text
+  statement               String                  @db.Text
+  requirements            String[]                @default([])
+  evaluationFocus         String[]                @default([])
+  starterCode             String                  @db.Text
+  examples                String[]                @default([])
+  isActive                Boolean                 @default(true)
+  solution                CodingChallengeTaskSolution?
+  attempts                CodingChallengeAttempt[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([role, difficulty, isActive])
+}
+
+model CodingChallengeTaskSolution {
+  taskId                  String                  @id
+  approach                String                  @db.Text
+  code                    String                  @db.Text
+  task                    CodingChallengeTask     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+}
+
+model CodingChallengeAttempt {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewId             String                  @db.Uuid
+  taskId                  String
+  attemptNumber           Int
+  status                  CodingChallengeAttemptStatus @default(assigned)
+  selectedAt              DateTime                @default(now())
+  submittedAt             DateTime?
+  lastEditedAt            DateTime?
+  draftCode               String                  @db.Text
+  submittedCode           String?                 @db.Text
+  taskSnapshot            Json?
+  interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  task                    CodingChallengeTask     @relation(fields: [taskId], references: [id], onDelete: NoAction)
+  evaluation              CodingChallengeEvaluation?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@unique([interviewId, attemptNumber])
+  @@index([interviewId, selectedAt])
+  @@index([taskId, status])
+}
+
+model CodingChallengeEvaluation {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  codingChallengeAttemptId String                 @unique @db.Uuid
+  taskId                  String
+  submittedAt             DateTime                @default(now())
+  overallScore            Int
+  passedLikely            Boolean
+  summary                 String                  @db.Text
+  correctnessScore        Int
+  correctnessFeedback     String                  @db.Text
+  codeQualityScore        Int
+  codeQualityFeedback     String                  @db.Text
+  problemSolvingScore     Int
+  problemSolvingFeedback  String                  @db.Text
+  strengths               String[]                @default([])
+  issues                  String[]                @default([])
+  improvements            String[]                @default([])
+  codingChallengeAttempt  CodingChallengeAttempt  @relation(fields: [codingChallengeAttemptId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([taskId, submittedAt])
+  @@index([overallScore, submittedAt])
 }

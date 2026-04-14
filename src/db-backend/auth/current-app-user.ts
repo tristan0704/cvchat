@@ -1,7 +1,7 @@
 import "server-only";
 
-import { db } from "@/db-backend/client";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/db-backend/auth/server-client";
+import { db } from "@/db-backend/prisma/client";
 
 type AuthIdentity = {
     email: string;
@@ -42,6 +42,16 @@ async function ensureAppUser(identity: AuthIdentity) {
         },
     });
 
+    await db.userSettings.upsert({
+        where: {
+            userId: identity.id,
+        },
+        update: {},
+        create: {
+            userId: identity.id,
+        },
+    });
+
     await db.profile.upsert({
         where: {
             userId: identity.id,
@@ -58,6 +68,7 @@ async function ensureAppUser(identity: AuthIdentity) {
         },
         include: {
             profile: true,
+            settings: true,
         },
     });
 }
