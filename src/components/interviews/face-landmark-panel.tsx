@@ -21,6 +21,10 @@ import type {
     FaceLandmarkExportSnapshot,
 } from "@/lib/face-analysis"
 import {
+    clearInterviewFaceAnalysisReport,
+    persistInterviewFaceAnalysisReport,
+} from "@/lib/interview-feedback/storage"
+import {
     type BlendShapeCategory,
     type FaceBodyLanguageSample,
     type FaceBodyMetricState,
@@ -365,6 +369,12 @@ type FaceLandmarkPanelProps = {
     showBlendShapes?: boolean
     title?: string
     description?: string
+    showAnalysisSummary?: boolean
+    analyzeOnStop?: boolean
+    showLandmarksOverlay?: boolean
+    videoWidth?: number
+    surface?: "light" | "dark"
+    analysisSessionId?: string | null
 }
 
 export type FaceLandmarkPanelHandle = {
@@ -379,8 +389,14 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
                                                                                                                             showBlendShapes = false,
                                                                                                                             title = "Face Landmark",
                                                                                                                             description = "Kamera aktivieren und Landmarken direkt im Video sehen.",
+                                                                                                                            showAnalysisSummary = true,
+                                                                                                                            analyzeOnStop = true,
+                                                                                                                            showLandmarksOverlay = true,
+                                                                                                                            videoWidth,
+                                                                                                                            surface = "light",
+                                                                                                                            analysisSessionId = null,
                                                                                                                         }: FaceLandmarkPanelProps, ref) {
-    const videoWidth = compact ? 320 : 480
+    const resolvedVideoWidth = videoWidth ?? (compact ? 320 : 480)
 
     const videoRef = useRef<HTMLVideoElement | null>(null)
     const videoCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -407,6 +423,7 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
     const [webcamSupported, setWebcamSupported] = useState(false)
     const [cameraError, setCameraError] = useState("")
     const [videoBlendShapes, setVideoBlendShapes] = useState<BlendShapeCategory[]>([])
+    const [videoAspectRatio, setVideoAspectRatio] = useState(4 / 3)
     const [exportSnapshotCount, setExportSnapshotCount] = useState(0)
     const [analysisStatus, setAnalysisStatus] = useState<FaceAnalysisRequestStatus>("idle")
     const [analysisError, setAnalysisError] = useState("")
@@ -466,28 +483,37 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
 
                 if (!response.ok || !("overallScore" in data)) {
                     const message = ("error" in data && data.error) || "Face-Analyse fehlgeschlagen."
+                    if (analysisSessionId) {
+                        clearInterviewFaceAnalysisReport(analysisSessionId)
+                    }
                     setAnalysisError(message)
                     setAnalysisStatus("error")
                     setAnalysisReport(null)
                     return null
                 }
 
+                if (analysisSessionId) {
+                    persistInterviewFaceAnalysisReport(analysisSessionId, data)
+                }
                 setAnalysisReport(data)
                 setAnalysisStatus("ready")
                 return data
             } catch (error) {
                 const message = error instanceof Error ? error.message : "Face-Analyse fehlgeschlagen."
+                if (analysisSessionId) {
+                    clearInterviewFaceAnalysisReport(analysisSessionId)
+                }
                 setAnalysisError(message)
                 setAnalysisStatus("error")
                 setAnalysisReport(null)
                 return null
             }
         },
-        [role]
+        [analysisSessionId, role]
     )
 
     const stopWebcam = useCallback(async (options?: { analyze?: boolean }) => {
-        const shouldAnalyze = options?.analyze ?? true
+        const shouldAnalyze = options?.analyze ?? analyzeOnStop
         const snapshots = [...sessionExportSnapshotsRef.current]
         const allSamples = [...allMetricsSamplesRef.current]
         const recentSamples = [...recentMetricsSamplesRef.current]
@@ -512,12 +538,12 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
 
         if (!shouldAnalyze || snapshots.length === 0) return null
         return analyzeSession(snapshots)
-    }, [analyzeSession, resetTrackingState, role])
+    }, [analyzeOnStop, analyzeSession, resetTrackingState, role])
 
     useImperativeHandle(
         ref,
         () => ({
-            stopAndAnalyze: async () => stopWebcam({ analyze: true }),
+            stopAndAnalyze: async () => stopWebcam(),
             isWebcamRunning: () => webcamRunningRef.current,
         }),
         [stopWebcam]
@@ -614,14 +640,6 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
             return
         }
 
-        const ratio = video.videoHeight / video.videoWidth || 0.75
-        const targetWidthPx = `${videoWidth}px`
-        const targetHeightPx = `${videoWidth * ratio}px`
-
-        if (video.style.width !== targetWidthPx) video.style.width = targetWidthPx
-        if (video.style.height !== targetHeightPx) video.style.height = targetHeightPx
-        if (canvas.style.width !== targetWidthPx) canvas.style.width = targetWidthPx
-        if (canvas.style.height !== targetHeightPx) canvas.style.height = targetHeightPx
         if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth
         if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight
 
@@ -657,7 +675,7 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
             lastDetectionAt: lastDetectionAtRef.current,
         })
 
-        if (effectiveLandmarks.length) {
+        if (showLandmarksOverlay && effectiveLandmarks.length) {
             const drawingUtils = new vision.DrawingUtils(ctx)
             for (const landmarks of effectiveLandmarks) {
                 drawFaceConnectors(drawingUtils, vision.FaceLandmarker, landmarks)
@@ -704,11 +722,11 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
         if (webcamRunningRef.current) {
             animationFrameRef.current = window.requestAnimationFrame(() => void predictWebcamLoop())
         }
-    }, [role, showBlendShapes, videoWidth])
+    }, [role, showBlendShapes, showLandmarksOverlay])
 
     const toggleWebcam = useCallback(async () => {
         if (webcamRunningRef.current) {
-            await stopWebcam({ analyze: true })
+            await stopWebcam()
             return
         }
 
@@ -724,6 +742,9 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
 
         try {
             setCameraError("")
+            if (analysisSessionId) {
+                clearInterviewFaceAnalysisReport(analysisSessionId)
+            }
             const stream = await navigator.mediaDevices.getUserMedia({ video: true })
             webcamStreamRef.current = stream
             sessionSnapshotCounterRef.current = 0
@@ -748,49 +769,103 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
         } catch (error) {
             setCameraError(error instanceof Error ? error.message : "Kamera konnte nicht gestartet werden.")
         }
-    }, [predictWebcam, stopWebcam])
+    }, [analysisSessionId, predictWebcam, stopWebcam])
+
+    const surfaceClasses = surface === "dark"
+        ? {
+            section: `rounded-xl bg-gray-800/50 outline outline-1 outline-white/10 ${compact ? "p-4" : "p-6"}`,
+            eyebrow: "text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500",
+            title: compact ? "mt-1 text-lg font-semibold tracking-tight text-white" : "mt-1 text-2xl font-semibold tracking-tight text-white",
+            description: compact ? "mt-2 max-w-2xl text-sm text-gray-400" : "mt-2 max-w-2xl text-sm leading-6 text-gray-400",
+            button: "rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-gray-200 outline outline-1 outline-white/10 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50",
+            chip: "rounded-md bg-gray-900 px-3 py-1.5 text-xs text-gray-300 outline outline-1 outline-white/10",
+            error: "mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300",
+            warning: "mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300",
+            videoShell: "rounded-xl bg-gray-900 p-3 outline outline-1 outline-white/10",
+            placeholder: "text-sm text-gray-500",
+        }
+        : {
+            section: `rounded-[24px] border bg-white ${compact ? "p-4" : "p-6"}`,
+            eyebrow: "text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500",
+            title: compact ? "mt-1 text-lg font-semibold tracking-tight text-slate-950" : "mt-1 text-2xl font-semibold tracking-tight text-slate-950",
+            description: compact ? "mt-2 max-w-2xl text-sm text-slate-600" : "mt-2 max-w-2xl text-sm leading-6 text-slate-600",
+            button: "rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50",
+            chip: "rounded-full border bg-slate-50 px-3 py-1.5 text-xs text-slate-600",
+            error: "mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+            warning: "mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800",
+            videoShell: "rounded-[20px] border bg-slate-950/95 p-3",
+            placeholder: "text-sm text-slate-400",
+        }
 
     return (
-        <section className={`rounded-[24px] border bg-white ${compact ? "p-4" : "p-6"}`}>
+        <section className={surfaceClasses.section}>
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    {!minimal ? <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Face Landmark</p> : null}
-                    <h2 className={`mt-1 font-semibold tracking-tight text-slate-950 ${compact ? "text-lg" : "text-2xl"}`}>{title}</h2>
-                    {!minimal ? <p className={`mt-2 max-w-2xl text-slate-600 ${compact ? "text-sm" : "text-sm leading-6"}`}>{description}</p> : null}
+                    {!minimal ? <p className={surfaceClasses.eyebrow}>Face Landmark</p> : null}
+                    <h2 className={surfaceClasses.title}>{title}</h2>
+                    {!minimal ? <p className={surfaceClasses.description}>{description}</p> : null}
                 </div>
 
                 <button
                     onClick={() => void toggleWebcam()}
                     disabled={modelStatus !== "ready" || !webcamSupported}
-                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    className={surfaceClasses.button}
                 >
                     {webcamRunning ? "Kamera aus" : "Kamera an"}
                 </button>
             </div>
 
             {!minimal ? (
-                <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
-                    {role ? <span className="rounded-full border bg-slate-50 px-3 py-1.5">{role}</span> : null}
-                    <span className="rounded-full border bg-slate-50 px-3 py-1.5">Modell: {modelStatus}</span>
-                    <span className="rounded-full border bg-slate-50 px-3 py-1.5">Kamera: {webcamRunning ? "aktiv" : "aus"}</span>
-                    <span className="rounded-full border bg-slate-50 px-3 py-1.5">Samples: {exportSnapshotCount}</span>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                    {role ? <span className={surfaceClasses.chip}>{role}</span> : null}
+                    <span className={surfaceClasses.chip}>Modell: {modelStatus}</span>
+                    <span className={surfaceClasses.chip}>Kamera: {webcamRunning ? "aktiv" : "aus"}</span>
+                    <span className={surfaceClasses.chip}>Samples: {exportSnapshotCount}</span>
                 </div>
             ) : null}
 
-            {modelError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{modelError}</div> : null}
-            {cameraError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{cameraError}</div> : null}
+            {modelError ? <div className={surfaceClasses.error}>{modelError}</div> : null}
+            {cameraError ? <div className={surfaceClasses.error}>{cameraError}</div> : null}
             {!webcamSupported ? (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <div className={surfaceClasses.warning}>
                     Kamera funktioniert nur mit HTTPS oder localhost und aktiver Browser-Freigabe.
                 </div>
             ) : null}
 
             <div className={`mt-4 ${showBlendShapes ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]" : ""}`}>
-                <div className="rounded-[20px] border bg-slate-950/95 p-3">
-                    <div className="mx-auto w-full max-w-full">
-                        <div className="relative mx-auto w-fit overflow-hidden rounded-[18px]">
-                            <video ref={videoRef} autoPlay playsInline muted className="block max-w-full [transform:rotateY(180deg)]" />
-                            <canvas ref={videoCanvasRef} className="pointer-events-none absolute left-0 top-0 [transform:rotateY(180deg)]" />
+                <div className={surfaceClasses.videoShell}>
+                    <div
+                        className="mx-auto w-full"
+                        style={{ maxWidth: `${resolvedVideoWidth}px` }}
+                    >
+                        <div
+                            className="relative overflow-hidden rounded-lg bg-black"
+                            style={{ aspectRatio: String(videoAspectRatio) }}
+                        >
+                            <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                onLoadedMetadata={(event) => {
+                                    const nextAspectRatio = event.currentTarget.videoWidth > 0 && event.currentTarget.videoHeight > 0
+                                        ? event.currentTarget.videoWidth / event.currentTarget.videoHeight
+                                        : 4 / 3
+
+                                    setVideoAspectRatio(nextAspectRatio)
+                                }}
+                                className="absolute inset-0 block h-full w-full object-cover [transform:rotateY(180deg)]"
+                            />
+                            <canvas
+                                ref={videoCanvasRef}
+                                className={`pointer-events-none absolute inset-0 h-full w-full [transform:rotateY(180deg)] ${showLandmarksOverlay ? "" : "hidden"}`}
+                            />
+
+                            {!webcamRunning ? (
+                                <div className={`absolute inset-0 flex items-center justify-center ${surfaceClasses.placeholder}`}>
+                                    Kamera aus
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </div>
@@ -798,7 +873,9 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
                 {showBlendShapes ? <BlendShapeList shapes={videoBlendShapes} /> : null}
             </div>
 
-            <FaceAnalysisSummary report={analysisReport} status={analysisStatus} error={analysisError} minimal={minimal} />
+            {showAnalysisSummary ? (
+                <FaceAnalysisSummary report={analysisReport} status={analysisStatus} error={analysisError} minimal={minimal} />
+            ) : null}
         </section>
     )
 })

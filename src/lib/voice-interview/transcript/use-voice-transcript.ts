@@ -75,6 +75,15 @@ export function useVoiceTranscript({
         [postCallCandidateTranscript, transcriptEntries]
     )
 
+    const transcriptExport = useMemo(
+        () =>
+            buildTranscriptQaExport(role, transcriptEntries, {
+                qaPairs: mappedTranscriptQaPairs,
+                candidateTranscript: postCallCandidateTranscript,
+            }),
+        [mappedTranscriptQaPairs, postCallCandidateTranscript, role, transcriptEntries]
+    )
+
     useEffect(() => {
         transcriptEntriesRef.current = transcriptEntries
     }, [transcriptEntries])
@@ -313,6 +322,7 @@ export function useVoiceTranscript({
         transcriptQaPairs,
         canExportTranscript,
         candidateTranscriptWordSource,
+        transcriptExport,
         transcriptEntriesRef,
         postCallCandidateTranscriptRef,
         mappedTranscriptQaPairsRef,

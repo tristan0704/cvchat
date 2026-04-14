@@ -231,6 +231,7 @@ export function useVoiceInterviewController(role: string) {
         postCallTranscriptStatus: transcript.postCallTranscriptStatus,
         postCallTranscriptError: transcript.postCallTranscriptError,
         canExportTranscript: transcript.canExportTranscript,
+        transcriptExport: transcript.transcriptExport,
         interviewTimingMetrics: timing.interviewTimingMetrics,
         hasTimingMetrics: timing.hasTimingMetrics,
         startCall,

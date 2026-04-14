@@ -18,10 +18,15 @@ export function buildCvFeedbackStorageKey(config: InterviewCvConfig) {
   ].join("|");
 }
 
-export function loadCvFeedbackResult(config: InterviewCvConfig) {
+export function loadCvFeedbackResult(
+  config: InterviewCvConfig,
+  cvFingerprint: string
+) {
   if (typeof window === "undefined") return null;
 
-  const raw = window.sessionStorage.getItem(buildCvFeedbackStorageKey(config));
+  const raw = window.sessionStorage.getItem(
+    `${buildCvFeedbackStorageKey(config)}|${cvFingerprint}`
+  );
   if (!raw) return null;
 
   try {
@@ -33,12 +38,13 @@ export function loadCvFeedbackResult(config: InterviewCvConfig) {
 
 export function persistCvFeedbackResult(
   config: InterviewCvConfig,
+  cvFingerprint: string,
   result: CvFeedbackResult
 ) {
   if (typeof window === "undefined") return;
 
   window.sessionStorage.setItem(
-    buildCvFeedbackStorageKey(config),
+    `${buildCvFeedbackStorageKey(config)}|${cvFingerprint}`,
     JSON.stringify(result)
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import CvAnalysisDashboard from "@/components/cv/CvAnalysisDashboard";
 import CvRoleMatchCard from "@/components/cv/CvRoleMatchCard";
@@ -8,8 +9,11 @@ import CvScoreBreakdownCard from "@/components/cv/CvScoreBreakdownCard";
 import { loadCvFeedbackResult, persistCvFeedbackResult } from "@/components/cv/storage";
 import type { CvFeedbackResult, InterviewCvConfig } from "@/components/cv/types";
 import { useOptionalInterviewSession } from "@/components/interviews/interview-session-context";
-
-const MAX_FILE_BYTES = 20_000_000;
+import {
+  buildStoredProfileCvFingerprint,
+  loadStoredProfileCv,
+  type StoredProfileCvRecord,
+} from "@/lib/profile-cv-storage";
 
 function buildConfigBadges(config: InterviewCvConfig) {
   return [
@@ -20,6 +24,43 @@ function buildConfigBadges(config: InterviewCvConfig) {
   ].filter((value) => value.trim().length > 0);
 }
 
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+async function requestCvFeedback(
+  storedCv: StoredProfileCvRecord,
+  config: InterviewCvConfig
+) {
+  const formData = new FormData();
+  formData.append("file", storedCv.file, storedCv.name);
+  formData.append("role", config.role);
+  formData.append("experience", config.experience);
+  formData.append("companySize", config.companySize);
+  formData.append("interviewType", config.interviewType);
+
+  const response = await fetch("/api/interview/cv-feedback", {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = (await response.json()) as CvFeedbackResult | { error?: string };
+  if (!response.ok || !("quality" in data) || !("roleAnalysis" in data)) {
+    throw new Error(
+      ("error" in data && data.error) || "CV-Analyse konnte nicht erstellt werden."
+    );
+  }
+
+  return data;
+}
+
 export default function CvFeedbackStep() {
   const session = useOptionalInterviewSession();
   const config = session?.config ?? {
@@ -28,81 +69,113 @@ export default function CvFeedbackStep() {
     companySize: "",
     interviewType: "",
   };
+  const { role, experience, companySize, interviewType } = config;
 
-  const [file, setFile] = useState<File | null>(null);
+  const [storedCv, setStoredCv] = useState<StoredProfileCvRecord | null>(null);
+  const [loadingStoredCv, setLoadingStoredCv] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<CvFeedbackResult | null>(null);
 
   useEffect(() => {
-    setResult(loadCvFeedbackResult(config));
-    setFile(null);
-    setError("");
+    let cancelled = false;
+
+    async function hydrateStep() {
+      setLoadingStoredCv(true);
+      setLoading(false);
+      setError("");
+      setResult(null);
+
+      try {
+        const nextStoredCv = await loadStoredProfileCv();
+
+        if (cancelled) return;
+
+        setStoredCv(nextStoredCv);
+
+        if (!nextStoredCv) {
+          return;
+        }
+
+        const cvFingerprint = buildStoredProfileCvFingerprint(nextStoredCv);
+        const currentConfig: InterviewCvConfig = {
+          role,
+          experience,
+          companySize,
+          interviewType,
+        };
+        const cachedResult = loadCvFeedbackResult(currentConfig, cvFingerprint);
+
+        if (cancelled) return;
+
+        if (cachedResult) {
+          setResult(cachedResult);
+          return;
+        }
+
+        setLoading(true);
+        const nextResult = await requestCvFeedback(nextStoredCv, currentConfig);
+
+        if (cancelled) return;
+
+        setResult(nextResult);
+        persistCvFeedbackResult(currentConfig, cvFingerprint, nextResult);
+      } catch (storageError) {
+        if (cancelled) return;
+
+        setError(
+          getErrorMessage(
+            storageError,
+            "Gespeicherter Lebenslauf konnte nicht geladen werden."
+          )
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setLoadingStoredCv(false);
+        }
+      }
+    }
+
+    void hydrateStep();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
-    config.companySize,
-    config.experience,
-    config.interviewType,
-    config.role,
+    companySize,
+    experience,
+    interviewType,
+    role,
   ]);
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const selected = event.target.files?.[0] ?? null;
-
-    if (!selected) {
-      setFile(null);
-      return;
-    }
-
-    if (selected.type !== "application/pdf") {
-      setError("Please upload a PDF");
-      setFile(null);
-      return;
-    }
-
-    if (selected.size > MAX_FILE_BYTES) {
-      setError("File too large");
-      setFile(null);
-      return;
-    }
-
-    setError("");
-    setFile(selected);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!file) {
-      setError("Please upload a PDF");
+  async function handleRefreshFeedback() {
+    if (!storedCv) {
+      setError("Kein gespeicherter Lebenslauf gefunden.");
       return;
     }
 
     setLoading(true);
     setError("");
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("role", config.role);
-    formData.append("experience", config.experience);
-    formData.append("companySize", config.companySize);
-    formData.append("interviewType", config.interviewType);
-
     try {
-      const response = await fetch("/api/interview/cv-feedback", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = (await response.json()) as CvFeedbackResult | { error?: string };
-      if (!response.ok || !("quality" in data) || !("roleAnalysis" in data)) {
-        throw new Error(("error" in data && data.error) || "Analysis failed");
-      }
+      const currentConfig: InterviewCvConfig = {
+        role,
+        experience,
+        companySize,
+        interviewType,
+      };
+      const data = await requestCvFeedback(storedCv, currentConfig);
+      const cvFingerprint = buildStoredProfileCvFingerprint(storedCv);
 
       setResult(data);
-      persistCvFeedbackResult(config, data);
+      persistCvFeedbackResult(currentConfig, cvFingerprint, data);
     } catch (requestError) {
       setError(
-        requestError instanceof Error ? requestError.message : "Analysis failed"
+        getErrorMessage(
+          requestError,
+          "CV-Analyse konnte nicht erstellt werden."
+        )
       );
     } finally {
       setLoading(false);
@@ -134,38 +207,61 @@ export default function CvFeedbackStep() {
           </div>
         </div>
 
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-semibold text-slate-700"
-              htmlFor="cv-feedback-upload"
-            >
-              CV (PDF)
-            </label>
-            <input
-              id="cv-feedback-upload"
-              type="file"
-              accept="application/pdf"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-slate-500 file:rounded-2xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-white"
-            />
-            {file ? (
-              <p className="text-xs text-slate-500">{file.name}</p>
-            ) : result?.fileName ? (
-              <p className="text-xs text-slate-500">
-                Letzte Analyse: {result.fileName}
-              </p>
-            ) : null}
-          </div>
+        <div className="mt-6 rounded-[24px] border bg-slate-50 p-4">
+          {loadingStoredCv ? (
+            <p className="text-sm text-slate-500">
+              Gespeicherter Lebenslauf wird geladen...
+            </p>
+          ) : storedCv ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {storedCv.name}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Im Profil gespeichert am {formatDateTime(storedCv.uploadedAt)}
+                </p>
+                {result?.analyzedAt ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Letzte Analyse: {formatDateTime(result.analyzedAt)}
+                  </p>
+                ) : null}
+              </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {loading ? "Analysiere..." : "CV analysieren"}
-          </button>
-        </form>
+              <button
+                type="button"
+                onClick={() => void handleRefreshFeedback()}
+                disabled={loading}
+                className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {loading
+                  ? "Analysiere..."
+                  : result
+                    ? "Feedback aktualisieren"
+                    : "Feedback starten"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Kein Lebenslauf im Profil hinterlegt
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Lade deinen CV zuerst im Profil hoch. Danach wird er hier pro
+                  Interview-Konfiguration automatisch analysiert.
+                </p>
+              </div>
+
+              <Link
+                href="/profile"
+                className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
+              >
+                Zum Profil
+              </Link>
+            </div>
+          )}
+        </div>
 
         {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
       </div>
@@ -186,7 +282,8 @@ export default function CvFeedbackStep() {
 
       {!loading && !result ? (
         <div className="rounded-[24px] border border-dashed bg-white p-10 text-center text-sm text-slate-500">
-          Lade deinen CV hoch, um ein rollenbezogenes Feedback zu sehen.
+          Hinterlege deinen Lebenslauf im Profil, um hier ein rollenbezogenes
+          Feedback zu sehen.
         </div>
       ) : null}
     </div>
