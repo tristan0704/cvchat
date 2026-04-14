@@ -1,6 +1,6 @@
 "use client";
 
-import type { CvRoleMatchAnalysis } from "@/components/cv/types";
+import type { CvRoleMatchAnalysis } from "@/lib/cv/types";
 
 type Props = {
   analysis: CvRoleMatchAnalysis;

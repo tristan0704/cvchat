@@ -1,12 +1,12 @@
 import "server-only";
 
-import taskManifest from "@/components/coding-challenge/coding-challenge-tasks.json";
+import taskManifest from "@/lib/coding-challenge/tasks.json";
 import type {
   CodingChallengeRole,
   CodingChallengeTask,
   CodingChallengeTaskManifest,
   PublicCodingChallengeTask,
-} from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/types";
 
 const tasks = (taskManifest as CodingChallengeTaskManifest).tasks;
 
@@ -69,6 +69,18 @@ export function pickRandomCodingChallengeTask(
 export function toPublicCodingChallengeTask(
   task: CodingChallengeTask
 ): PublicCodingChallengeTask {
-  const { solution: _solution, ...publicTask } = task;
-  return publicTask;
+  return {
+    id: task.id,
+    name: task.name,
+    role: task.role,
+    language: task.language,
+    difficulty: task.difficulty,
+    estimatedMinutes: task.estimatedMinutes,
+    description: task.description,
+    statement: task.statement,
+    requirements: task.requirements,
+    evaluationFocus: task.evaluationFocus,
+    starterCode: task.starterCode,
+    examples: task.examples,
+  };
 }

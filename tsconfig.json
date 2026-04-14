@@ -29,7 +29,6 @@
     ".next/types/**/*.ts",
     "**/*.mts",
     ".next/dev/types/**/*.ts",
-    "src/components/ui/DeleteDialog.jsx",
     "src/app/(protected)/profile/page.jsx"
   ],
   "exclude": ["node_modules"]

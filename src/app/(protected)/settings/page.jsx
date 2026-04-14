@@ -4,7 +4,6 @@ import { useState } from "react";
 
 export default function SettingsPage() {
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
   const [language, setLanguage] = useState("de");
 
   return (

@@ -6,17 +6,17 @@ import { useParams } from "next/navigation";
 import {
   DIFFICULTY_LABELS,
   LANGUAGE_LABELS,
-} from "@/components/coding-challenge/coding-challenge-labels";
-import { getCodingChallengeInterviewId } from "@/components/coding-challenge/coding-challenge-interview-id";
+} from "@/lib/coding-challenge/labels";
 import {
   loadCodingChallengeDraft,
   loadCodingChallengeEvaluation,
-} from "@/components/coding-challenge/coding-challenge-storage";
+} from "@/lib/coding-challenge/storage";
 import type {
   CodingChallengeDraft,
   CodingChallengeEvaluation,
   CodingChallengeEvaluationDimension,
-} from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/types";
+import { getInterviewSessionId } from "@/lib/interview-session/session-id";
 
 function getScoreTone(score: number) {
   if (score >= 75) {
@@ -99,7 +99,7 @@ function ListCard({
 
 export default function CodingChallengeFeedback() {
   const params = useParams<{ id: string }>();
-  const interviewId = getCodingChallengeInterviewId(params.id);
+  const interviewId = getInterviewSessionId(params.id);
   const [draft, setDraft] = useState<CodingChallengeDraft | null>(null);
   const [evaluation, setEvaluation] = useState<CodingChallengeEvaluation | null>(
     null

@@ -3,17 +3,17 @@
 import { useMemo, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 
-import { getInterviewSessionId } from "@/components/interviews/interview-session-id";
-import { useInterviewFeedbackAnalysis } from "@/components/interviews/use-interview-feedback-analysis";
-import { useOptionalInterviewSession } from "@/components/interviews/interview-session-context";
 import type { FaceAnalysisParameterReport, FaceAnalysisReport } from "@/lib/face-analysis";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback/fingerprint";
 import {
     loadFaceBodyLanguageSummary,
     loadInterviewFaceAnalysisReport,
 } from "@/lib/interview-feedback/storage";
+import { useInterviewFeedbackAnalysis } from "@/lib/interview-feedback/use-interview-feedback-analysis";
 import { formatCountdown } from "@/lib/interview";
 import type { InterviewFeedbackEvaluationDimension } from "@/lib/interview-feedback/types";
+import { useOptionalInterviewSession } from "@/lib/interview-session/context";
+import { getInterviewSessionId } from "@/lib/interview-session/session-id";
 import {
     formatMetricSeconds,
     formatMetricWordsPerMinute,

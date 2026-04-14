@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import CvAnalysisDashboard from "@/components/cv/CvAnalysisDashboard";
 import CvRoleMatchCard from "@/components/cv/CvRoleMatchCard";
 import CvScoreBreakdownCard from "@/components/cv/CvScoreBreakdownCard";
-import { loadCvFeedbackResult, persistCvFeedbackResult } from "@/components/cv/storage";
-import type { CvFeedbackResult, InterviewCvConfig } from "@/components/cv/types";
-import { useOptionalInterviewSession } from "@/components/interviews/interview-session-context";
+import { loadCvFeedbackResult, persistCvFeedbackResult } from "@/lib/cv/storage";
+import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
+import { useOptionalInterviewSession } from "@/lib/interview-session/context";
 import {
   buildStoredProfileCvFingerprint,
   loadStoredProfileCv,

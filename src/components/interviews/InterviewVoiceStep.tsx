@@ -3,10 +3,10 @@
 import { Suspense, type ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
-import { useOptionalInterviewSession } from "@/components/interviews/interview-session-context";
-import { getInterviewSessionId } from "@/components/interviews/interview-session-id";
 import { FaceLandmarkPanel } from "@/components/interviews/face-landmark-panel";
 import { formatCountdown } from "@/lib/interview";
+import { useOptionalInterviewSession } from "@/lib/interview-session/context";
+import { getInterviewSessionId } from "@/lib/interview-session/session-id";
 import { LAST_MINUTE_THRESHOLD_SECONDS } from "@/lib/voice-interview/session/endgame";
 import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-voice-interview-controller";
 

@@ -3,7 +3,7 @@
 import type {
   CodingChallengeDraft,
   CodingChallengeEvaluation,
-} from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/types";
 
 const STORAGE_PREFIX = "codingChallengeDraft:";
 const FEEDBACK_STORAGE_PREFIX = "codingChallengeFeedback:";

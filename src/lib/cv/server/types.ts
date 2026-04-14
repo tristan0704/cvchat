@@ -1,3 +1,5 @@
+import "server-only";
+
 export type RoleProfile = {
   role: string;
   mustHave: string[];

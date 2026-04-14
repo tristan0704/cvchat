@@ -2,7 +2,6 @@
 
 import { useParams } from "next/navigation";
 
-import { getCodingChallengeInterviewId } from "@/components/coding-challenge/coding-challenge-interview-id";
 import {
   CodingChallengeErrorState,
   CodingChallengeHeader,
@@ -11,14 +10,15 @@ import {
   CodingChallengeSubmitState,
   CodingChallengeWorkspace,
 } from "@/components/coding-challenge/coding-challenge-editor-sections";
-import { useCodingChallengeSubmission } from "@/components/coding-challenge/use-coding-challenge-submission";
-import { useCodingChallengeTask } from "@/components/coding-challenge/use-coding-challenge-task";
-import { useOptionalInterviewSession } from "@/components/interviews/interview-session-context";
+import { useCodingChallengeSubmission } from "@/lib/coding-challenge/use-coding-challenge-submission";
+import { useCodingChallengeTask } from "@/lib/coding-challenge/use-coding-challenge-task";
+import { useOptionalInterviewSession } from "@/lib/interview-session/context";
+import { getInterviewSessionId } from "@/lib/interview-session/session-id";
 
 export default function CodingChallengeEditor() {
   const params = useParams<{ id: string }>();
   const session = useOptionalInterviewSession();
-  const interviewId = getCodingChallengeInterviewId(params.id);
+  const interviewId = getInterviewSessionId(params.id);
   const roleLabel = session?.role ?? "Backend Developer";
   const {
     draft,

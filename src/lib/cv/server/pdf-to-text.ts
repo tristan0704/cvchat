@@ -1,3 +1,5 @@
+import "server-only";
+
 import { extractText } from "unpdf";
 
 export async function pdfToText(buffer: Buffer) {

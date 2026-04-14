@@ -5,11 +5,11 @@ import { useEffect, useState } from "react";
 import {
   loadCodingChallengeDraft,
   persistCodingChallengeDraft,
-} from "@/components/coding-challenge/coding-challenge-storage";
+} from "@/lib/coding-challenge/storage";
 import type {
   CodingChallengeDraft,
   PublicCodingChallengeTask,
-} from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/types";
 
 type UseCodingChallengeTaskArgs = {
   interviewId: string;

@@ -20,6 +20,7 @@ import type {
     FaceAnalysisStatus as FaceScoreStatus,
     FaceLandmarkExportSnapshot,
 } from "@/lib/face-analysis"
+import type { FaceLandmarkPanelHandle } from "@/lib/face-landmark-panel-handle"
 import {
     clearInterviewFaceAnalysisReport,
     persistInterviewFaceAnalysisReport,
@@ -377,10 +378,7 @@ type FaceLandmarkPanelProps = {
     analysisSessionId?: string | null
 }
 
-export type FaceLandmarkPanelHandle = {
-    stopAndAnalyze: () => Promise<FaceAnalysisReport | null>
-    isWebcamRunning: () => boolean
-}
+export type { FaceLandmarkPanelHandle }
 
 export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmarkPanelProps>(function FaceLandmarkPanel({
                                                                                                                             role,

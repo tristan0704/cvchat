@@ -1,6 +1,8 @@
+import "server-only";
+
 import { callOpenAiChat } from "@/lib/openai";
-import type { CvQualityAnalysis, InterviewCvConfig } from "@/components/cv/types";
-import { parseJsonObject } from "@/app/api/interview/cv-feedback/json";
+import type { CvQualityAnalysis, InterviewCvConfig } from "@/lib/cv/types";
+import { parseJsonObject } from "@/lib/cv/server/json";
 
 const FALLBACK_FEEDBACK = "Unable to analyze content.";
 

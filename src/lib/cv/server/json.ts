@@ -1,3 +1,5 @@
+import "server-only";
+
 export function parseJsonObject<T>(value: string): T {
   const trimmed = value.trim();
 

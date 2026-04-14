@@ -1,6 +1,6 @@
 "use client";
 
-import type { CvQualityAnalysis } from "@/components/cv/types";
+import type { CvQualityAnalysis } from "@/lib/cv/types";
 
 type Props = {
   data: CvQualityAnalysis;

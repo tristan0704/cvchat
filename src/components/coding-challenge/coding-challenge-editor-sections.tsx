@@ -4,11 +4,11 @@ import Editor from "@monaco-editor/react";
 import {
   DIFFICULTY_LABELS,
   LANGUAGE_LABELS,
-} from "@/components/coding-challenge/coding-challenge-labels";
+} from "@/lib/coding-challenge/labels";
 import type {
   PublicCodingChallengeTask,
   CodingChallengeLanguage,
-} from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/types";
 
 function TaskPanel({
   title,

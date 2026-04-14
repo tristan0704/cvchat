@@ -1,6 +1,6 @@
 "use client";
 
-import type { CvFeedbackResult, InterviewCvConfig } from "@/components/cv/types";
+import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
 
 const STORAGE_PREFIX = "cvFeedbackResult:";
 

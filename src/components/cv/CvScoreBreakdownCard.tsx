@@ -1,6 +1,6 @@
 "use client";
 
-import type { CvScoreBreakdown } from "@/components/cv/types";
+import type { CvScoreBreakdown } from "@/lib/cv/types";
 
 type Props = {
   breakdown: CvScoreBreakdown;

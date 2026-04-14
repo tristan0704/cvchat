@@ -7,8 +7,8 @@ import CvFeedbackStep from "@/components/cv/CvFeedbackStep";
 import CodingChallengeEditor from "@/components/coding-challenge/coding-challenge-editor";
 import CodingChallengeFeedback from "@/components/coding-challenge/coding-challenge-feedback";
 import InterviewFeedback from "@/components/interviews/InterviewFeedback";
-import { InterviewSessionProvider } from "@/components/interviews/interview-session-context";
 import InterviewVoiceStep from "@/components/interviews/InterviewVoiceStep";
+import { InterviewSessionProvider } from "@/lib/interview-session/context";
 
 function FeedbackBlock({
   score,

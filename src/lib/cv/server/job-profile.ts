@@ -1,5 +1,7 @@
-import type { InterviewCvConfig } from "@/components/cv/types";
-import type { RoleProfile } from "@/app/api/interview/cv-feedback/types";
+import "server-only";
+
+import type { InterviewCvConfig } from "@/lib/cv/types";
+import type { RoleProfile } from "@/lib/cv/server/types";
 
 function getRoleBucket(role: string) {
   const normalized = role.toLowerCase();

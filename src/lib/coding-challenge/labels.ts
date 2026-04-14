@@ -1,7 +1,7 @@
 import type {
   CodingChallengeDifficulty,
   CodingChallengeLanguage,
-} from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/types";
 
 export const LANGUAGE_LABELS: Record<CodingChallengeLanguage, string> = {
   javascript: "JavaScript",

@@ -1,8 +1,10 @@
+import "server-only";
+
 import type {
   CodingChallengeEvaluation,
   CodingChallengeEvaluationDimension,
   CodingChallengeTask,
-} from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/types";
 import { callOpenAiChat } from "@/lib/openai";
 
 const FALLBACK_FEEDBACK = "Unable to analyze submission.";

@@ -3,7 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
-import type { InterviewCvConfig } from "@/components/cv/types";
+import type { InterviewCvConfig } from "@/lib/cv/types";
 import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-voice-interview-controller";
 
 type InterviewSessionValue = {

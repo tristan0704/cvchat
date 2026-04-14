@@ -1,13 +1,11 @@
-import type { CvFeedbackResult, InterviewCvConfig } from "@/components/cv/types";
+import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
 import {
-  KEYWORD_WEIGHT,
-  LLM_WEIGHT,
   MAX_CV_BYTES,
-} from "@/app/api/interview/cv-feedback/constants";
-import { buildRoleProfile } from "@/app/api/interview/cv-feedback/job-profile";
-import { analyzeKeywordMatch } from "@/app/api/interview/cv-feedback/keyword-match";
-import { analyzeCvQualityWithLLM } from "@/app/api/interview/cv-feedback/llm-quality";
-import { pdfToText } from "@/app/api/interview/cv-feedback/pdf-to-text";
+} from "@/lib/cv/server/constants";
+import {
+  analyzeCvFeedback,
+  CvFeedbackError,
+} from "@/lib/cv/server/analyze-cv-feedback";
 
 export const runtime = "nodejs";
 
@@ -45,44 +43,14 @@ export async function POST(req: Request) {
       companySize: readString(formData, "companySize"),
       interviewType: readString(formData, "interviewType"),
     };
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const cvText = await pdfToText(buffer);
-
-    if (!cvText.trim()) {
-      return Response.json(
-        { error: "No readable text could be extracted from the PDF" },
-        { status: 422 }
-      );
-    }
-
-    const roleProfile = buildRoleProfile(config);
-    const roleAnalysis = analyzeKeywordMatch(cvText, roleProfile);
-    const llmQuality = await analyzeCvQualityWithLLM(cvText, config);
-    const blendedScore = Math.round(
-      llmQuality.overallScore * LLM_WEIGHT + roleAnalysis.score * KEYWORD_WEIGHT
-    );
-
-    const result: CvFeedbackResult = {
-      fileName: file.name,
-      analyzedAt: new Date().toISOString(),
-      config,
-      quality: {
-        ...llmQuality,
-        overallScore: blendedScore,
-      },
-      roleAnalysis,
-      scoreBreakdown: {
-        keywordScore: roleAnalysis.score,
-        llmScore: llmQuality.overallScore,
-        blendedScore,
-        keywordWeight: KEYWORD_WEIGHT,
-        llmWeight: LLM_WEIGHT,
-      },
-    };
+    const result: CvFeedbackResult = await analyzeCvFeedback({ file, config });
 
     return Response.json(result);
   } catch (error) {
+    if (error instanceof CvFeedbackError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
+
     console.error("[api/interview/cv-feedback]", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }

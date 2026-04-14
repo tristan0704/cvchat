@@ -18,7 +18,7 @@ type UseInterviewFeedbackAnalysisArgs = InterviewFeedbackRequest & {
 }
 
 export function useInterviewFeedbackAnalysis(
-    args: UseInterviewFeedbackAnalysisArgs
+  args: UseInterviewFeedbackAnalysisArgs
 ) {
     const [evaluation, setEvaluation] =
         useState<InterviewFeedbackEvaluation | null>(null)

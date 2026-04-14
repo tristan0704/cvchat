@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InterviewStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id         String      @id @default(uuid()) @db.Uuid
+  email      String      @unique
+  profile    Profile?
+  cvVersions CvVersion[]
+  interviews Interview[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Profile {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @db.Uuid
+  displayName     String?
+  targetRole      String?
+  experienceLevel String?
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CvVersion {
+  id                String      @id @default(uuid()) @db.Uuid
+  userId            String      @db.Uuid
+  sourceFileName    String?
+  extractedText     String
+  extractedTextHash String
+  isActive          Boolean     @default(true)
+  uploadedAt        DateTime    @default(now())
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviews        Interview[]
+
+  @@index([userId, uploadedAt(sort: Desc)])
+  @@index([userId, extractedTextHash])
+}
+
+model Interview {
+  id            String          @id @default(uuid()) @db.Uuid
+  userId        String          @db.Uuid
+  cvVersionId   String?         @db.Uuid
+  role          String
+  experience    String?
+  companySize   String?
+  interviewType String?
+  status        InterviewStatus @default(DRAFT)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cvVersion     CvVersion?      @relation(fields: [cvVersionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([cvVersionId])
+}

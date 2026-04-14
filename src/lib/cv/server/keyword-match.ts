@@ -1,5 +1,7 @@
-import type { CvRoleMatchAnalysis } from "@/components/cv/types";
-import type { RoleProfile } from "@/app/api/interview/cv-feedback/types";
+import "server-only";
+
+import type { CvRoleMatchAnalysis } from "@/lib/cv/types";
+import type { RoleProfile } from "@/lib/cv/server/types";
 
 function normalize(value: string) {
   return value

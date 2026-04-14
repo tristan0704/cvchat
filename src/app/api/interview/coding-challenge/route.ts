@@ -2,9 +2,9 @@ import {
   getCodingChallengeTaskById,
   pickRandomCodingChallengeTask,
   toPublicCodingChallengeTask,
-} from "@/components/coding-challenge/coding-challenge-task-pool";
-import { evaluateCodingChallengeSubmission } from "@/app/api/interview/coding-challenge/evaluate-submission";
-import type { CodingChallengeEvaluationRequest } from "@/components/coding-challenge/coding-challenge-types";
+} from "@/lib/coding-challenge/task-pool";
+import { evaluateCodingChallengeSubmission } from "@/lib/coding-challenge/server/evaluate-submission";
+import type { CodingChallengeEvaluationRequest } from "@/lib/coding-challenge/types";
 
 export const runtime = "nodejs";
 
