@@ -1,6 +1,20 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function LoginPage() {
+import { login } from "./actions";
+import { createClient } from "@/lib/supabase/server";
+
+export default async function LoginPage({ searchParams }) {
+  const params = await searchParams;
+  const error = typeof params?.error === "string" ? params.error : "";
+  const message = typeof params?.message === "string" ? params.message : "";
+  const supabase = await createClient();
+  const { data: claimsData } = await supabase.auth.getClaims();
+
+  if (claimsData?.claims) {
+    redirect("/home");
+  }
+
   return (
     <div className="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
       {/* Header */}
@@ -18,7 +32,19 @@ export default function LoginPage() {
 
       {/* Form */}
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-        <form className="space-y-6">
+        <form action={login} className="space-y-6">
+          {message ? (
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+              {message}
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-100">
@@ -27,6 +53,7 @@ export default function LoginPage() {
 
             <div className="mt-2">
               <input
+                name="email"
                 type="email"
                 required
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-white outline outline-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:outline-indigo-500"
@@ -50,6 +77,7 @@ export default function LoginPage() {
 
             <div className="mt-2">
               <input
+                name="password"
                 type="password"
                 required
                 className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-white outline outline-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:outline-indigo-500"
@@ -66,12 +94,12 @@ export default function LoginPage() {
             >
               Zurück
             </Link>
-            <Link
-              href="/home"
+            <button
+              type="submit"
               className="flex w-full items-center justify-center rounded-md bg-indigo-500 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
             >
               Anmelden
-            </Link>
+            </button>
           </div>
         </form>
 

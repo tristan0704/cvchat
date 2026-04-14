@@ -145,12 +145,14 @@ export default function Navbar() {
                   >
                     Einstellungen
                   </Link>
-                  <Link
-                    href="/logout"
-                    className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5"
-                  >
-                    Abmelden
-                  </Link>
+                  <form action="/auth/signout" method="post">
+                    <button
+                      type="submit"
+                      className="block w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5"
+                    >
+                      Abmelden
+                    </button>
+                  </form>
                 </div>
               )}
             </div>
