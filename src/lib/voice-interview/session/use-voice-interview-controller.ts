@@ -16,8 +16,12 @@ import { useVoiceTranscript } from "@/lib/voice-interview/transcript/use-voice-t
 
 type StopCallRef = MutableRefObject<((options?: { terminalStatus?: ConnectionStatus; closeSession?: boolean }) => Promise<void>) | null>
 
-export function useVoiceInterviewController(role: string) {
-    const questionPlan = getInterviewQuestionPool(role)
+export function useVoiceInterviewController(
+    role: string,
+    questionPlanOverride?: ReturnType<typeof getInterviewQuestionPool>,
+    interviewId?: string
+) {
+    const questionPlan = questionPlanOverride ?? getInterviewQuestionPool(role)
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle")
     const [error, setError] = useState("")
     const [callLifecyclePhase, setCallLifecyclePhase] = useState<CallLifecyclePhase>("idle")
@@ -81,6 +85,7 @@ export function useVoiceInterviewController(role: string) {
     }, [])
 
     const transcript = useVoiceTranscript({
+        interviewId,
         role,
         turnStateRef,
         endgameStateRef,

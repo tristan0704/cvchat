@@ -9,9 +9,9 @@ export default async function LoginPage({ searchParams }) {
   const error = typeof params?.error === "string" ? params.error : "";
   const message = typeof params?.message === "string" ? params.message : "";
   const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
+  const { data } = await supabase.auth.getUser();
 
-  if (claimsData?.claims) {
+  if (data.user) {
     redirect("/home");
   }
 
@@ -69,9 +69,12 @@ export default async function LoginPage({ searchParams }) {
               </label>
 
               <div className="text-sm">
-                <a className="font-semibold text-indigo-400 hover:text-indigo-300">
+                <Link
+                  href="/auth/reset-password"
+                  className="font-semibold text-indigo-400 hover:text-indigo-300"
+                >
                   Passwort vergessen?
-                </a>
+                </Link>
               </div>
             </div>
 

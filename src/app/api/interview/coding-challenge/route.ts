@@ -1,70 +1,157 @@
+import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import {
-  getCodingChallengeTaskById,
-  pickRandomCodingChallengeTask,
-  toPublicCodingChallengeTask,
-} from "@/lib/coding-challenge/task-pool";
-import { evaluateCodingChallengeSubmission } from "@/lib/coding-challenge/server/evaluate-submission";
-import type { CodingChallengeEvaluationRequest } from "@/lib/coding-challenge/types";
+    assignCodingChallengeAttempt,
+    evaluateCodingChallengeAttempt,
+    updateCodingChallengeDraft,
+} from "@/db-backend/coding-challenge/coding-challenge-service";
+import type {
+    CodingChallengeEvaluationRequest,
+    CodingChallengeEvaluationResponse,
+} from "@/lib/coding-challenge/types";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const role = searchParams.get("role") ?? "";
-  const excludeTaskId = searchParams.get("excludeTaskId") ?? undefined;
+    const currentUser = await getCurrentAppUser();
 
-  try {
-    const task = pickRandomCodingChallengeTask(role, excludeTaskId);
+    if (!currentUser) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    return Response.json({
-      task: toPublicCodingChallengeTask(task),
-    });
-  } catch (error) {
-    console.error("[api/interview/coding-challenge]", error);
-    return Response.json(
-      { error: "Unable to load coding challenge" },
-      { status: 500 }
-    );
-  }
+    const { searchParams } = new URL(request.url);
+    const interviewId = searchParams.get("interviewId") ?? "";
+    const role = searchParams.get("role") ?? "";
+    const excludeTaskId = searchParams.get("excludeTaskId") ?? undefined;
+
+    if (!interviewId) {
+        return Response.json(
+            { error: "Interview id is required" },
+            { status: 400 }
+        );
+    }
+
+    try {
+        const draft = await assignCodingChallengeAttempt({
+            userId: currentUser.id,
+            interviewId,
+            role,
+            excludeTaskId,
+        });
+
+        return Response.json({ draft });
+    } catch (error) {
+        console.error("[api/interview/coding-challenge]", error);
+        return Response.json(
+            { error: "Unable to load coding challenge" },
+            { status: 500 }
+        );
+    }
+}
+
+export async function PATCH(request: Request) {
+    const currentUser = await getCurrentAppUser();
+
+    if (!currentUser) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+        const body = (await request.json().catch(() => null)) as
+            | {
+                  interviewId?: unknown;
+                  attemptId?: unknown;
+                  code?: unknown;
+              }
+            | null;
+
+        const interviewId =
+            body && typeof body.interviewId === "string"
+                ? body.interviewId.trim()
+                : "";
+        const attemptId =
+            body && typeof body.attemptId === "string"
+                ? body.attemptId.trim()
+                : "";
+        const code = body && typeof body.code === "string" ? body.code : "";
+
+        if (!interviewId || !attemptId) {
+            return Response.json(
+                { error: "Interview id and attempt id are required" },
+                { status: 400 }
+            );
+        }
+
+        const draft = await updateCodingChallengeDraft({
+            userId: currentUser.id,
+            interviewId,
+            attemptId,
+            code,
+        });
+
+        return Response.json({ draft });
+    } catch (error) {
+        console.error("[api/interview/coding-challenge]", error);
+        return Response.json(
+            { error: "Unable to save coding challenge draft" },
+            { status: 500 }
+        );
+    }
 }
 
 export async function POST(request: Request) {
-  try {
-    const body = (await request.json().catch(() => null)) as
-      | CodingChallengeEvaluationRequest
-      | null;
+    const currentUser = await getCurrentAppUser();
 
-    const taskId =
-      body && typeof body.taskId === "string" ? body.taskId.trim() : "";
-    const code = body && typeof body.code === "string" ? body.code : "";
-
-    if (!taskId) {
-      return Response.json({ error: "Task id is required" }, { status: 400 });
+    if (!currentUser) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!code.trim()) {
-      return Response.json(
-        { error: "Code submission is required" },
-        { status: 400 }
-      );
+    try {
+        const body = (await request.json().catch(() => null)) as
+            | (CodingChallengeEvaluationRequest & {
+                  interviewId?: unknown;
+              })
+            | null;
+
+        const interviewId =
+            body && typeof body.interviewId === "string"
+                ? body.interviewId.trim()
+                : "";
+        const attemptId =
+            body && typeof body.attemptId === "string"
+                ? body.attemptId.trim()
+                : "";
+        const code = body && typeof body.code === "string" ? body.code : "";
+
+        if (!interviewId || !attemptId) {
+            return Response.json(
+                { error: "Interview id and attempt id are required" },
+                { status: 400 }
+            );
+        }
+
+        if (!code.trim()) {
+            return Response.json(
+                { error: "Code submission is required" },
+                { status: 400 }
+            );
+        }
+
+        const result = await evaluateCodingChallengeAttempt({
+            userId: currentUser.id,
+            interviewId,
+            attemptId,
+            code,
+        });
+
+        return Response.json({
+            draft: result.draft,
+            evaluation: result.evaluation,
+        } satisfies CodingChallengeEvaluationResponse);
+    } catch (error) {
+        console.error("[api/interview/coding-challenge]", error);
+        return Response.json(
+            { error: "Unable to evaluate coding challenge" },
+            { status: 500 }
+        );
     }
-
-    const task = getCodingChallengeTaskById(taskId);
-    if (!task) {
-      return Response.json(
-        { error: "Coding challenge not found" },
-        { status: 404 }
-      );
-    }
-
-    const evaluation = await evaluateCodingChallengeSubmission(task, code);
-
-    return Response.json({ evaluation });
-  } catch (error) {
-    console.error("[api/interview/coding-challenge]", error);
-    return Response.json(
-      { error: "Unable to evaluate coding challenge" },
-      { status: 500 }
-    );
-  }
 }

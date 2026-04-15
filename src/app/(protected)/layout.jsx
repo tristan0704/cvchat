@@ -10,6 +10,10 @@ export default async function HomeLayout({ children }) {
     redirect("/auth/login");
   }
 
+  if (!currentUser.profile?.username) {
+    redirect("/auth/register/step2");
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Navbar />

@@ -1,19 +1,19 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 
 import type { FaceAnalysisParameterReport, FaceAnalysisReport } from "@/lib/face-analysis";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback/fingerprint";
-import {
-    loadFaceBodyLanguageSummary,
-    loadInterviewFaceAnalysisReport,
-} from "@/lib/interview-feedback/storage";
 import { useInterviewFeedbackAnalysis } from "@/lib/interview-feedback/use-interview-feedback-analysis";
 import { formatCountdown } from "@/lib/interview";
-import type { InterviewFeedbackEvaluationDimension } from "@/lib/interview-feedback/types";
+import type {
+    InterviewFeedbackEvaluation,
+    InterviewFeedbackEvaluationDimension,
+} from "@/lib/interview-feedback/types";
 import { useOptionalInterviewSession } from "@/lib/interview-session/context";
 import { getInterviewSessionId } from "@/lib/interview-session/session-id";
+import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 import {
     formatMetricSeconds,
     formatMetricWordsPerMinute,
@@ -384,58 +384,199 @@ function AnalysisStateCard(args: {
     );
 }
 
+type PersistedInterviewFeedbackState = {
+    transcript: {
+        transcriptStatus: string;
+        transcriptError: string;
+        transcriptExport: string;
+        recapStatus: string;
+        recapError: string;
+        recapCaptureNote: string;
+    } | null;
+    timingMetrics: InterviewTimingMetrics | null;
+    feedback: InterviewFeedbackEvaluation | null;
+    faceAnalysis: FaceAnalysisReport | null;
+};
+
 export default function InterviewFeedback() {
     const session = useOptionalInterviewSession();
     const params = useParams<{ id?: string }>();
-    const interviewId = getInterviewSessionId(params?.id);
+    const interviewId = session?.interviewId ?? getInterviewSessionId(params?.id);
     const controller = session?.voiceInterview ?? null;
     const role = session?.role ?? "Backend Developer";
     const experience = session?.config.experience ?? "";
     const companySize = session?.config.companySize ?? "";
     const interviewType = session?.config.interviewType ?? "";
-    const transcriptExport = controller?.transcriptExport ?? "";
+    const [persistedState, setPersistedState] =
+        useState<PersistedInterviewFeedbackState | null>(null);
+    const [loadError, setLoadError] = useState("");
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function hydratePersistedInterview() {
+            if (!interviewId || interviewId === "standalone") {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/interviews/${interviewId}`, {
+                    method: "GET",
+                    cache: "no-store",
+                });
+                const data = (await response.json().catch(() => null)) as
+                    | {
+                          interview?: {
+                              transcript?: PersistedInterviewFeedbackState["transcript"];
+                              timingMetrics?: InterviewTimingMetrics | null;
+                              feedback?: InterviewFeedbackEvaluation | null;
+                              faceAnalysis?: FaceAnalysisReport | null;
+                          };
+                          error?: string;
+                      }
+                    | null;
+
+                if (!response.ok || !data?.interview) {
+                    throw new Error(
+                        data?.error ||
+                            "Persistierte Interviewdaten konnten nicht geladen werden."
+                    );
+                }
+
+                if (!cancelled) {
+                    setPersistedState({
+                        transcript: data.interview.transcript ?? null,
+                        timingMetrics: data.interview.timingMetrics ?? null,
+                        feedback: data.interview.feedback ?? null,
+                        faceAnalysis: data.interview.faceAnalysis ?? null,
+                    });
+                    setLoadError("");
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setLoadError(
+                        error instanceof Error
+                            ? error.message
+                            : "Persistierte Interviewdaten konnten nicht geladen werden."
+                    );
+                }
+            }
+        }
+
+        void hydratePersistedInterview();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [interviewId]);
+
+    useEffect(() => {
+        if (
+            !controller?.hasTimingMetrics ||
+            !interviewId ||
+            interviewId === "standalone"
+        ) {
+            return;
+        }
+
+        void fetch(`/api/interviews/${interviewId}/timing`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(controller.interviewTimingMetrics),
+        }).then(() => {
+            setPersistedState((currentState) => ({
+                transcript: currentState?.transcript ?? null,
+                feedback: currentState?.feedback ?? null,
+                faceAnalysis: currentState?.faceAnalysis ?? null,
+                timingMetrics: controller.interviewTimingMetrics,
+            }));
+        });
+    }, [controller?.hasTimingMetrics, controller?.interviewTimingMetrics, interviewId]);
+
+    const transcriptExport =
+        controller?.transcriptExport ??
+        persistedState?.transcript?.transcriptExport ??
+        "";
+    const transcriptStatus =
+        controller?.postCallTranscriptStatus ??
+        persistedState?.transcript?.transcriptStatus ??
+        "idle";
+    const transcriptError =
+        controller?.postCallTranscriptError ??
+        persistedState?.transcript?.transcriptError ??
+        "";
+    const recapStatus =
+        controller?.interviewRecapStatus ??
+        persistedState?.transcript?.recapStatus ??
+        "idle";
+    const recapError =
+        controller?.interviewRecapError ??
+        persistedState?.transcript?.recapError ??
+        "";
+    const recapCaptureNote =
+        controller?.interviewRecapCaptureNote ??
+        persistedState?.transcript?.recapCaptureNote ??
+        "";
+    const timingMetrics =
+        controller?.hasTimingMetrics && controller.interviewTimingMetrics
+            ? controller.interviewTimingMetrics
+            : persistedState?.timingMetrics ?? null;
+    const hasTimingMetrics = Boolean(
+        timingMetrics &&
+            (timingMetrics.answerCount > 0 ||
+                timingMetrics.totalCandidateSpeechMs > 0 ||
+                timingMetrics.averageResponseLatencyMs > 0)
+    );
 
     const transcriptFingerprint = useMemo(
         () => buildInterviewTranscriptFingerprint(transcriptExport),
         [transcriptExport]
     );
     const analysisEnabled =
-        controller?.postCallTranscriptStatus === "ready" &&
+        transcriptStatus === "ready" &&
         transcriptExport.trim().length > 0;
 
     const analysis = useInterviewFeedbackAnalysis({
         interviewId,
-        enabled: Boolean(controller) && analysisEnabled,
+        enabled: interviewId !== "standalone" && analysisEnabled,
         role,
         experience,
         companySize,
         interviewType,
         transcript: transcriptExport,
         transcriptFingerprint,
+        existingEvaluation: persistedState?.feedback ?? null,
     });
 
-    const faceAnalysisReport = controller
-        ? loadInterviewFaceAnalysisReport(interviewId)
-        : null;
-    const faceBodyLanguageSummary = controller
-        ? loadFaceBodyLanguageSummary()
-        : null;
+    useEffect(() => {
+        if (!analysis.evaluation) {
+            return;
+        }
 
-    const evaluation = analysis.evaluation;
+        setPersistedState((currentState) => ({
+            transcript: currentState?.transcript ?? null,
+            timingMetrics: currentState?.timingMetrics ?? null,
+            faceAnalysis: currentState?.faceAnalysis ?? null,
+            feedback: analysis.evaluation,
+        }));
+    }, [analysis.evaluation]);
 
-    if (!session || !controller) {
-        return null;
-    }
+    const faceAnalysisReport = persistedState?.faceAnalysis ?? null;
+    const evaluation = analysis.evaluation ?? persistedState?.feedback ?? null;
 
     return (
         <div className="space-y-6">
+            {loadError ? <p className="text-sm text-red-300">{loadError}</p> : null}
+
             <AnalysisStateCard
                 role={role}
                 experience={experience}
                 companySize={companySize}
                 interviewType={interviewType}
-                transcriptStatus={controller.postCallTranscriptStatus}
-                transcriptError={controller.postCallTranscriptError}
+                transcriptStatus={transcriptStatus}
+                transcriptError={transcriptError}
                 analysisStatus={analysis.status}
                 analysisError={analysis.error}
                 overallScore={evaluation?.overallScore ?? null}
@@ -491,13 +632,13 @@ export default function InterviewFeedback() {
                         description="Replay der gemeinsamen Aufnahme mit Interviewer- und Kandidatenstimme."
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                                {controller.interviewRecapStatus}
+                                {recapStatus}
                             </span>
                         }
                     />
 
                     <div className="mt-4">
-                        {controller.interviewRecapUrl ? (
+                        {controller?.interviewRecapUrl ? (
                             <div className="space-y-3">
                                 <audio
                                     controls
@@ -513,25 +654,26 @@ export default function InterviewFeedback() {
                                     gemeinsamen Aufnahme.
                                 </p>
                             </div>
-                        ) : controller.interviewRecapStatus === "recording" ? (
+                        ) : recapStatus === "recording" ? (
                             <p className="text-sm text-gray-400">
                                 Der Replay-Track wird gerade noch verarbeitet.
                             </p>
-                        ) : controller.interviewRecapStatus === "error" ? (
+                        ) : recapStatus === "error" ? (
                             <p className="text-sm text-red-300">
-                                {controller.interviewRecapError ||
+                                {recapError ||
                                     "Das Replay konnte nicht erstellt werden."}
                             </p>
                         ) : (
                             <p className="text-sm text-gray-400">
                                 Nach dem Interview erscheint hier die gemeinsame
-                                Replay-Aufnahme.
+                                Replay-Aufnahme. Ohne gespeichertes Audio bleibt
+                                dieser Bereich nur in der Live-Session verfuegbar.
                             </p>
                         )}
 
-                        {controller.interviewRecapCaptureNote ? (
+                        {recapCaptureNote ? (
                             <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                                {controller.interviewRecapCaptureNote}
+                                {recapCaptureNote}
                             </p>
                         ) : null}
                     </div>
@@ -544,7 +686,7 @@ export default function InterviewFeedback() {
                         description="Dieselbe strukturierte Export-Basis wird fuer die GPT-Auswertung verwendet."
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                                {controller.postCallTranscriptStatus}
+                                {transcriptStatus}
                             </span>
                         }
                     />
@@ -554,13 +696,13 @@ export default function InterviewFeedback() {
                             <pre className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-gray-950 p-4 text-sm leading-6 text-gray-200">
                                 {transcriptExport}
                             </pre>
-                        ) : controller.postCallTranscriptStatus === "transcribing" ? (
+                        ) : transcriptStatus === "transcribing" ? (
                             <p className="text-sm text-gray-400">
                                 Das Interview-Transkript wird gerade erzeugt.
                             </p>
-                        ) : controller.postCallTranscriptStatus === "error" ? (
+                        ) : transcriptStatus === "error" ? (
                             <p className="text-sm text-red-300">
-                                {controller.postCallTranscriptError ||
+                                {transcriptError ||
                                     "Das Interview-Transkript konnte nicht erstellt werden."}
                             </p>
                         ) : (
@@ -580,15 +722,15 @@ export default function InterviewFeedback() {
                     description="WPM und Antwort-Timing bleiben als eigene Signale neben der GPT-Auswertung sichtbar."
                     badge={
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                            {controller.hasTimingMetrics
-                                ? `${controller.interviewTimingMetrics.answerCount} Antworten`
+                            {hasTimingMetrics && timingMetrics
+                                ? `${timingMetrics.answerCount} Antworten`
                                 : "noch leer"}
                         </span>
                     }
                 />
 
                 <div className="mt-4">
-                    {controller.hasTimingMetrics ? (
+                    {hasTimingMetrics && timingMetrics ? (
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <MetricCard
                                 label="Gesamte Sprechzeit"
@@ -596,8 +738,8 @@ export default function InterviewFeedback() {
                                     Math.max(
                                         0,
                                         Math.round(
-                                            controller.interviewTimingMetrics
-                                                .totalCandidateSpeechMs / 1_000
+                                            timingMetrics.totalCandidateSpeechMs /
+                                                1_000
                                         )
                                     )
                                 )}
@@ -605,50 +747,42 @@ export default function InterviewFeedback() {
                             <MetricCard
                                 label="Words per Minute"
                                 value={formatMetricWordsPerMinute(
-                                    controller.interviewTimingMetrics
-                                        .candidateWordsPerMinute
+                                    timingMetrics.candidateWordsPerMinute
                                 )}
                             />
                             <MetricCard
                                 label="Durchschn. Antwort"
                                 value={formatMetricSeconds(
-                                    controller.interviewTimingMetrics
-                                        .averageAnswerDurationMs
+                                    timingMetrics.averageAnswerDurationMs
                                 )}
                             />
                             <MetricCard
                                 label="Laengste Antwort"
                                 value={formatMetricSeconds(
-                                    controller.interviewTimingMetrics
-                                        .longestAnswerDurationMs
+                                    timingMetrics.longestAnswerDurationMs
                                 )}
                             />
                             <MetricCard
                                 label="Kuerzeste Antwort"
                                 value={formatMetricSeconds(
-                                    controller.interviewTimingMetrics
-                                        .shortestAnswerDurationMs
+                                    timingMetrics.shortestAnswerDurationMs
                                 )}
                             />
                             <MetricCard
                                 label="Durchschn. Reaktionszeit"
                                 value={formatMetricSeconds(
-                                    controller.interviewTimingMetrics
-                                        .averageResponseLatencyMs
+                                    timingMetrics.averageResponseLatencyMs
                                 )}
                             />
                             <MetricCard
                                 label="Laengste Denkpause"
                                 value={formatMetricSeconds(
-                                    controller.interviewTimingMetrics
-                                        .longestResponseLatencyMs
+                                    timingMetrics.longestResponseLatencyMs
                                 )}
                             />
                             <MetricCard
                                 label="Antworten"
-                                value={String(
-                                    controller.interviewTimingMetrics.answerCount
-                                )}
+                                value={String(timingMetrics.answerCount)}
                             />
                         </div>
                     ) : (
@@ -676,9 +810,7 @@ export default function InterviewFeedback() {
                             </span>
                         ) : (
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                                {faceBodyLanguageSummary?.sampleCount
-                                    ? `${faceBodyLanguageSummary.sampleCount} Samples`
-                                    : "keine Daten"}
+                                keine Daten
                             </span>
                         )
                     }
@@ -749,57 +881,6 @@ export default function InterviewFeedback() {
                                 emptyLabel="Keine Alerts vorhanden."
                             />
                         ) : null}
-                    </div>
-                ) : faceBodyLanguageSummary && faceBodyLanguageSummary.sampleCount > 0 ? (
-                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <MetricCard
-                            label="Gesicht im Frame"
-                            value={formatPercent(
-                                faceBodyLanguageSummary.faceDetectedPct
-                            )}
-                        />
-                        <MetricCard
-                            label="Fokus zur Kamera"
-                            value={formatPercent(
-                                faceBodyLanguageSummary.avgFrontalFacingScore
-                            )}
-                        />
-                        <MetricCard
-                            label="Sprechaktivitaet"
-                            value={formatPercent(
-                                faceBodyLanguageSummary.speakingActivityPct
-                            )}
-                        />
-                        <MetricCard
-                            label="Blinkrate"
-                            value={`${NUMBER_FORMATTER.format(
-                                faceBodyLanguageSummary.blinkRatePerMin
-                            )}/min`}
-                        />
-                        <MetricCard
-                            label="Kopfbewegung"
-                            value={NUMBER_FORMATTER.format(
-                                faceBodyLanguageSummary.avgHeadMovement
-                            )}
-                        />
-                        <MetricCard
-                            label="Mundoeffnung"
-                            value={NUMBER_FORMATTER.format(
-                                faceBodyLanguageSummary.avgMouthOpenness
-                            )}
-                        />
-                        <MetricCard
-                            label="Samples"
-                            value={String(faceBodyLanguageSummary.sampleCount)}
-                        />
-                        <MetricCard
-                            label="Status"
-                            value={
-                                faceBodyLanguageSummary.webcamActive
-                                    ? "Kamera aktiv"
-                                    : "Kamera beendet"
-                            }
-                        />
                     </div>
                 ) : (
                     <p className="mt-4 text-sm text-gray-400">

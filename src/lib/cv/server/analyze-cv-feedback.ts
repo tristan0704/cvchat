@@ -25,13 +25,17 @@ type AnalyzeCvFeedbackArgs = {
   config: InterviewCvConfig;
 };
 
-export async function analyzeCvFeedback({
-  file,
-  config,
-}: AnalyzeCvFeedbackArgs): Promise<CvFeedbackResult> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const cvText = await pdfToText(buffer);
+type AnalyzeCvFeedbackFromTextArgs = {
+  cvText: string;
+  fileName: string;
+  config: InterviewCvConfig;
+};
 
+export async function analyzeCvFeedbackFromText({
+  cvText,
+  fileName,
+  config,
+}: AnalyzeCvFeedbackFromTextArgs): Promise<CvFeedbackResult> {
   if (!cvText.trim()) {
     throw new CvFeedbackError(
       "No readable text could be extracted from the PDF",
@@ -47,7 +51,7 @@ export async function analyzeCvFeedback({
   );
 
   return {
-    fileName: file.name,
+    fileName,
     analyzedAt: new Date().toISOString(),
     config,
     quality: {
@@ -63,4 +67,18 @@ export async function analyzeCvFeedback({
       llmWeight: LLM_WEIGHT,
     },
   };
+}
+
+export async function analyzeCvFeedback({
+  file,
+  config,
+}: AnalyzeCvFeedbackArgs): Promise<CvFeedbackResult> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const cvText = await pdfToText(buffer);
+
+  return analyzeCvFeedbackFromText({
+    cvText,
+    fileName: file.name,
+    config,
+  });
 }

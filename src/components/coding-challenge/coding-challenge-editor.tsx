@@ -35,6 +35,7 @@ export default function CodingChallengeEditor() {
   const { evaluation, isSubmitting, submitError, submitSolution } =
     useCodingChallengeSubmission({
       interviewId,
+      initialEvaluation: draft?.evaluation ?? null,
     });
 
   const lineCount = draft ? draft.code.split("\n").length : 0;
@@ -54,11 +55,16 @@ export default function CodingChallengeEditor() {
 
   const { task } = draft;
   const currentCode = draft.code;
-  const hasSubmittedCurrentTask = evaluation?.taskId === task.id;
+  const hasSubmittedCurrentTask =
+    evaluation?.taskId === task.id && evaluation?.attemptId === draft.attemptId;
 
   async function handleSubmitSolution() {
+    if (!draft) {
+      return;
+    }
+
     await submitSolution({
-      taskId: task.id,
+      attemptId: draft.attemptId,
       code: currentCode,
     });
   }

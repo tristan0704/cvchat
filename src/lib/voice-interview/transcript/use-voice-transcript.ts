@@ -8,7 +8,6 @@ import {
     extractInterviewerQuestions,
     normalizeTranscriptQaPairs,
     normalizeTranscriptText,
-    persistVoiceFeedbackDraft,
     type PostCallTranscriptStatus,
     type Speaker,
     type TranscriptEntry,
@@ -18,6 +17,7 @@ import type { AsyncResult } from "@/lib/voice-interview/core/types"
 import type { InterviewEndgameState, InterviewTurnState } from "@/lib/voice-interview/session/endgame"
 
 type UseVoiceTranscriptArgs = {
+    interviewId?: string
     role: string
     turnStateRef: MutableRefObject<InterviewTurnState>
     endgameStateRef: MutableRefObject<InterviewEndgameState>
@@ -35,6 +35,7 @@ type PersistDraftOverrides = {
 }
 
 export function useVoiceTranscript({
+    interviewId,
     role,
     turnStateRef,
     endgameStateRef,
@@ -104,30 +105,9 @@ export function useVoiceTranscript({
         postCallTranscriptErrorRef.current = postCallTranscriptError
     }, [postCallTranscriptError])
 
-    useEffect(() => {
-        persistVoiceFeedbackDraft({
-            role,
-            transcriptEntries,
-            postCallCandidateTranscript,
-            mappedTranscriptQaPairs,
-            postCallTranscriptStatus,
-            postCallTranscriptError,
-        })
-    }, [role, transcriptEntries, postCallCandidateTranscript, mappedTranscriptQaPairs, postCallTranscriptStatus, postCallTranscriptError])
-
-    const persistDraft = useCallback(
-        (overrides?: PersistDraftOverrides) => {
-            persistVoiceFeedbackDraft({
-                role,
-                transcriptEntries: overrides?.transcriptEntries ?? transcriptEntriesRef.current,
-                postCallCandidateTranscript: overrides?.postCallCandidateTranscript ?? postCallCandidateTranscriptRef.current,
-                mappedTranscriptQaPairs: overrides?.mappedTranscriptQaPairs ?? mappedTranscriptQaPairsRef.current,
-                postCallTranscriptStatus: overrides?.postCallTranscriptStatus ?? postCallTranscriptStatusRef.current,
-                postCallTranscriptError: overrides?.postCallTranscriptError ?? postCallTranscriptErrorRef.current,
-            })
-        },
-        [role]
-    )
+    const persistDraft = useCallback((overrides?: PersistDraftOverrides) => {
+        void overrides
+    }, [])
 
     const appendTranscript = useCallback((speaker: Speaker, text: string, options?: { mergeWithPrevious?: boolean }) => {
         const normalized = normalizeTranscriptText(text)
@@ -260,9 +240,13 @@ export function useVoiceTranscript({
             })
 
             const formData = new FormData()
+            if (interviewId) {
+                formData.append("interviewId", interviewId)
+            }
             formData.append("role", role)
             formData.append("audio", new File([audioBlob], `voice-interview.${audioBlob.type.includes("mp4") ? "mp4" : "webm"}`, { type: audioBlob.type || "audio/webm" }))
             formData.append("interviewerQuestions", JSON.stringify(extractInterviewerQuestions(transcriptEntriesRef.current)))
+            formData.append("transcriptEntries", JSON.stringify(transcriptEntriesRef.current))
 
             const response = await fetch("/api/interview/transcript", {
                 method: "POST",
@@ -310,7 +294,7 @@ export function useVoiceTranscript({
                 },
             }
         },
-        [persistDraft, role]
+        [interviewId, persistDraft, role]
     )
 
     return {

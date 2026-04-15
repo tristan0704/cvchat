@@ -32,8 +32,13 @@ export type CodingChallengeTaskManifest = {
 export type PublicCodingChallengeTask = Omit<CodingChallengeTask, "solution">;
 
 export type CodingChallengeDraft = {
+  attemptId: string;
   task: PublicCodingChallengeTask;
   code: string;
+  evaluation?: CodingChallengeEvaluation | null;
+  status?: string;
+  submittedAt?: string | null;
+  lastEditedAt?: string | null;
 };
 
 export type CodingChallengeEvaluationDimension = {
@@ -42,6 +47,7 @@ export type CodingChallengeEvaluationDimension = {
 };
 
 export type CodingChallengeEvaluation = {
+  attemptId?: string;
   taskId: string;
   submittedAt: string;
   overallScore: number;
@@ -56,10 +62,11 @@ export type CodingChallengeEvaluation = {
 };
 
 export type CodingChallengeEvaluationRequest = {
-  taskId: string;
+  attemptId: string;
   code: string;
 };
 
 export type CodingChallengeEvaluationResponse = {
+  draft?: CodingChallengeDraft;
   evaluation: CodingChallengeEvaluation;
 };

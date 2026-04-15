@@ -35,7 +35,7 @@ export async function signup(formData: FormData) {
     revalidatePath("/", "layout");
 
     if (data.session) {
-        redirect("/home");
+        redirect("/auth/register/step2");
     }
 
     redirect(

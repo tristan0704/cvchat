@@ -2,12 +2,31 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 
-import {
-    PROFILE_CV_MAX_FILE_BYTES,
-    loadStoredProfileCv,
-    saveStoredProfileCv,
-    type StoredProfileCvRecord,
-} from "@/lib/profile-cv-storage";
+const PROFILE_CV_MAX_FILE_BYTES = 20_000_000;
+const PROFILE_AVATAR_MAX_FILE_BYTES = 5_000_000;
+const PROFILE_AVATAR_MIME_TYPES = new Set([
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+]);
+
+type ActiveCvSummary = {
+    id: string;
+    fileName: string;
+    fileSizeBytes: number | null;
+    mimeType: string | null;
+    uploadedAt: string;
+};
+
+type ProfileSnapshot = {
+    email: string;
+    username: string;
+    avatarUrl: string | null;
+    language: string;
+    emailNotifications: boolean;
+    activeCv: ActiveCvSummary | null;
+};
 
 function formatUploadDate(value: string) {
     return new Intl.DateTimeFormat("de-DE", {
@@ -16,7 +35,11 @@ function formatUploadDate(value: string) {
     }).format(new Date(value));
 }
 
-function formatFileSize(bytes: number) {
+function formatFileSize(bytes: number | null) {
+    if (!bytes) {
+        return "Unbekannte Dateigroesse";
+    }
+
     const megabytes = bytes / 1_000_000;
     return `${megabytes.toFixed(1)} MB`;
 }
@@ -26,14 +49,16 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function ProfilePageContent() {
-    const [username, setUsername] = useState("maxmustermann");
-    const [email, setEmail] = useState("max@mail.com");
+    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [selectedCv, setSelectedCv] = useState<File | null>(null);
-    const [currentCv, setCurrentCv] = useState<StoredProfileCvRecord | null>(null);
-    const [currentCvUrl, setCurrentCvUrl] = useState("");
-    const [loadingCv, setLoadingCv] = useState(true);
+    const [currentCv, setCurrentCv] = useState<ActiveCvSummary | null>(null);
+    const [loadingProfile, setLoadingProfile] = useState(true);
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [savingAvatar, setSavingAvatar] = useState(false);
     const [savingCv, setSavingCv] = useState(false);
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");
@@ -41,52 +66,60 @@ export default function ProfilePageContent() {
     useEffect(() => {
         let cancelled = false;
 
-        async function hydrateStoredCv() {
-            setLoadingCv(true);
+        async function hydrateProfile() {
+            setLoadingProfile(true);
             setError("");
 
             try {
-                const storedCv = await loadStoredProfileCv();
+                const response = await fetch("/api/profile", {
+                    method: "GET",
+                    cache: "no-store",
+                });
+                const data = (await response.json().catch(() => null)) as
+                    | ProfileSnapshot
+                    | { error?: string }
+                    | null;
 
-                if (cancelled) return;
+                if (!response.ok || !data || "error" in data) {
+                    throw new Error(
+                        data && "error" in data && data.error
+                            ? data.error
+                            : "Profil konnte nicht geladen werden."
+                    );
+                }
 
-                setCurrentCv(storedCv);
-            } catch (storageError) {
-                if (cancelled) return;
+                if (cancelled) {
+                    return;
+                }
 
-                setError(
-                    getErrorMessage(
-                        storageError,
-                        "Gespeicherter Lebenslauf konnte nicht geladen werden."
-                    )
-                );
+                const profile = data as ProfileSnapshot;
+
+                setUsername(profile.username);
+                setEmail(profile.email);
+                setAvatarUrl(profile.avatarUrl);
+                setCurrentCv(profile.activeCv);
+            } catch (profileError) {
+                if (!cancelled) {
+                    setError(
+                        getErrorMessage(
+                            profileError,
+                            "Profil konnte nicht geladen werden."
+                        )
+                    );
+                }
             } finally {
                 if (!cancelled) {
-                    setLoadingCv(false);
+                    setLoadingProfile(false);
                 }
             }
         }
 
-        void hydrateStoredCv();
+        void hydrateProfile();
 
         return () => {
             cancelled = true;
         };
     }, []);
-
-    useEffect(() => {
-        if (!currentCv) {
-            setCurrentCvUrl("");
-            return;
-        }
-
-        const nextUrl = URL.createObjectURL(currentCv.file);
-        setCurrentCvUrl(nextUrl);
-
-        return () => {
-            URL.revokeObjectURL(nextUrl);
-        };
-    }, [currentCv]);
 
     function handleCvChange(event: ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0] ?? null;
@@ -115,18 +148,158 @@ export default function ProfilePageContent() {
         setSelectedCv(file);
     }
 
+    async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0] ?? null;
+
+        if (!file) {
+            return;
+        }
+
+        if (!PROFILE_AVATAR_MIME_TYPES.has(file.type)) {
+            setError("Bitte ein Bild als PNG, JPG, WEBP oder GIF auswaehlen.");
+            setStatus("");
+            return;
+        }
+
+        if (file.size > PROFILE_AVATAR_MAX_FILE_BYTES) {
+            setError("Das Profilbild darf maximal 5 MB gross sein.");
+            setStatus("");
+            return;
+        }
+
+        setSavingAvatar(true);
+        setError("");
+        setStatus("");
+
+        try {
+            const formData = new FormData();
+            formData.append("file", file, file.name);
+
+            const response = await fetch("/api/profile/avatar", {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = (await response.json().catch(() => null)) as
+                | {
+                      message?: string;
+                      error?: string;
+                      avatarUrl?: string | null;
+                  }
+                | null;
+
+            if (!response.ok || !data || data.error) {
+                throw new Error(
+                    data?.error || "Profilbild konnte nicht gespeichert werden."
+                );
+            }
+
+            setAvatarUrl(data.avatarUrl ?? null);
+            setStatus(data.message || "Profilbild gespeichert.");
+        } catch (avatarError) {
+            setError(
+                getErrorMessage(
+                    avatarError,
+                    "Profilbild konnte nicht gespeichert werden."
+                )
+            );
+        } finally {
+            event.target.value = "";
+            setSavingAvatar(false);
+        }
+    }
+
+    async function handleSaveProfile() {
+        setSavingProfile(true);
+        setError("");
+        setStatus("");
+
+        try {
+            const response = await fetch("/api/profile", {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password,
+                    confirmPassword,
+                }),
+            });
+
+            const data = (await response.json().catch(() => null)) as
+                | {
+                      message?: string;
+                      error?: string;
+                      profile?: ProfileSnapshot;
+                  }
+                | null;
+
+            if (!response.ok || !data || data.error) {
+                throw new Error(data?.error || "Profil konnte nicht gespeichert werden.");
+            }
+
+            if (data.profile) {
+                setUsername(data.profile.username);
+                setEmail(data.profile.email);
+                setAvatarUrl(data.profile.avatarUrl);
+                setCurrentCv(data.profile.activeCv);
+            }
+
+            setPassword("");
+            setConfirmPassword("");
+            setStatus(data.message || "Profil gespeichert.");
+        } catch (profileError) {
+            setError(
+                getErrorMessage(
+                    profileError,
+                    "Profil konnte nicht gespeichert werden."
+                )
+            );
+        } finally {
+            setSavingProfile(false);
+        }
+    }
+
     async function handleSaveCv() {
-        if (!selectedCv) return;
+        if (!selectedCv) {
+            return;
+        }
 
         setSavingCv(true);
         setError("");
         setStatus("");
 
         try {
-            const storedCv = await saveStoredProfileCv(selectedCv);
-            setCurrentCv(storedCv);
+            const formData = new FormData();
+            formData.append("file", selectedCv, selectedCv.name);
+
+            const response = await fetch("/api/profile/cv", {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = (await response.json().catch(() => null)) as
+                | {
+                      message?: string;
+                      error?: string;
+                      cv?: ActiveCvSummary;
+                  }
+                | null;
+
+            if (!response.ok || !data || data.error || !data.cv) {
+                throw new Error(
+                    data?.error || "Lebenslauf konnte nicht gespeichert werden."
+                );
+            }
+
+            setCurrentCv(data.cv);
             setSelectedCv(null);
-            setStatus("Lebenslauf gespeichert. Neue Interviews verwenden ab jetzt diesen CV.");
+            setStatus(
+                data.message ||
+                    "Lebenslauf gespeichert. Neue Interviews verwenden ab jetzt diesen CV."
+            );
         } catch (storageError) {
             setError(
                 getErrorMessage(
@@ -139,6 +312,11 @@ export default function ProfilePageContent() {
         }
     }
 
+    const avatarFallback =
+        username.trim().charAt(0).toUpperCase() ||
+        email.trim().charAt(0).toUpperCase() ||
+        "?";
+
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <main className="mx-auto max-w-7xl px-4 py-10">
@@ -149,22 +327,41 @@ export default function ProfilePageContent() {
 
                 <div className="mt-8 space-y-6 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
                     <div className="flex items-center gap-4">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"
-                            className="h-16 w-16 rounded-full object-cover"
-                            alt="Profilbild"
-                        />
+                        {avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={avatarUrl}
+                                className="h-16 w-16 rounded-full object-cover"
+                                alt="Profilbild"
+                            />
+                        ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500 text-lg font-semibold text-white">
+                                {avatarFallback}
+                            </div>
+                        )}
                         <div>
                             <label className="mb-1 block text-sm text-gray-400">
                                 Profilbild
                             </label>
                             <input
                                 type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                onChange={handleAvatarChange}
                                 className="text-sm text-gray-300 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-500 file:px-3 file:py-1 file:text-white hover:file:bg-indigo-400"
                             />
+                            <p className="mt-1 text-xs text-gray-500">
+                                {savingAvatar
+                                    ? "Profilbild wird gespeichert..."
+                                    : "PNG, JPG, WEBP oder GIF bis 5 MB"}
+                            </p>
                         </div>
                     </div>
+
+                    {loadingProfile ? (
+                        <div className="rounded-lg bg-gray-900 px-4 py-3 text-sm text-gray-400 outline outline-1 outline-white/10">
+                            Profil wird geladen...
+                        </div>
+                    ) : null}
 
                     <div>
                         <label className="mb-1 block text-sm text-gray-400">
@@ -212,7 +409,18 @@ export default function ProfilePageContent() {
                         />
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={() => void handleSaveProfile()}
+                            disabled={loadingProfile || savingProfile}
+                            className="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {savingProfile ? "Speichere..." : "Profil speichern"}
+                        </button>
+                    </div>
+
+                    <div className="space-y-4 border-t border-white/10 pt-6">
                         <div>
                             <p className="text-sm text-gray-400">Lebenslauf</p>
                             <p className="mt-1 text-xs text-gray-500">
@@ -221,33 +429,18 @@ export default function ProfilePageContent() {
                             </p>
                         </div>
 
-                        {loadingCv ? (
-                            <div className="rounded-lg bg-gray-900 px-4 py-3 text-sm text-gray-400 outline outline-1 outline-white/10">
-                                Gespeicherter Lebenslauf wird geladen...
-                            </div>
-                        ) : currentCv ? (
+                        {currentCv ? (
                             <div className="flex items-center justify-between rounded-lg bg-gray-900 px-4 py-3 outline outline-1 outline-white/10">
                                 <div>
                                     <p className="text-sm font-medium text-white">
-                                        {currentCv.name}
+                                        {currentCv.fileName}
                                     </p>
                                     <p className="text-xs text-gray-400">
                                         Gespeichert am {formatUploadDate(currentCv.uploadedAt)}
                                         {" | "}
-                                        {formatFileSize(currentCv.size)}
+                                        {formatFileSize(currentCv.fileSizeBytes)}
                                     </p>
                                 </div>
-
-                                {currentCvUrl ? (
-                                    <a
-                                        href={currentCvUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-sm text-indigo-400 hover:text-indigo-300"
-                                    >
-                                        Ansehen
-                                    </a>
-                                ) : null}
                             </div>
                         ) : (
                             <div className="rounded-lg bg-gray-900 px-4 py-3 text-sm text-gray-400 outline outline-1 outline-white/10">

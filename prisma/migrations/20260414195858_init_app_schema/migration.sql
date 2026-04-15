@@ -34,7 +34,6 @@ CREATE TYPE "CodingChallengeAttemptStatus" AS ENUM ('assigned', 'draft', 'submit
 -- CreateTable
 CREATE TABLE "User" (
     "id" UUID NOT NULL,
-    "email" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -46,11 +45,7 @@ CREATE TABLE "Profile" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "username" TEXT,
-    "displayName" TEXT,
     "avatarUrl" TEXT,
-    "targetRole" TEXT,
-    "experienceLevel" TEXT,
-    "onboardingCompletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -377,9 +372,6 @@ CREATE TABLE "CodingChallengeEvaluation" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Profile_userId_key" ON "Profile"("userId");
 
 -- CreateIndex
@@ -566,11 +558,12 @@ ALTER TABLE "CodingChallengeAttempt" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "CodingChallengeEvaluation" ENABLE ROW LEVEL SECURITY;
 
 -- User-scoped tables
-CREATE POLICY "Users can view own user row"
+CREATE POLICY "No direct access to user anchor rows"
 ON "User"
-FOR SELECT
+FOR ALL
 TO authenticated
-USING ("id" = auth.uid());
+USING (false)
+WITH CHECK (false);
 
 CREATE POLICY "Users can manage own profile"
 ON "Profile"
@@ -737,5 +730,75 @@ USING (
           AND "Interview"."userId" = auth.uid()
     )
 );
+
+INSERT INTO storage.buckets (
+    id,
+    name,
+    public,
+    file_size_limit,
+    allowed_mime_types
+)
+VALUES (
+    'avatars',
+    'avatars',
+    false,
+    5242880,
+    ARRAY['image/gif', 'image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Users can read own avatars"
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Users can upload own avatars"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Users can update own avatars"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+)
+WITH CHECK (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Users can delete own avatars"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "No direct access to coding challenge tasks"
+ON "CodingChallengeTask"
+FOR ALL
+TO authenticated
+USING (false)
+WITH CHECK (false);
+
+CREATE POLICY "No direct access to coding challenge task solutions"
+ON "CodingChallengeTaskSolution"
+FOR ALL
+TO authenticated
+USING (false)
+WITH CHECK (false);
 
 

@@ -1,64 +1,107 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
 
 import type { InterviewCvConfig } from "@/lib/cv/types";
+import type { InterviewQuestion } from "@/lib/interview";
 import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-voice-interview-controller";
 
+type PlannedQuestion = {
+    questionKey: string | null;
+    text: string;
+    priority: number | null;
+};
+
 type InterviewSessionValue = {
-  role: string;
-  config: InterviewCvConfig;
-  voiceInterview: ReturnType<typeof useVoiceInterviewController>;
+    interviewId: string;
+    role: string;
+    config: InterviewCvConfig;
+    plannedQuestions: PlannedQuestion[];
+    voiceInterview: ReturnType<typeof useVoiceInterviewController>;
 };
 
 const InterviewSessionContext = createContext<InterviewSessionValue | null>(null);
 
-function InterviewSessionScope({
-  role,
-  config,
-  children,
-}: {
-  role: string;
-  config: InterviewCvConfig;
-  children: ReactNode;
-}) {
-  const voiceInterview = useVoiceInterviewController(role);
+function mapPlannedQuestionsToQuestionPlan(
+    plannedQuestions: PlannedQuestion[]
+): InterviewQuestion[] {
+    return plannedQuestions.map((question, index) => ({
+        id: question.questionKey ?? `planned-${index + 1}`,
+        text: question.text,
+        priority: question.priority ?? (index + 1) * 10,
+    }));
+}
 
-  return (
-    <InterviewSessionContext.Provider value={{ role, config, voiceInterview }}>
-      {children}
-    </InterviewSessionContext.Provider>
-  );
+function InterviewSessionScope({
+    interviewId,
+    role,
+    config,
+    plannedQuestions,
+    children,
+}: {
+    interviewId: string;
+    role: string;
+    config: InterviewCvConfig;
+    plannedQuestions: PlannedQuestion[];
+    children: ReactNode;
+}) {
+    const voiceInterview = useVoiceInterviewController(
+        role,
+        plannedQuestions.length > 0
+            ? mapPlannedQuestionsToQuestionPlan(plannedQuestions)
+            : undefined,
+        interviewId
+    );
+
+    return (
+        <InterviewSessionContext.Provider
+            value={{
+                interviewId,
+                role,
+                config,
+                plannedQuestions,
+                voiceInterview,
+            }}
+        >
+            {children}
+        </InterviewSessionContext.Provider>
+    );
 }
 
 export function InterviewSessionProvider({
-  children,
+    interviewId,
+    config,
+    plannedQuestions,
+    children,
 }: {
-  children: ReactNode;
+    interviewId: string;
+    config: InterviewCvConfig;
+    plannedQuestions: PlannedQuestion[];
+    children: ReactNode;
 }) {
-  const searchParams = useSearchParams();
-  const role = searchParams.get("role") ?? "Backend Developer";
-  const config: InterviewCvConfig = {
-    role,
-    experience: searchParams.get("experience") ?? "",
-    companySize: searchParams.get("companySize") ?? "",
-    interviewType: searchParams.get("type") ?? "",
-  };
-  const sessionKey = [
-    config.role,
-    config.experience,
-    config.companySize,
-    config.interviewType,
-  ].join("|");
+    const role = config.role.trim() || "Backend Developer";
+    const sessionKey = [
+        interviewId,
+        role,
+        config.experience,
+        config.companySize,
+        config.interviewType,
+        plannedQuestions.map((question) => question.questionKey ?? question.text).join("|"),
+    ].join("|");
 
-  return (
-    <InterviewSessionScope key={sessionKey} role={role} config={config}>
-      {children}
-    </InterviewSessionScope>
-  );
+    return (
+        <InterviewSessionScope
+            key={sessionKey}
+            interviewId={interviewId}
+            role={role}
+            config={config}
+            plannedQuestions={plannedQuestions}
+        >
+            {children}
+        </InterviewSessionScope>
+    );
 }
 
 export function useOptionalInterviewSession() {
-  return useContext(InterviewSessionContext);
+    return useContext(InterviewSessionContext);
 }

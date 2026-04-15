@@ -8,7 +8,9 @@ import { defineConfig } from "prisma/config";
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(currentDir, "..", "..");
 const prismaDatasourceUrl =
-    process.env.DIRECT_URL?.trim() || process.env.DATABASE_URL?.trim();
+    process.env.DIRECT_URL?.trim() ||
+    process.env.DATABASE_URL?.trim() ||
+    "postgresql://postgres:postgres@localhost:5432/postgres";
 
 export default defineConfig({
     schema: path.join(currentDir, "prisma/schema.prisma"),
@@ -16,11 +18,7 @@ export default defineConfig({
         path: path.join(workspaceRoot, "prisma/migrations"),
     },
     engine: "classic",
-    ...(prismaDatasourceUrl
-        ? {
-              datasource: {
-                  url: prismaDatasourceUrl,
-              },
-          }
-        : {}),
+    datasource: {
+        url: prismaDatasourceUrl,
+    },
 });

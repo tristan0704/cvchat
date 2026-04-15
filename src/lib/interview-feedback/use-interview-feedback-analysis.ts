@@ -1,57 +1,54 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
+import { useEffect, useState } from "react";
 
-import {
-    loadInterviewFeedbackEvaluation,
-    persistInterviewFeedbackEvaluation,
-} from "@/lib/interview-feedback/storage"
 import type {
     InterviewFeedbackEvaluation,
     InterviewFeedbackRequest,
     InterviewFeedbackResponse,
-} from "@/lib/interview-feedback/types"
+} from "@/lib/interview-feedback/types";
 
 type UseInterviewFeedbackAnalysisArgs = InterviewFeedbackRequest & {
-    interviewId: string
-    enabled: boolean
-}
+    interviewId: string;
+    enabled: boolean;
+    existingEvaluation?: InterviewFeedbackEvaluation | null;
+};
 
 export function useInterviewFeedbackAnalysis(
-  args: UseInterviewFeedbackAnalysisArgs
+    args: UseInterviewFeedbackAnalysisArgs
 ) {
     const [evaluation, setEvaluation] =
-        useState<InterviewFeedbackEvaluation | null>(null)
+        useState<InterviewFeedbackEvaluation | null>(
+            args.existingEvaluation ?? null
+        );
     const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
-        "idle"
-    )
-    const [error, setError] = useState("")
+        args.existingEvaluation ? "ready" : "idle"
+    );
+    const [error, setError] = useState("");
 
     useEffect(() => {
-        const cachedEvaluation = loadInterviewFeedbackEvaluation(args.interviewId)
-
         if (
-            cachedEvaluation &&
-            cachedEvaluation.transcriptFingerprint === args.transcriptFingerprint
+            args.existingEvaluation &&
+            args.existingEvaluation.transcriptFingerprint === args.transcriptFingerprint
         ) {
-            setEvaluation(cachedEvaluation)
-            setStatus("ready")
-            setError("")
-            return
+            setEvaluation(args.existingEvaluation);
+            setStatus("ready");
+            setError("");
+            return;
         }
 
         if (!args.enabled || !args.transcript.trim()) {
-            setEvaluation(null)
-            setStatus("idle")
-            setError("")
-            return
+            setEvaluation(args.existingEvaluation ?? null);
+            setStatus(args.existingEvaluation ? "ready" : "idle");
+            setError("");
+            return;
         }
 
-        let cancelled = false
+        let cancelled = false;
 
         async function evaluateInterview() {
-            setStatus("loading")
-            setError("")
+            setStatus("loading");
+            setError("");
 
             try {
                 const response = await fetch("/api/interview/interview-feedback", {
@@ -60,64 +57,69 @@ export function useInterviewFeedbackAnalysis(
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
+                        interviewId: args.interviewId,
                         role: args.role,
                         experience: args.experience,
                         companySize: args.companySize,
                         interviewType: args.interviewType,
                         transcript: args.transcript,
                         transcriptFingerprint: args.transcriptFingerprint,
-                    } satisfies InterviewFeedbackRequest),
-                })
+                    }),
+                });
 
                 const data = (await response.json().catch(() => null)) as
                     | InterviewFeedbackResponse
                     | { error?: string }
-                    | null
+                    | null;
 
                 if (!response.ok || !data || !("evaluation" in data)) {
                     throw new Error(
                         (data && "error" in data && data.error) ||
                             "Interview-Feedback konnte nicht analysiert werden."
-                    )
+                    );
                 }
 
-                if (cancelled) return
+                if (cancelled) {
+                    return;
+                }
 
-                persistInterviewFeedbackEvaluation(args.interviewId, data.evaluation)
-                setEvaluation(data.evaluation)
-                setStatus("ready")
+                setEvaluation(data.evaluation);
+                setStatus("ready");
             } catch (requestError) {
-                if (cancelled) return
+                if (cancelled) {
+                    return;
+                }
 
-                setEvaluation(null)
-                setStatus("error")
+                setEvaluation(args.existingEvaluation ?? null);
+                setStatus("error");
                 setError(
                     requestError instanceof Error
                         ? requestError.message
                         : "Interview-Feedback konnte nicht analysiert werden."
-                )
+                );
             }
         }
 
-        void evaluateInterview()
+        void evaluateInterview();
 
         return () => {
-            cancelled = true
-        }
+            cancelled = true;
+        };
     }, [
         args.companySize,
         args.enabled,
+        args.existingEvaluation,
         args.experience,
         args.interviewId,
         args.interviewType,
         args.role,
         args.transcript,
         args.transcriptFingerprint,
-    ])
+    ]);
 
     return {
         evaluation,
         status,
         error,
-    }
+    };
 }

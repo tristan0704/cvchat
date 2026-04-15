@@ -8,9 +8,9 @@ export default async function RegisterPage({ searchParams }) {
   const params = await searchParams;
   const error = typeof params?.error === "string" ? params.error : "";
   const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
+  const { data } = await supabase.auth.getUser();
 
-  if (claimsData?.claims) {
+  if (data.user) {
     redirect("/home");
   }
 

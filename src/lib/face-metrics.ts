@@ -7,9 +7,7 @@
  *    derives head pose, eye openness, blink detection, mouth openness,
  *    and a speaking-likelihood heuristic from geometric ratios.
  * 3. Samples are collected at ~120 ms intervals (METRICS_SAMPLE_INTERVAL_MS).
- * 4. A rolling summary is persisted to sessionStorage every ~1 s so that
- *    other parts of the app can read aggregated metrics without coupling.
- * 5. On session stop, all collected snapshots are sent to the face-analysis
+ * 4. On session stop, all collected snapshots are sent to the face-analysis
  *    API for a full heuristic coaching report.
  *
  * Important assumptions:
@@ -58,22 +56,6 @@ export type FaceBodyMetricState = {
     invalidFrameCount: number
 }
 
-export type FaceBodyLanguageSummary = {
-    updatedAt: string
-    role: string | null
-    webcamActive: boolean
-    sampleCount: number
-    faceDetectedPct: number
-    avgFrontalFacingScore: number
-    avgHeadMovement: number
-    blinkCount: number
-    blinkRatePerMin: number
-    avgMouthOpenness: number
-    speakingActivityPct: number
-    current: FaceBodyLanguageSample | null
-    recentSamples: FaceBodyLanguageSample[]
-}
-
 export type ComputeBodyLanguageResult = {
     sample: FaceBodyLanguageSample
     nextState: FaceBodyMetricState
@@ -83,14 +65,8 @@ export type ComputeBodyLanguageResult = {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Session storage key for the face body-language metrics summary. */
-export const FACE_BODY_LANGUAGE_STORAGE_KEY = "faceBodyLanguageMetrics"
-
 /** Minimum interval between metric samples in the rAF loop (ms). */
 export const METRICS_SAMPLE_INTERVAL_MS = 120
-
-/** How often the rolling summary is written to sessionStorage (ms). */
-export const METRICS_WRITE_INTERVAL_MS = 1_000
 
 /** Maximum number of recent samples kept in the rolling window. */
 export const METRICS_RECENT_SAMPLE_LIMIT = 180
@@ -208,26 +184,8 @@ export function createEmptyMetricState(): FaceBodyMetricState {
     }
 }
 
-export function createEmptyBodyLanguageSummary(role?: string): FaceBodyLanguageSummary {
-    return {
-        updatedAt: new Date().toISOString(),
-        role: role?.trim() || null,
-        webcamActive: false,
-        sampleCount: 0,
-        faceDetectedPct: 0,
-        avgFrontalFacingScore: 0,
-        avgHeadMovement: 0,
-        blinkCount: 0,
-        blinkRatePerMin: 0,
-        avgMouthOpenness: 0,
-        speakingActivityPct: 0,
-        current: null,
-        recentSamples: [],
-    }
-}
-
 // ---------------------------------------------------------------------------
-// Snapshot & persistence helpers
+// Snapshot helpers
 // ---------------------------------------------------------------------------
 
 export function buildFaceLandmarkExportSnapshot(args: {
@@ -254,14 +212,6 @@ export function buildFaceLandmarkExportSnapshot(args: {
 
 export function keepRecentSamples(samples: FaceBodyLanguageSample[]): FaceBodyLanguageSample[] {
     return samples.slice(-METRICS_RECENT_SAMPLE_LIMIT)
-}
-
-export function persistBodyLanguageSummary(summary: FaceBodyLanguageSummary): void {
-    if (typeof window === "undefined") return
-    window.sessionStorage.setItem(FACE_BODY_LANGUAGE_STORAGE_KEY, JSON.stringify(summary))
-    if (process.env.NODE_ENV !== "production") {
-        console.log("[faceBodyLanguageMetrics]", summary)
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -456,65 +406,5 @@ export function computeBodyLanguageSample(
             blinkActive: blink,
             invalidFrameCount: 0,
         },
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Summary aggregation
-// ---------------------------------------------------------------------------
-
-/**
- * Aggregate all collected samples into a summary object.
- * Used both for the periodic sessionStorage writes and the final summary
- * when the webcam is stopped.
- */
-export function summarizeBodyLanguageSamples(args: {
-    allSamples: FaceBodyLanguageSample[]
-    recentSamples: FaceBodyLanguageSample[]
-    role?: string
-    webcamActive?: boolean
-}): FaceBodyLanguageSummary {
-    const { allSamples, recentSamples, role, webcamActive = false } = args
-
-    if (allSamples.length === 0) {
-        const empty = createEmptyBodyLanguageSummary(role)
-        return { ...empty, webcamActive }
-    }
-
-    const detectedSamples = allSamples.filter((sample) => sample.faceDetected)
-    const totalDurationMs = allSamples.length > 1
-        ? Math.max(1, allSamples[allSamples.length - 1].ts - allSamples[0].ts)
-        : METRICS_SAMPLE_INTERVAL_MS
-    const speakingSamples = detectedSamples.filter(
-        (sample) => sample.speakingLikelihood >= SPEAKING_ACTIVITY_THRESHOLD
-    )
-    const blinkCount = detectedSamples.reduce((count, sample, index) => {
-        const previous = detectedSamples[index - 1]
-        return count + (!previous?.blink && sample.blink ? 1 : 0)
-    }, 0)
-
-    return {
-        updatedAt: new Date().toISOString(),
-        role: role?.trim() || null,
-        webcamActive,
-        sampleCount: allSamples.length,
-        faceDetectedPct: roundMetric(detectedSamples.length / allSamples.length),
-        avgFrontalFacingScore: roundMetric(
-            detectedSamples.reduce((sum, sample) => sum + sample.frontalFacingScore, 0) /
-                Math.max(1, detectedSamples.length)
-        ),
-        avgHeadMovement: roundMetric(
-            detectedSamples.reduce((sum, sample) => sum + sample.headMovement, 0) /
-                Math.max(1, detectedSamples.length)
-        ),
-        blinkCount,
-        blinkRatePerMin: roundMetric(blinkCount / (totalDurationMs / 60_000), 2),
-        avgMouthOpenness: roundMetric(
-            detectedSamples.reduce((sum, sample) => sum + sample.mouthOpenness, 0) /
-                Math.max(1, detectedSamples.length)
-        ),
-        speakingActivityPct: roundMetric(speakingSamples.length / Math.max(1, detectedSamples.length)),
-        current: allSamples[allSamples.length - 1] ?? null,
-        recentSamples: recentSamples.length > 0 ? recentSamples : keepRecentSamples(allSamples),
     }
 }

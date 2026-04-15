@@ -2,81 +2,82 @@
 
 import { useEffect, useState } from "react";
 
-import {
-  loadCodingChallengeEvaluation,
-  persistCodingChallengeEvaluation,
-} from "@/lib/coding-challenge/storage";
 import type {
-  CodingChallengeEvaluation,
-  CodingChallengeEvaluationRequest,
-  CodingChallengeEvaluationResponse,
+    CodingChallengeEvaluation,
+    CodingChallengeEvaluationRequest,
+    CodingChallengeEvaluationResponse,
 } from "@/lib/coding-challenge/types";
 
 type UseCodingChallengeSubmissionArgs = {
-  interviewId: string;
+    interviewId: string;
+    initialEvaluation?: CodingChallengeEvaluation | null;
 };
 
 const FALLBACK_ERROR = "Unable to submit coding challenge";
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : FALLBACK_ERROR;
+    return error instanceof Error ? error.message : FALLBACK_ERROR;
 }
 
 export function useCodingChallengeSubmission({
-  interviewId,
+    interviewId,
+    initialEvaluation = null,
 }: UseCodingChallengeSubmissionArgs) {
-  const [evaluation, setEvaluation] =
-    useState<CodingChallengeEvaluation | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
+    const [evaluation, setEvaluation] =
+        useState<CodingChallengeEvaluation | null>(initialEvaluation);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
-  useEffect(() => {
-    setEvaluation(loadCodingChallengeEvaluation(interviewId));
-    setSubmitError("");
-  }, [interviewId]);
+    useEffect(() => {
+        setEvaluation(initialEvaluation);
+        setSubmitError("");
+    }, [initialEvaluation, interviewId]);
 
-  async function submitSolution(payload: CodingChallengeEvaluationRequest) {
-    setIsSubmitting(true);
-    setSubmitError("");
+    async function submitSolution(payload: CodingChallengeEvaluationRequest) {
+        setIsSubmitting(true);
+        setSubmitError("");
 
-    try {
-      const response = await fetch("/api/interview/coding-challenge", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+        try {
+            const response = await fetch("/api/interview/coding-challenge", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    interviewId,
+                    ...payload,
+                }),
+            });
 
-      const data = (await response.json().catch(() => null)) as
-        | CodingChallengeEvaluationResponse
-        | { error?: string }
-        | null;
+            const data = (await response.json().catch(() => null)) as
+                | CodingChallengeEvaluationResponse
+                | { error?: string }
+                | null;
 
-      if (!response.ok || !data || !("evaluation" in data) || !data.evaluation) {
-        throw new Error(
-          data && "error" in data && typeof data.error === "string"
-            ? data.error
-            : FALLBACK_ERROR
-        );
-      }
+            if (!response.ok || !data || !("evaluation" in data) || !data.evaluation) {
+                throw new Error(
+                    data && "error" in data && typeof data.error === "string"
+                        ? data.error
+                        : FALLBACK_ERROR
+                );
+            }
 
-      setEvaluation(data.evaluation);
-      persistCodingChallengeEvaluation(interviewId, data.evaluation);
-      return data.evaluation;
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setSubmitError(message);
-      return null;
-    } finally {
-      setIsSubmitting(false);
+            setEvaluation(data.evaluation);
+            return data;
+        } catch (error) {
+            const message = getErrorMessage(error);
+            setSubmitError(message);
+            return null;
+        } finally {
+            setIsSubmitting(false);
+        }
     }
-  }
 
-  return {
-    evaluation,
-    isSubmitting,
-    submitError,
-    submitSolution,
-  };
+    return {
+        evaluation,
+        isSubmitting,
+        submitError,
+        submitSolution,
+        setEvaluation,
+    };
 }

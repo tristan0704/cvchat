@@ -5,9 +5,9 @@ import { createClient } from "@/db-backend/auth/server-client";
 
 export async function POST(request: NextRequest) {
     const supabase = await createClient();
-    const { data: claimsData } = await supabase.auth.getClaims();
+    const { data } = await supabase.auth.getUser();
 
-    if (claimsData?.claims) {
+    if (data.user) {
         await supabase.auth.signOut();
     }
 

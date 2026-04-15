@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { User } from "@supabase/supabase-js";
+
 import { createClient } from "@/db-backend/auth/server-client";
 import { db } from "@/db-backend/prisma/client";
 
@@ -8,75 +10,77 @@ type AuthIdentity = {
     id: string;
 };
 
-function readAuthIdentity(claims: unknown): AuthIdentity | null {
-    if (!claims || typeof claims !== "object") {
-        return null;
-    }
+type AppProfile = {
+    username: string | null;
+};
 
-    const { email, sub } = claims as {
-        email?: unknown;
-        sub?: unknown;
-    };
+export type CurrentAppUser = {
+    email: string;
+    id: string;
+    profile: AppProfile | null;
+};
 
-    if (typeof sub !== "string" || typeof email !== "string") {
+function readAuthIdentity(user: User | null): AuthIdentity | null {
+    if (!user?.id || !user.email) {
         return null;
     }
 
     return {
-        email,
-        id: sub,
+        email: user.email,
+        id: user.id,
     };
 }
 
 async function ensureAppUser(identity: AuthIdentity) {
-    await db.user.upsert({
-        where: {
-            id: identity.id,
-        },
-        update: {
-            email: identity.email,
-        },
-        create: {
-            email: identity.email,
-            id: identity.id,
-        },
-    });
+    const [, , profile] = await db.$transaction([
+        db.user.upsert({
+            where: {
+                id: identity.id,
+            },
+            update: {},
+            create: {
+                id: identity.id,
+            },
+        }),
+        db.userSettings.upsert({
+            where: {
+                userId: identity.id,
+            },
+            update: {},
+            create: {
+                userId: identity.id,
+            },
+        }),
+        db.profile.upsert({
+            where: {
+                userId: identity.id,
+            },
+            update: {},
+            create: {
+                userId: identity.id,
+            },
+            select: {
+                username: true,
+            },
+        }),
+    ]);
 
-    await db.userSettings.upsert({
-        where: {
-            userId: identity.id,
-        },
-        update: {},
-        create: {
-            userId: identity.id,
-        },
-    });
-
-    await db.profile.upsert({
-        where: {
-            userId: identity.id,
-        },
-        update: {},
-        create: {
-            userId: identity.id,
-        },
-    });
-
-    return db.user.findUnique({
-        where: {
-            id: identity.id,
-        },
-        include: {
-            profile: true,
-            settings: true,
-        },
-    });
+    return {
+        email: identity.email,
+        id: identity.id,
+        profile,
+    } satisfies CurrentAppUser;
 }
 
 export async function getCurrentAppUser() {
     const supabase = await createClient();
-    const { data: claimsData } = await supabase.auth.getClaims();
-    const identity = readAuthIdentity(claimsData?.claims ?? null);
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error) {
+        return null;
+    }
+
+    const identity = readAuthIdentity(data.user);
 
     if (!identity) {
         return null;

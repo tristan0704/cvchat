@@ -1,0 +1,1008 @@
+import "server-only";
+
+import type {
+    FaceAnalysisOverallStatus,
+    InterviewQaPairSource,
+    InterviewRecapStatus,
+    InterviewStatus,
+    InterviewTranscriptStatus,
+    TranscriptSpeaker,
+} from "@prisma/client";
+
+import { db } from "@/db-backend/prisma/client";
+import { getLatestCodingChallengeAttempt } from "@/db-backend/coding-challenge/coding-challenge-service";
+import { buildTranscriptQaExport } from "@/lib/interview-transcript";
+import type { TranscriptEntry, TranscriptQaPair } from "@/lib/interview-transcript/types";
+import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
+import type { FaceAnalysisReport } from "@/lib/face-analysis";
+import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback/types";
+import { getInterviewQuestionPool } from "@/lib/interview";
+import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
+
+export type InterviewListItem = {
+    id: string;
+    title: string;
+    role: string;
+    status: InterviewStatus;
+    currentStep: number;
+    createdAt: string;
+    startedAt: string | null;
+    completedAt: string | null;
+};
+
+export type InterviewDetail = {
+    id: string;
+    title: string;
+    role: string;
+    experience: string;
+    companySize: string;
+    interviewType: string;
+    currentStep: number;
+    status: InterviewStatus;
+    createdAt: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    cv: {
+        id: string;
+        fileName: string;
+        fileSizeBytes: number | null;
+        uploadedAt: string;
+    } | null;
+    plannedQuestions: Array<{
+        id: string;
+        sequence: number;
+        questionKey: string | null;
+        text: string;
+        priority: number | null;
+    }>;
+    cvFeedbackAnalysisId: string | null;
+    cvFeedback: CvFeedbackResult | null;
+    transcript: {
+        transcriptStatus: InterviewTranscriptStatus;
+        transcriptError: string;
+        candidateTranscript: string;
+        transcriptExport: string;
+        transcriptFingerprint: string;
+        interviewerQuestions: string[];
+        recapStatus: InterviewRecapStatus;
+        recapError: string;
+        recapCaptureNote: string;
+        entries: Array<{
+            id: string;
+            sequence: number;
+            speaker: TranscriptSpeaker;
+            text: string;
+        }>;
+        qaPairs: Array<{
+            id: string;
+            sequence: number;
+            question: string;
+            answer: string;
+            source: InterviewQaPairSource;
+        }>;
+    } | null;
+    timingMetrics: InterviewTimingMetrics | null;
+    feedback: InterviewFeedbackEvaluation | null;
+    faceAnalysis: FaceAnalysisReport | null;
+    codingChallenge: Awaited<ReturnType<typeof getLatestCodingChallengeAttempt>>;
+};
+
+function normalizeConfig(config: InterviewCvConfig): InterviewCvConfig {
+    return {
+        role: config.role.trim() || "Backend Developer",
+        experience: config.experience.trim(),
+        companySize: config.companySize.trim(),
+        interviewType: config.interviewType.trim(),
+    };
+}
+
+function buildInterviewTitle(config: InterviewCvConfig) {
+    const role = config.role.trim() || "Backend Developer";
+    return `${role} Interview`;
+}
+
+function resolveStatusForStep(step: number): InterviewStatus {
+    if (step >= 6) {
+        return "completed";
+    }
+
+    if (step >= 2) {
+        return "in_progress";
+    }
+
+    return "ready";
+}
+
+function mapInterviewListItem(item: {
+    id: string;
+    title: string | null;
+    role: string;
+    status: InterviewStatus;
+    currentStep: number;
+    createdAt: Date;
+    startedAt: Date | null;
+    completedAt: Date | null;
+}) {
+    return {
+        id: item.id,
+        title: item.title ?? buildInterviewTitle({
+            role: item.role,
+            experience: "",
+            companySize: "",
+            interviewType: "",
+        }),
+        role: item.role,
+        status: item.status,
+        currentStep: item.currentStep,
+        createdAt: item.createdAt.toISOString(),
+        startedAt: item.startedAt?.toISOString() ?? null,
+        completedAt: item.completedAt?.toISOString() ?? null,
+    } satisfies InterviewListItem;
+}
+
+function mapInterviewFeedback(feedback: {
+    analyzedAt: Date;
+    role: string;
+    transcriptFingerprint: string;
+    overallScore: number;
+    passedLikely: boolean;
+    summary: string;
+    communicationScore: number;
+    communicationFeedback: string;
+    answerQualityScore: number;
+    answerQualityFeedback: string;
+    roleFitScore: number;
+    roleFitFeedback: string;
+    strengths: string[];
+    issues: string[];
+    improvements: string[];
+} | null): InterviewFeedbackEvaluation | null {
+    if (!feedback) {
+        return null;
+    }
+
+    return {
+        analyzedAt: feedback.analyzedAt.toISOString(),
+        role: feedback.role,
+        transcriptFingerprint: feedback.transcriptFingerprint,
+        overallScore: feedback.overallScore,
+        passedLikely: feedback.passedLikely,
+        summary: feedback.summary,
+        communication: {
+            score: feedback.communicationScore,
+            feedback: feedback.communicationFeedback,
+        },
+        answerQuality: {
+            score: feedback.answerQualityScore,
+            feedback: feedback.answerQualityFeedback,
+        },
+        roleFit: {
+            score: feedback.roleFitScore,
+            feedback: feedback.roleFitFeedback,
+        },
+        strengths: feedback.strengths,
+        issues: feedback.issues,
+        improvements: feedback.improvements,
+    };
+}
+
+function mapFaceAnalysis(faceAnalysis: {
+    analysisVersion: string;
+    mode: string;
+    role: string | null;
+    startedAt: Date;
+    endedAt: Date;
+    durationMs: number;
+    durationLabel: string;
+    sampleCount: number;
+    windowCount: number;
+    overallScore: number;
+    overallStatus: FaceAnalysisOverallStatus;
+    faceDetectedPct: number;
+    avgFrontalFacingScore: number;
+    avgHeadMovement: number;
+    avgEyeOpenness: number;
+    avgMouthOpenness: number;
+    avgSpeakingLikelihood: number;
+    speakingActivityPct: number;
+    blinkCount: number;
+    blinkRatePerMin: number;
+    stableWindowPct: number;
+    headline: string;
+    strengths: string[];
+    risks: string[];
+    nextSteps: string[];
+    limitations: string[];
+    parameters: unknown;
+    alerts: unknown;
+    windows: unknown;
+} | null): FaceAnalysisReport | null {
+    if (!faceAnalysis) {
+        return null;
+    }
+
+    return {
+        analysisVersion: faceAnalysis.analysisVersion,
+        mode: faceAnalysis.mode as FaceAnalysisReport["mode"],
+        role: faceAnalysis.role,
+        startedAt: faceAnalysis.startedAt.toISOString(),
+        endedAt: faceAnalysis.endedAt.toISOString(),
+        durationMs: faceAnalysis.durationMs,
+        durationLabel: faceAnalysis.durationLabel,
+        sampleCount: faceAnalysis.sampleCount,
+        windowCount: faceAnalysis.windowCount,
+        overallScore: faceAnalysis.overallScore,
+        overallStatus: faceAnalysis.overallStatus as FaceAnalysisReport["overallStatus"],
+        globalMetrics: {
+            faceDetectedPct: faceAnalysis.faceDetectedPct,
+            avgFrontalFacingScore: faceAnalysis.avgFrontalFacingScore,
+            avgHeadMovement: faceAnalysis.avgHeadMovement,
+            avgEyeOpenness: faceAnalysis.avgEyeOpenness,
+            avgMouthOpenness: faceAnalysis.avgMouthOpenness,
+            avgSpeakingLikelihood: faceAnalysis.avgSpeakingLikelihood,
+            speakingActivityPct: faceAnalysis.speakingActivityPct,
+            blinkCount: faceAnalysis.blinkCount,
+            blinkRatePerMin: faceAnalysis.blinkRatePerMin,
+            stableWindowPct: faceAnalysis.stableWindowPct,
+        },
+        parameters: Array.isArray(faceAnalysis.parameters)
+            ? (faceAnalysis.parameters as FaceAnalysisReport["parameters"])
+            : [],
+        alerts: Array.isArray(faceAnalysis.alerts)
+            ? (faceAnalysis.alerts as FaceAnalysisReport["alerts"])
+            : [],
+        windows: Array.isArray(faceAnalysis.windows)
+            ? (faceAnalysis.windows as FaceAnalysisReport["windows"])
+            : [],
+        summary: {
+            headline: faceAnalysis.headline,
+            strengths: faceAnalysis.strengths,
+            risks: faceAnalysis.risks,
+            nextSteps: faceAnalysis.nextSteps,
+        },
+        limitations: faceAnalysis.limitations,
+    };
+}
+
+function mapTimingMetrics(metrics: {
+    answerCount: number;
+    totalCandidateSpeechMs: number;
+    averageAnswerDurationMs: number;
+    longestAnswerDurationMs: number;
+    shortestAnswerDurationMs: number;
+    averageResponseLatencyMs: number;
+    longestResponseLatencyMs: number;
+    candidateWordsPerMinute: number | null;
+} | null): InterviewTimingMetrics | null {
+    if (!metrics) {
+        return null;
+    }
+
+    return {
+        answerCount: metrics.answerCount,
+        totalCandidateSpeechMs: metrics.totalCandidateSpeechMs,
+        averageAnswerDurationMs: metrics.averageAnswerDurationMs,
+        longestAnswerDurationMs: metrics.longestAnswerDurationMs,
+        shortestAnswerDurationMs: metrics.shortestAnswerDurationMs,
+        averageResponseLatencyMs: metrics.averageResponseLatencyMs,
+        longestResponseLatencyMs: metrics.longestResponseLatencyMs,
+        candidateWordsPerMinute: metrics.candidateWordsPerMinute,
+    };
+}
+
+function mapCvFeedbackAnalysis(analysis: {
+    analyzedAt: Date;
+    fileName: string | null;
+    role: string;
+    experience: string;
+    companySize: string;
+    interviewType: string;
+    overallScore: number;
+    keywordScore: number;
+    llmScore: number;
+    blendedScore: number;
+    keywordWeight: number;
+    llmWeight: number;
+    sectionsScore: number;
+    sectionsFeedback: string;
+    impactScore: number;
+    impactFeedback: string;
+    lengthScore: number;
+    lengthFeedback: string;
+    contactScore: number;
+    contactFeedback: string;
+    clarityScore: number;
+    clarityFeedback: string;
+    improvements: string[];
+    roleMatchScore: number;
+    matchedKeywords: string[];
+    missingMustHaveKeywords: string[];
+    niceToHaveMatches: string[];
+    bonusMatches: string[];
+    roleSummary: string;
+} | null): CvFeedbackResult | null {
+    if (!analysis) {
+        return null;
+    }
+
+    return {
+        fileName: analysis.fileName ?? "Lebenslauf.pdf",
+        analyzedAt: analysis.analyzedAt.toISOString(),
+        config: {
+            role: analysis.role,
+            experience: analysis.experience,
+            companySize: analysis.companySize,
+            interviewType: analysis.interviewType,
+        },
+        quality: {
+            overallScore: analysis.overallScore,
+            sections: {
+                score: analysis.sectionsScore,
+                feedback: analysis.sectionsFeedback,
+            },
+            impact: {
+                score: analysis.impactScore,
+                feedback: analysis.impactFeedback,
+            },
+            length: {
+                score: analysis.lengthScore,
+                feedback: analysis.lengthFeedback,
+            },
+            contact: {
+                score: analysis.contactScore,
+                feedback: analysis.contactFeedback,
+            },
+            clarity: {
+                score: analysis.clarityScore,
+                feedback: analysis.clarityFeedback,
+            },
+            improvements: analysis.improvements,
+        },
+        roleAnalysis: {
+            score: analysis.roleMatchScore,
+            matched: analysis.matchedKeywords,
+            missingMustHave: analysis.missingMustHaveKeywords,
+            niceToHaveMatches: analysis.niceToHaveMatches,
+            bonusMatches: analysis.bonusMatches,
+            summary: analysis.roleSummary,
+        },
+        scoreBreakdown: {
+            keywordScore: analysis.keywordScore,
+            llmScore: analysis.llmScore,
+            blendedScore: analysis.blendedScore,
+            keywordWeight: analysis.keywordWeight,
+            llmWeight: analysis.llmWeight,
+        },
+    };
+}
+
+export async function createInterviewForUser(userId: string, config: InterviewCvConfig) {
+    const normalizedConfig = normalizeConfig(config);
+    const activeCv = await db.cvVersion.findFirst({
+        where: {
+            userId,
+            isActive: true,
+        },
+        orderBy: {
+            uploadedAt: "desc",
+        },
+        select: {
+            id: true,
+        },
+    });
+    const questionPlan = getInterviewQuestionPool(normalizedConfig.role);
+
+    const interview = await db.interview.create({
+        data: {
+            userId,
+            cvVersionId: activeCv?.id ?? null,
+            title: buildInterviewTitle(normalizedConfig),
+            role: normalizedConfig.role,
+            experience: normalizedConfig.experience,
+            companySize: normalizedConfig.companySize,
+            interviewType: normalizedConfig.interviewType,
+            currentStep: 1,
+            status: "ready",
+            plannedQuestions: {
+                create: questionPlan.map((question, index) => ({
+                    sequence: index + 1,
+                    questionKey: question.id,
+                    text: question.text,
+                    priority: question.priority,
+                })),
+            },
+        },
+        select: {
+            id: true,
+            title: true,
+            role: true,
+            status: true,
+            currentStep: true,
+            createdAt: true,
+            startedAt: true,
+            completedAt: true,
+        },
+    });
+
+    return mapInterviewListItem(interview);
+}
+
+export async function listInterviewsForUser(userId: string) {
+    const interviews = await db.interview.findMany({
+        where: {
+            userId,
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+        select: {
+            id: true,
+            title: true,
+            role: true,
+            status: true,
+            currentStep: true,
+            createdAt: true,
+            startedAt: true,
+            completedAt: true,
+        },
+    });
+
+    return interviews.map(mapInterviewListItem);
+}
+
+export async function getInterviewDetailForUser(userId: string, interviewId: string) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        include: {
+            cvVersion: {
+                select: {
+                    id: true,
+                    fileName: true,
+                    fileSizeBytes: true,
+                    uploadedAt: true,
+                },
+            },
+            plannedQuestions: {
+                orderBy: {
+                    sequence: "asc",
+                },
+            },
+            cvFeedbackAnalysis: true,
+            transcript: {
+                include: {
+                    entries: {
+                        orderBy: {
+                            sequence: "asc",
+                        },
+                    },
+                    qaPairs: {
+                        orderBy: {
+                            sequence: "asc",
+                        },
+                    },
+                },
+            },
+            timingMetrics: true,
+            feedback: true,
+            faceAnalysis: true,
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    return {
+        id: interview.id,
+        title:
+            interview.title ??
+            buildInterviewTitle({
+                role: interview.role,
+                experience: interview.experience,
+                companySize: interview.companySize,
+                interviewType: interview.interviewType,
+            }),
+        role: interview.role,
+        experience: interview.experience,
+        companySize: interview.companySize,
+        interviewType: interview.interviewType,
+        currentStep: interview.currentStep,
+        status: interview.status,
+        createdAt: interview.createdAt.toISOString(),
+        startedAt: interview.startedAt?.toISOString() ?? null,
+        completedAt: interview.completedAt?.toISOString() ?? null,
+        cv: interview.cvVersion
+            ? {
+                  id: interview.cvVersion.id,
+                  fileName: interview.cvVersion.fileName ?? "Lebenslauf.pdf",
+                  fileSizeBytes: interview.cvVersion.fileSizeBytes,
+                  uploadedAt: interview.cvVersion.uploadedAt.toISOString(),
+              }
+            : null,
+        plannedQuestions: interview.plannedQuestions.map((question) => ({
+            id: question.id,
+            sequence: question.sequence,
+            questionKey: question.questionKey,
+            text: question.text,
+            priority: question.priority,
+        })),
+        cvFeedbackAnalysisId: interview.cvFeedbackAnalysisId,
+        cvFeedback: mapCvFeedbackAnalysis(interview.cvFeedbackAnalysis),
+        transcript: interview.transcript
+            ? {
+                  transcriptStatus: interview.transcript.transcriptStatus,
+                  transcriptError: interview.transcript.transcriptError ?? "",
+                  candidateTranscript:
+                      interview.transcript.candidateTranscript ?? "",
+                  transcriptExport: interview.transcript.transcriptExport ?? "",
+                  transcriptFingerprint:
+                      interview.transcript.transcriptFingerprint ?? "",
+                  interviewerQuestions: interview.transcript.interviewerQuestions,
+                  recapStatus: interview.transcript.recapStatus,
+                  recapError: interview.transcript.recapError ?? "",
+                  recapCaptureNote:
+                      interview.transcript.recapCaptureNote ?? "",
+                  entries: interview.transcript.entries.map((entry) => ({
+                      id: entry.id,
+                      sequence: entry.sequence,
+                      speaker: entry.speaker,
+                      text: entry.text,
+                  })),
+                  qaPairs: interview.transcript.qaPairs.map((pair) => ({
+                      id: pair.id,
+                      sequence: pair.sequence,
+                      question: pair.question,
+                      answer: pair.answer,
+                      source: pair.source,
+                  })),
+              }
+            : null,
+        timingMetrics: mapTimingMetrics(interview.timingMetrics),
+        feedback: mapInterviewFeedback(interview.feedback),
+        faceAnalysis: mapFaceAnalysis(interview.faceAnalysis),
+        codingChallenge: await getLatestCodingChallengeAttempt(userId, interview.id),
+    } satisfies InterviewDetail;
+}
+
+export async function updateInterviewProgressForUser(args: {
+    userId: string;
+    interviewId: string;
+    currentStep: number;
+}) {
+    const currentStep = Math.max(1, Math.min(6, Math.round(args.currentStep)));
+    const status = resolveStatusForStep(currentStep);
+
+    const existing = await db.interview.findFirst({
+        where: {
+            id: args.interviewId,
+            userId: args.userId,
+        },
+        select: {
+            id: true,
+            startedAt: true,
+            completedAt: true,
+        },
+    });
+
+    if (!existing) {
+        throw new Error("Interview not found");
+    }
+
+    const updatedInterview = await db.interview.update({
+        where: {
+            id: existing.id,
+        },
+        data: {
+            currentStep,
+            status,
+            startedAt:
+                currentStep >= 2 ? existing.startedAt ?? new Date() : existing.startedAt,
+            completedAt:
+                currentStep >= 6
+                    ? existing.completedAt ?? new Date()
+                    : currentStep < 6
+                      ? null
+                      : existing.completedAt,
+        },
+        select: {
+            id: true,
+            title: true,
+            role: true,
+            status: true,
+            currentStep: true,
+            createdAt: true,
+            startedAt: true,
+            completedAt: true,
+        },
+    });
+
+    return mapInterviewListItem(updatedInterview);
+}
+
+export async function deleteInterviewForUser(userId: string, interviewId: string) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!interview) {
+        return false;
+    }
+
+    await db.interview.delete({
+        where: {
+            id: interview.id,
+        },
+    });
+
+    return true;
+}
+
+export async function saveInterviewTranscript(args: {
+    userId: string;
+    interviewId: string;
+    role: string;
+    transcriptStatus: InterviewTranscriptStatus;
+    transcriptError?: string;
+    candidateTranscript?: string;
+    transcriptFingerprint?: string;
+    interviewerQuestions?: string[];
+    entries?: TranscriptEntry[];
+    qaPairs?: TranscriptQaPair[];
+    recapStatus?: InterviewRecapStatus;
+    recapError?: string;
+    recapCaptureNote?: string;
+}) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: args.interviewId,
+            userId: args.userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!interview) {
+        throw new Error("Interview not found");
+    }
+
+    const entries = args.entries ?? [];
+    const qaPairs = args.qaPairs ?? [];
+    const transcriptExport =
+        args.transcriptStatus === "ready"
+            ? buildTranscriptQaExport(args.role, entries, {
+                  qaPairs,
+                  candidateTranscript: args.candidateTranscript ?? "",
+              })
+            : "";
+
+    await db.interviewTranscript.upsert({
+        where: {
+            interviewId: interview.id,
+        },
+        update: {
+            transcriptStatus: args.transcriptStatus,
+            transcriptError: args.transcriptError?.trim() || null,
+            candidateTranscript: args.candidateTranscript?.trim() || null,
+            transcriptExport: transcriptExport || null,
+            transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
+            interviewerQuestions: args.interviewerQuestions ?? [],
+            recapStatus: args.recapStatus ?? "idle",
+            recapError: args.recapError?.trim() || null,
+            recapCaptureNote: args.recapCaptureNote?.trim() || null,
+            entries: {
+                deleteMany: {},
+                create: entries.map((entry, index) => ({
+                    sequence: index + 1,
+                    speaker: entry.speaker,
+                    text: entry.text,
+                })),
+            },
+            qaPairs: {
+                deleteMany: {},
+                create: qaPairs.map((pair, index) => ({
+                    sequence: index + 1,
+                    question: pair.question,
+                    answer: pair.answer,
+                    source: "ai_mapped",
+                })),
+            },
+        },
+        create: {
+            interviewId: interview.id,
+            transcriptStatus: args.transcriptStatus,
+            transcriptError: args.transcriptError?.trim() || null,
+            candidateTranscript: args.candidateTranscript?.trim() || null,
+            transcriptExport: transcriptExport || null,
+            transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
+            interviewerQuestions: args.interviewerQuestions ?? [],
+            recapStatus: args.recapStatus ?? "idle",
+            recapError: args.recapError?.trim() || null,
+            recapCaptureNote: args.recapCaptureNote?.trim() || null,
+            entries: {
+                create: entries.map((entry, index) => ({
+                    sequence: index + 1,
+                    speaker: entry.speaker,
+                    text: entry.text,
+                })),
+            },
+            qaPairs: {
+                create: qaPairs.map((pair, index) => ({
+                    sequence: index + 1,
+                    question: pair.question,
+                    answer: pair.answer,
+                    source: "ai_mapped",
+                })),
+            },
+        },
+    });
+}
+
+export async function upsertInterviewTimingMetrics(args: {
+    userId: string;
+    interviewId: string;
+    metrics: InterviewTimingMetrics;
+}) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: args.interviewId,
+            userId: args.userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!interview) {
+        throw new Error("Interview not found");
+    }
+
+    return db.interviewTimingMetrics.upsert({
+        where: {
+            interviewId: interview.id,
+        },
+        update: {
+            answerCount: args.metrics.answerCount,
+            totalCandidateSpeechMs: args.metrics.totalCandidateSpeechMs,
+            averageAnswerDurationMs: args.metrics.averageAnswerDurationMs,
+            longestAnswerDurationMs: args.metrics.longestAnswerDurationMs,
+            shortestAnswerDurationMs: args.metrics.shortestAnswerDurationMs,
+            averageResponseLatencyMs: args.metrics.averageResponseLatencyMs,
+            longestResponseLatencyMs: args.metrics.longestResponseLatencyMs,
+            candidateWordsPerMinute: args.metrics.candidateWordsPerMinute,
+        },
+        create: {
+            interviewId: interview.id,
+            answerCount: args.metrics.answerCount,
+            totalCandidateSpeechMs: args.metrics.totalCandidateSpeechMs,
+            averageAnswerDurationMs: args.metrics.averageAnswerDurationMs,
+            longestAnswerDurationMs: args.metrics.longestAnswerDurationMs,
+            shortestAnswerDurationMs: args.metrics.shortestAnswerDurationMs,
+            averageResponseLatencyMs: args.metrics.averageResponseLatencyMs,
+            longestResponseLatencyMs: args.metrics.longestResponseLatencyMs,
+            candidateWordsPerMinute: args.metrics.candidateWordsPerMinute,
+        },
+    });
+}
+
+export async function saveInterviewFeedbackForUser(args: {
+    userId: string;
+    interviewId: string;
+    evaluation: InterviewFeedbackEvaluation;
+}) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: args.interviewId,
+            userId: args.userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!interview) {
+        throw new Error("Interview not found");
+    }
+
+    return db.interviewFeedback.upsert({
+        where: {
+            interviewId: interview.id,
+        },
+        update: {
+            analyzedAt: new Date(args.evaluation.analyzedAt),
+            role: args.evaluation.role,
+            transcriptFingerprint: args.evaluation.transcriptFingerprint,
+            overallScore: args.evaluation.overallScore,
+            passedLikely: args.evaluation.passedLikely,
+            summary: args.evaluation.summary,
+            communicationScore: args.evaluation.communication.score,
+            communicationFeedback: args.evaluation.communication.feedback,
+            answerQualityScore: args.evaluation.answerQuality.score,
+            answerQualityFeedback: args.evaluation.answerQuality.feedback,
+            roleFitScore: args.evaluation.roleFit.score,
+            roleFitFeedback: args.evaluation.roleFit.feedback,
+            strengths: args.evaluation.strengths,
+            issues: args.evaluation.issues,
+            improvements: args.evaluation.improvements,
+        },
+        create: {
+            interviewId: interview.id,
+            analyzedAt: new Date(args.evaluation.analyzedAt),
+            role: args.evaluation.role,
+            transcriptFingerprint: args.evaluation.transcriptFingerprint,
+            overallScore: args.evaluation.overallScore,
+            passedLikely: args.evaluation.passedLikely,
+            summary: args.evaluation.summary,
+            communicationScore: args.evaluation.communication.score,
+            communicationFeedback: args.evaluation.communication.feedback,
+            answerQualityScore: args.evaluation.answerQuality.score,
+            answerQualityFeedback: args.evaluation.answerQuality.feedback,
+            roleFitScore: args.evaluation.roleFit.score,
+            roleFitFeedback: args.evaluation.roleFit.feedback,
+            strengths: args.evaluation.strengths,
+            issues: args.evaluation.issues,
+            improvements: args.evaluation.improvements,
+        },
+    });
+}
+
+export async function saveInterviewFaceAnalysisForUser(args: {
+    userId: string;
+    interviewId: string;
+    report: FaceAnalysisReport;
+}) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: args.interviewId,
+            userId: args.userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!interview) {
+        throw new Error("Interview not found");
+    }
+
+    return db.interviewFaceAnalysis.upsert({
+        where: {
+            interviewId: interview.id,
+        },
+        update: {
+            analyzedAt: new Date(),
+            analysisVersion: args.report.analysisVersion,
+            mode: args.report.mode,
+            role: args.report.role,
+            startedAt: new Date(args.report.startedAt),
+            endedAt: new Date(args.report.endedAt),
+            durationMs: args.report.durationMs,
+            durationLabel: args.report.durationLabel,
+            sampleCount: args.report.sampleCount,
+            windowCount: args.report.windowCount,
+            overallScore: args.report.overallScore,
+            overallStatus: args.report.overallStatus,
+            faceDetectedPct: args.report.globalMetrics.faceDetectedPct,
+            avgFrontalFacingScore:
+                args.report.globalMetrics.avgFrontalFacingScore,
+            avgHeadMovement: args.report.globalMetrics.avgHeadMovement,
+            avgEyeOpenness: args.report.globalMetrics.avgEyeOpenness,
+            avgMouthOpenness: args.report.globalMetrics.avgMouthOpenness,
+            avgSpeakingLikelihood:
+                args.report.globalMetrics.avgSpeakingLikelihood,
+            speakingActivityPct: args.report.globalMetrics.speakingActivityPct,
+            blinkCount: args.report.globalMetrics.blinkCount,
+            blinkRatePerMin: args.report.globalMetrics.blinkRatePerMin,
+            stableWindowPct: args.report.globalMetrics.stableWindowPct,
+            headline: args.report.summary.headline,
+            strengths: args.report.summary.strengths,
+            risks: args.report.summary.risks,
+            nextSteps: args.report.summary.nextSteps,
+            limitations: args.report.limitations,
+            parameters: args.report.parameters,
+            alerts: args.report.alerts,
+            windows: args.report.windows,
+        },
+        create: {
+            interviewId: interview.id,
+            analysisVersion: args.report.analysisVersion,
+            mode: args.report.mode,
+            role: args.report.role,
+            startedAt: new Date(args.report.startedAt),
+            endedAt: new Date(args.report.endedAt),
+            durationMs: args.report.durationMs,
+            durationLabel: args.report.durationLabel,
+            sampleCount: args.report.sampleCount,
+            windowCount: args.report.windowCount,
+            overallScore: args.report.overallScore,
+            overallStatus: args.report.overallStatus,
+            faceDetectedPct: args.report.globalMetrics.faceDetectedPct,
+            avgFrontalFacingScore:
+                args.report.globalMetrics.avgFrontalFacingScore,
+            avgHeadMovement: args.report.globalMetrics.avgHeadMovement,
+            avgEyeOpenness: args.report.globalMetrics.avgEyeOpenness,
+            avgMouthOpenness: args.report.globalMetrics.avgMouthOpenness,
+            avgSpeakingLikelihood:
+                args.report.globalMetrics.avgSpeakingLikelihood,
+            speakingActivityPct: args.report.globalMetrics.speakingActivityPct,
+            blinkCount: args.report.globalMetrics.blinkCount,
+            blinkRatePerMin: args.report.globalMetrics.blinkRatePerMin,
+            stableWindowPct: args.report.globalMetrics.stableWindowPct,
+            headline: args.report.summary.headline,
+            strengths: args.report.summary.strengths,
+            risks: args.report.summary.risks,
+            nextSteps: args.report.summary.nextSteps,
+            limitations: args.report.limitations,
+            parameters: args.report.parameters,
+            alerts: args.report.alerts,
+            windows: args.report.windows,
+        },
+    });
+}
+
+export async function getHomeDashboardSnapshot(userId: string) {
+    const [totalInterviews, completedInterviews, latestCvFeedback, recentInterviews] =
+        await Promise.all([
+            db.interview.count({
+                where: {
+                    userId,
+                },
+            }),
+            db.interview.count({
+                where: {
+                    userId,
+                    status: "completed",
+                },
+            }),
+            db.cvFeedbackAnalysis.findFirst({
+                where: {
+                    cvVersion: {
+                        userId,
+                    },
+                },
+                orderBy: {
+                    analyzedAt: "desc",
+                },
+                select: {
+                    overallScore: true,
+                },
+            }),
+            db.interview.findMany({
+                where: {
+                    userId,
+                },
+                orderBy: {
+                    createdAt: "desc",
+                },
+                take: 3,
+                select: {
+                    id: true,
+                    title: true,
+                    role: true,
+                },
+            }),
+        ]);
+
+    return {
+        totalInterviews,
+        completedInterviews,
+        cvScore: latestCvFeedback?.overallScore ?? null,
+        successRate:
+            totalInterviews > 0
+                ? Math.round((completedInterviews / totalInterviews) * 100)
+                : null,
+        recentInterviews: recentInterviews.map((interview) => ({
+            id: interview.id,
+            title: interview.title ?? interview.role,
+        })),
+    };
+}

@@ -22,24 +22,16 @@ import type {
 } from "@/lib/face-analysis"
 import type { FaceLandmarkPanelHandle } from "@/lib/face-landmark-panel-handle"
 import {
-    clearInterviewFaceAnalysisReport,
-    persistInterviewFaceAnalysisReport,
-} from "@/lib/interview-feedback/storage"
-import {
     type BlendShapeCategory,
     type FaceBodyLanguageSample,
     type FaceBodyMetricState,
     type FaceLandmarkPoint,
     buildFaceLandmarkExportSnapshot,
     computeBodyLanguageSample,
-    createEmptyBodyLanguageSummary,
     createEmptyMetricState,
     keepRecentSamples,
     METRICS_SAMPLE_INTERVAL_MS,
-    METRICS_WRITE_INTERVAL_MS,
-    persistBodyLanguageSummary,
     resolveEffectiveLandmarks,
-    summarizeBodyLanguageSamples,
 } from "@/lib/face-metrics"
 
 // ---------------------------------------------------------------------------
@@ -408,7 +400,6 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
     const lastBlendShapesRef = useRef<BlendShapeCategory[]>([])
     const lastDetectionAtRef = useRef(0)
     const lastMetricsSampleAtRef = useRef(0)
-    const lastMetricsWriteAtRef = useRef(0)
     const allMetricsSamplesRef = useRef<FaceBodyLanguageSample[]>([])
     const recentMetricsSamplesRef = useRef<FaceBodyLanguageSample[]>([])
     const metricStateRef = useRef<FaceBodyMetricState>(createEmptyMetricState())
@@ -449,7 +440,6 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
         lastDetectionAtRef.current = 0
         metricStateRef.current = createEmptyMetricState()
         lastMetricsSampleAtRef.current = 0
-        lastMetricsWriteAtRef.current = 0
         allMetricsSamplesRef.current = []
         recentMetricsSamplesRef.current = []
         sessionExportSnapshotsRef.current = []
@@ -473,6 +463,7 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
+                        interviewId: analysisSessionId,
                         role,
                         snapshots,
                     }),
@@ -481,26 +472,17 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
 
                 if (!response.ok || !("overallScore" in data)) {
                     const message = ("error" in data && data.error) || "Face-Analyse fehlgeschlagen."
-                    if (analysisSessionId) {
-                        clearInterviewFaceAnalysisReport(analysisSessionId)
-                    }
                     setAnalysisError(message)
                     setAnalysisStatus("error")
                     setAnalysisReport(null)
                     return null
                 }
 
-                if (analysisSessionId) {
-                    persistInterviewFaceAnalysisReport(analysisSessionId, data)
-                }
                 setAnalysisReport(data)
                 setAnalysisStatus("ready")
                 return data
             } catch (error) {
                 const message = error instanceof Error ? error.message : "Face-Analyse fehlgeschlagen."
-                if (analysisSessionId) {
-                    clearInterviewFaceAnalysisReport(analysisSessionId)
-                }
                 setAnalysisError(message)
                 setAnalysisStatus("error")
                 setAnalysisReport(null)
@@ -513,30 +495,15 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
     const stopWebcam = useCallback(async (options?: { analyze?: boolean }) => {
         const shouldAnalyze = options?.analyze ?? analyzeOnStop
         const snapshots = [...sessionExportSnapshotsRef.current]
-        const allSamples = [...allMetricsSamplesRef.current]
-        const recentSamples = [...recentMetricsSamplesRef.current]
 
         webcamRunningRef.current = false
         setWebcamRunning(false)
-
-        if (allSamples.length > 0) {
-            persistBodyLanguageSummary(
-                summarizeBodyLanguageSamples({
-                    allSamples,
-                    recentSamples,
-                    role,
-                    webcamActive: false,
-                })
-            )
-        } else {
-            persistBodyLanguageSummary(createEmptyBodyLanguageSummary(role))
-        }
 
         resetTrackingState()
 
         if (!shouldAnalyze || snapshots.length === 0) return null
         return analyzeSession(snapshots)
-    }, [analyzeOnStop, analyzeSession, resetTrackingState, role])
+    }, [analyzeOnStop, analyzeSession, resetTrackingState])
 
     useImperativeHandle(
         ref,
@@ -705,18 +672,6 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
             setExportSnapshotCount(sessionExportSnapshotsRef.current.length)
         }
 
-        if (now - lastMetricsWriteAtRef.current >= METRICS_WRITE_INTERVAL_MS) {
-            lastMetricsWriteAtRef.current = now
-            persistBodyLanguageSummary(
-                summarizeBodyLanguageSamples({
-                    allSamples: allMetricsSamplesRef.current,
-                    recentSamples: recentMetricsSamplesRef.current,
-                    role,
-                    webcamActive: webcamRunningRef.current,
-                })
-            )
-        }
-
         if (webcamRunningRef.current) {
             animationFrameRef.current = window.requestAnimationFrame(() => void predictWebcamLoop())
         }
@@ -740,9 +695,6 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
 
         try {
             setCameraError("")
-            if (analysisSessionId) {
-                clearInterviewFaceAnalysisReport(analysisSessionId)
-            }
             const stream = await navigator.mediaDevices.getUserMedia({ video: true })
             webcamStreamRef.current = stream
             sessionSnapshotCounterRef.current = 0
@@ -767,7 +719,7 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
         } catch (error) {
             setCameraError(error instanceof Error ? error.message : "Kamera konnte nicht gestartet werden.")
         }
-    }, [analysisSessionId, predictWebcam, stopWebcam])
+    }, [predictWebcam, stopWebcam])
 
     const surfaceClasses = surface === "dark"
         ? {
