@@ -9,13 +9,21 @@
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { saveInterviewTranscript } from "@/db-backend/interviews/interview-service";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback/fingerprint";
-import type { Speaker, TranscriptEntry } from "@/lib/interview-transcript/types";
+import type {
+    PostCallTranscriptStatus,
+    Speaker,
+    TranscriptEntry,
+    TranscriptQaPair,
+} from "@/lib/interview-transcript/types";
+import {
+    buildTranscriptQaExport,
+    extractInterviewerQuestions,
+} from "@/lib/interview-transcript";
 import {
     parseInterviewerQuestions,
     transcribeCandidateAudio,
     TranscriptServiceError,
 } from "@/lib/interview-transcript/server/transcribe-candidate-audio";
-import { buildTranscriptQaExport } from "@/lib/interview-transcript";
 
 export const runtime = "nodejs";
 
@@ -56,6 +64,68 @@ function parseTranscriptEntries(value: FormDataEntryValue | null): TranscriptEnt
     } catch {
         return [];
     }
+}
+
+function parseTranscriptEntriesFromJson(value: unknown): TranscriptEntry[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((entry, index) => {
+            const parsed = entry as {
+                id?: unknown;
+                speaker?: unknown;
+                text?: unknown;
+            };
+            const speaker: Speaker =
+                parsed.speaker === "candidate" ||
+                parsed.speaker === "interviewer" ||
+                parsed.speaker === "system"
+                    ? parsed.speaker
+                    : "candidate";
+
+            return {
+                id:
+                    typeof parsed.id === "string"
+                        ? parsed.id
+                        : `entry-${index + 1}`,
+                speaker,
+                text: typeof parsed.text === "string" ? parsed.text : "",
+            };
+        })
+        .filter((entry) => entry.text.trim().length > 0);
+}
+
+function parseTranscriptQaPairs(value: unknown): TranscriptQaPair[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((pair) => {
+            const parsed = pair as {
+                question?: unknown;
+                answer?: unknown;
+            };
+
+            return {
+                question:
+                    typeof parsed.question === "string" ? parsed.question.trim() : "",
+                answer:
+                    typeof parsed.answer === "string" ? parsed.answer.trim() : "",
+            };
+        })
+        .filter((pair) => pair.question.length > 0 && pair.answer.length > 0);
+}
+
+function parseTranscriptStatus(value: unknown): PostCallTranscriptStatus {
+    return value === "recording" ||
+        value === "transcribing" ||
+        value === "ready" ||
+        value === "error"
+        ? value
+        : "idle";
 }
 
 export async function POST(req: Request) {
@@ -149,5 +219,90 @@ export async function POST(req: Request) {
         const message =
             error instanceof Error ? error.message : "Gemini transcription failed";
         return Response.json({ error: message, stage: "fatal" }, { status: 502 });
+    }
+}
+
+export async function PATCH(request: Request) {
+    const currentUser = await getCurrentAppUser();
+
+    if (!currentUser) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+        const body = (await request.json().catch(() => null)) as
+            | {
+                  interviewId?: unknown;
+                  role?: unknown;
+                  transcriptEntries?: unknown;
+                  postCallCandidateTranscript?: unknown;
+                  mappedTranscriptQaPairs?: unknown;
+                  postCallTranscriptStatus?: unknown;
+                  postCallTranscriptError?: unknown;
+              }
+            | null;
+
+        const interviewId =
+            typeof body?.interviewId === "string" ? body.interviewId.trim() : "";
+        const role = typeof body?.role === "string" ? body.role.trim() : "";
+
+        if (!interviewId) {
+            return Response.json(
+                { error: "Interview id is required" },
+                { status: 400 }
+            );
+        }
+
+        if (!role) {
+            return Response.json({ error: "Role is required" }, { status: 400 });
+        }
+
+        const transcriptEntries = parseTranscriptEntriesFromJson(
+            body?.transcriptEntries
+        );
+        const qaPairs = parseTranscriptQaPairs(body?.mappedTranscriptQaPairs);
+        const postCallCandidateTranscript =
+            typeof body?.postCallCandidateTranscript === "string"
+                ? body.postCallCandidateTranscript.trim()
+                : "";
+        const transcriptStatus = parseTranscriptStatus(
+            body?.postCallTranscriptStatus
+        );
+        const transcriptError =
+            typeof body?.postCallTranscriptError === "string"
+                ? body.postCallTranscriptError.trim()
+                : "";
+        const transcriptExport =
+            transcriptStatus === "ready"
+                ? buildTranscriptQaExport(role, transcriptEntries, {
+                      qaPairs,
+                      candidateTranscript: postCallCandidateTranscript,
+                  })
+                : "";
+        const transcriptFingerprint = transcriptExport
+            ? buildInterviewTranscriptFingerprint(transcriptExport)
+            : "";
+
+        await saveInterviewTranscript({
+            userId: currentUser.id,
+            interviewId,
+            role,
+            transcriptStatus,
+            transcriptError,
+            candidateTranscript: postCallCandidateTranscript,
+            transcriptFingerprint,
+            interviewerQuestions: extractInterviewerQuestions(transcriptEntries),
+            entries: transcriptEntries,
+            qaPairs,
+        });
+
+        return Response.json({ ok: true });
+    } catch (error) {
+        console.error("[api/interview/transcript][patch]", error);
+
+        return Response.json(
+            { error: "Unable to persist interview transcript draft" },
+            { status: 500 }
+        );
     }
 }

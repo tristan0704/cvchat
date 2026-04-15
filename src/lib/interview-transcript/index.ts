@@ -8,6 +8,7 @@ export type {
     TranscriptEntry,
     TranscriptQaPair,
     VoiceFeedbackDraft,
+    VoiceFeedbackDraftPersistence,
 } from "@/lib/interview-transcript/types"
 
 //Typensammlung

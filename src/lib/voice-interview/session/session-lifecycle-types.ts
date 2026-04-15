@@ -1,7 +1,11 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 import type { Session } from "@google/genai"
 import type { FaceLandmarkPanelHandle } from "@/lib/face-landmark-panel-handle"
-import type { PostCallTranscriptStatus, Speaker } from "@/lib/interview-transcript"
+import type {
+    PostCallTranscriptStatus,
+    Speaker,
+    VoiceFeedbackDraftPersistence,
+} from "@/lib/interview-transcript"
 import type { resolveGreetingPhrase } from "@/lib/voice-interview/playback/host-phrases"
 import type { CallLifecyclePhase, ConnectionStatus, InterviewRecapStatus } from "@/lib/voice-interview/core/types"
 import type { CallTiming, InterviewEndgameState, InterviewTurnState } from "@/lib/voice-interview/session/endgame"
@@ -13,7 +17,7 @@ export type TranscriptControls = {
     flushPendingTranscript: (speaker: Extract<Speaker, "candidate" | "interviewer">, fallbackText?: string) => void
     handleLiveTranscription: (speaker: Extract<Speaker, "candidate" | "interviewer">, text?: string, finished?: boolean) => void
     transcribeCandidateAudio: (audioBlob: Blob) => Promise<{ ok: true; value: { transcriptText: string; qaPairs: unknown[] } } | { ok: false; error: string }>
-    persistDraft: (overrides?: { postCallTranscriptStatus?: PostCallTranscriptStatus; postCallTranscriptError?: string }) => void
+    persistDraft: (overrides?: VoiceFeedbackDraftPersistence) => void
     resetTranscriptState: () => void
     resetPendingTranscripts: () => void
     markPostCallTranscriptError: (message: string) => void

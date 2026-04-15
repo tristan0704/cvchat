@@ -40,6 +40,17 @@ type InterviewDetail = {
         issues: string[];
         improvements: string[];
     } | null;
+    overallFeedback: {
+        analyzedAt: string;
+        overallScore: number;
+        summary: string;
+        strengths: string[];
+        issues: string[];
+        improvements: string[];
+        cvScore: number | null;
+        interviewScore: number | null;
+        codingChallengeScore: number | null;
+    } | null;
     codingChallenge: {
         evaluation: {
             overallScore: number;
@@ -94,27 +105,113 @@ function SummaryCard({
 
 function OverallFeedbackBlock({
     interview,
+    onOverallFeedbackChange,
 }: {
     interview: InterviewDetail;
+    onOverallFeedbackChange: (
+        overallFeedback: InterviewDetail["overallFeedback"]
+    ) => void;
 }) {
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generationError, setGenerationError] = useState("");
+    const canGenerateOverallFeedback =
+        Boolean(interview.cvFeedback) &&
+        Boolean(interview.feedback) &&
+        Boolean(interview.codingChallenge?.evaluation);
+
+    useEffect(() => {
+        if (!canGenerateOverallFeedback || interview.overallFeedback || isGenerating) {
+            return;
+        }
+
+        let cancelled = false;
+
+        async function generateOverallFeedback() {
+            setIsGenerating(true);
+            setGenerationError("");
+
+            try {
+                const response = await fetch("/api/interview/overall-feedback", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        interviewId: interview.id,
+                    }),
+                });
+                const data = (await response.json().catch(() => null)) as
+                    | {
+                          overallFeedback?: InterviewDetail["overallFeedback"];
+                          error?: string;
+                      }
+                    | null;
+
+                if (!response.ok || !data?.overallFeedback) {
+                    throw new Error(
+                        data?.error ||
+                            "Gesamtfeedback konnte nicht erstellt werden."
+                    );
+                }
+
+                if (!cancelled) {
+                    onOverallFeedbackChange(data.overallFeedback);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setGenerationError(
+                        error instanceof Error
+                            ? error.message
+                            : "Gesamtfeedback konnte nicht erstellt werden."
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsGenerating(false);
+                }
+            }
+        }
+
+        void generateOverallFeedback();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        canGenerateOverallFeedback,
+        interview.id,
+        interview.overallFeedback,
+        isGenerating,
+        onOverallFeedbackChange,
+    ]);
+
     const cards = [
         {
             label: "CV",
-            score: interview.cvFeedback?.quality.overallScore ?? null,
+            score:
+                interview.overallFeedback?.cvScore ??
+                interview.cvFeedback?.quality.overallScore ??
+                null,
             summary:
                 interview.cvFeedback?.roleAnalysis.summary ||
                 "Noch kein CV-Feedback gespeichert.",
         },
         {
             label: "Interview",
-            score: interview.feedback?.overallScore ?? null,
+            score:
+                interview.overallFeedback?.interviewScore ??
+                interview.feedback?.overallScore ??
+                null,
             summary:
                 interview.feedback?.summary ||
                 "Noch kein Interview-Feedback gespeichert.",
         },
         {
             label: "Code",
-            score: interview.codingChallenge?.evaluation?.overallScore ?? null,
+            score:
+                interview.overallFeedback?.codingChallengeScore ??
+                interview.codingChallenge?.evaluation?.overallScore ??
+                null,
             summary:
                 interview.codingChallenge?.evaluation?.summary ||
                 "Noch kein Coding-Feedback gespeichert.",
@@ -135,10 +232,23 @@ function OverallFeedbackBlock({
                 ))}
             </div>
 
-            {interview.feedback ? (
+            {isGenerating ? (
+                <div className="mt-4 rounded-lg bg-gray-900 p-4 text-sm text-gray-300">
+                    Gesamtfeedback wird aus den gespeicherten Step-Ergebnissen erstellt.
+                </div>
+            ) : generationError ? (
+                <div className="mt-4 rounded-lg bg-red-500/10 p-4 text-sm text-red-200">
+                    {generationError}
+                </div>
+            ) : interview.overallFeedback ? (
                 <div className="mt-4 space-y-4">
                     <div className="rounded-lg bg-gray-900 p-4 text-sm text-gray-300">
-                        {interview.feedback.summary}
+                        <div className="flex items-center justify-between gap-4">
+                            <p>{interview.overallFeedback.summary}</p>
+                            <span className="rounded-md bg-indigo-500/20 px-2 py-1 text-xs text-indigo-200">
+                                {interview.overallFeedback.overallScore}%
+                            </span>
+                        </div>
                     </div>
 
                     <div className="rounded-lg bg-green-500/10 p-4">
@@ -146,7 +256,7 @@ function OverallFeedbackBlock({
                             Positiv
                         </p>
                         <ul className="space-y-1 text-sm text-green-200">
-                            {interview.feedback.strengths.map((item) => (
+                            {interview.overallFeedback.strengths.map((item) => (
                                 <li key={item}>{item}</li>
                             ))}
                         </ul>
@@ -157,11 +267,12 @@ function OverallFeedbackBlock({
                             Verbesserung
                         </p>
                         <ul className="space-y-1 text-sm text-red-200">
-                            {[...interview.feedback.issues, ...interview.feedback.improvements].map(
-                                (item) => (
-                                    <li key={item}>{item}</li>
-                                )
-                            )}
+                            {[
+                                ...interview.overallFeedback.issues,
+                                ...interview.overallFeedback.improvements,
+                            ].map((item) => (
+                                <li key={item}>{item}</li>
+                            ))}
                         </ul>
                     </div>
                 </div>
@@ -330,7 +441,19 @@ function InterviewDetailPageContent() {
                         ) : step === 5 ? (
                             <CodingChallengeFeedback />
                         ) : (
-                            <OverallFeedbackBlock interview={interview} />
+                            <OverallFeedbackBlock
+                                interview={interview}
+                                onOverallFeedbackChange={(overallFeedback) => {
+                                    setInterview((currentInterview) =>
+                                        currentInterview
+                                            ? {
+                                                  ...currentInterview,
+                                                  overallFeedback,
+                                              }
+                                            : currentInterview
+                                    );
+                                }}
+                            />
                         )}
 
                         <div className="mt-6 flex justify-between">

@@ -11,6 +11,8 @@ import type {
 
 import { db } from "@/db-backend/prisma/client";
 import { getLatestCodingChallengeAttempt } from "@/db-backend/coding-challenge/coding-challenge-service";
+import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
+import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback/types";
 import { buildTranscriptQaExport } from "@/lib/interview-transcript";
 import type { TranscriptEntry, TranscriptQaPair } from "@/lib/interview-transcript/types";
 import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
@@ -83,6 +85,7 @@ export type InterviewDetail = {
     } | null;
     timingMetrics: InterviewTimingMetrics | null;
     feedback: InterviewFeedbackEvaluation | null;
+    overallFeedback: InterviewOverallFeedback | null;
     faceAnalysis: FaceAnalysisReport | null;
     codingChallenge: Awaited<ReturnType<typeof getLatestCodingChallengeAttempt>>;
 };
@@ -183,6 +186,34 @@ function mapInterviewFeedback(feedback: {
         strengths: feedback.strengths,
         issues: feedback.issues,
         improvements: feedback.improvements,
+    };
+}
+
+function mapInterviewOverallFeedback(feedback: {
+    analyzedAt: Date;
+    overallScore: number;
+    summary: string;
+    strengths: string[];
+    issues: string[];
+    improvements: string[];
+    cvScore: number | null;
+    interviewScore: number | null;
+    codingChallengeScore: number | null;
+} | null): InterviewOverallFeedback | null {
+    if (!feedback) {
+        return null;
+    }
+
+    return {
+        analyzedAt: feedback.analyzedAt.toISOString(),
+        overallScore: feedback.overallScore,
+        summary: feedback.summary,
+        strengths: feedback.strengths,
+        issues: feedback.issues,
+        improvements: feedback.improvements,
+        cvScore: feedback.cvScore,
+        interviewScore: feedback.interviewScore,
+        codingChallengeScore: feedback.codingChallengeScore,
     };
 }
 
@@ -487,6 +518,7 @@ export async function getInterviewDetailForUser(userId: string, interviewId: str
             },
             timingMetrics: true,
             feedback: true,
+            overallFeedback: true,
             faceAnalysis: true,
         },
     });
@@ -562,9 +594,19 @@ export async function getInterviewDetailForUser(userId: string, interviewId: str
             : null,
         timingMetrics: mapTimingMetrics(interview.timingMetrics),
         feedback: mapInterviewFeedback(interview.feedback),
+        overallFeedback: mapInterviewOverallFeedback(interview.overallFeedback),
         faceAnalysis: mapFaceAnalysis(interview.faceAnalysis),
         codingChallenge: await getLatestCodingChallengeAttempt(userId, interview.id),
     } satisfies InterviewDetail;
+}
+
+export async function getOrCreateInterviewOverallFeedbackForUser(args: {
+    userId: string;
+    interviewId: string;
+    force?: boolean;
+}) {
+    const feedback = await createOrRefreshInterviewOverallFeedback(args);
+    return mapInterviewOverallFeedback(feedback);
 }
 
 export async function updateInterviewProgressForUser(args: {

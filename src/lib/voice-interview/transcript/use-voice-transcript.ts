@@ -12,6 +12,7 @@ import {
     type Speaker,
     type TranscriptEntry,
     type TranscriptQaPair,
+    type VoiceFeedbackDraftPersistence,
 } from "@/lib/interview-transcript"
 import type { AsyncResult } from "@/lib/voice-interview/core/types"
 import type { InterviewEndgameState, InterviewTurnState } from "@/lib/voice-interview/session/endgame"
@@ -24,14 +25,6 @@ type UseVoiceTranscriptArgs = {
     pendingCandidateTranscriptRef: MutableRefObject<string>
     pendingInterviewerTranscriptRef: MutableRefObject<string>
     updateTurnState: (nextState: InterviewTurnState) => void
-}
-
-type PersistDraftOverrides = {
-    transcriptEntries?: TranscriptEntry[]
-    postCallCandidateTranscript?: string
-    mappedTranscriptQaPairs?: TranscriptQaPair[]
-    postCallTranscriptStatus?: PostCallTranscriptStatus
-    postCallTranscriptError?: string
 }
 
 export function useVoiceTranscript({
@@ -105,9 +98,36 @@ export function useVoiceTranscript({
         postCallTranscriptErrorRef.current = postCallTranscriptError
     }, [postCallTranscriptError])
 
-    const persistDraft = useCallback((overrides?: PersistDraftOverrides) => {
-        void overrides
-    }, [])
+    const persistDraft = useCallback((overrides?: VoiceFeedbackDraftPersistence) => {
+        if (!interviewId) {
+            return
+        }
+
+        const nextTranscriptEntries = overrides?.transcriptEntries ?? transcriptEntriesRef.current
+        const nextCandidateTranscript =
+            overrides?.postCallCandidateTranscript ?? postCallCandidateTranscriptRef.current
+        const nextQaPairs = overrides?.mappedTranscriptQaPairs ?? mappedTranscriptQaPairsRef.current
+        const nextTranscriptStatus =
+            overrides?.postCallTranscriptStatus ?? postCallTranscriptStatusRef.current
+        const nextTranscriptError =
+            overrides?.postCallTranscriptError ?? postCallTranscriptErrorRef.current
+
+        void fetch("/api/interview/transcript", {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                interviewId,
+                role,
+                transcriptEntries: nextTranscriptEntries,
+                postCallCandidateTranscript: nextCandidateTranscript,
+                mappedTranscriptQaPairs: nextQaPairs,
+                postCallTranscriptStatus: nextTranscriptStatus,
+                postCallTranscriptError: nextTranscriptError,
+            }),
+        }).catch(() => undefined)
+    }, [interviewId, role])
 
     const appendTranscript = useCallback((speaker: Speaker, text: string, options?: { mergeWithPrevious?: boolean }) => {
         const normalized = normalizeTranscriptText(text)

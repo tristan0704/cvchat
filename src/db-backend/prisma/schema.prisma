@@ -198,6 +198,7 @@ model Interview {
   transcript              InterviewTranscript?
   timingMetrics           InterviewTimingMetrics?
   feedback                InterviewFeedback?
+  overallFeedback         InterviewOverallFeedback?
   faceAnalysis            InterviewFaceAnalysis?
   codingChallengeAttempts CodingChallengeAttempt[]
   createdAt               DateTime                @default(now())
@@ -321,6 +322,25 @@ model InterviewFeedback {
 
   @@index([role, analyzedAt])
   @@index([transcriptFingerprint])
+}
+
+model InterviewOverallFeedback {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  interviewId             String                  @unique @db.Uuid
+  analyzedAt              DateTime                @default(now())
+  overallScore            Int
+  summary                 String                  @db.Text
+  strengths               String[]                @default([])
+  issues                  String[]                @default([])
+  improvements            String[]                @default([])
+  cvScore                 Int?
+  interviewScore          Int?
+  codingChallengeScore    Int?
+  interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([overallScore, analyzedAt])
 }
 
 model InterviewFaceAnalysis {

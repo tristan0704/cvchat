@@ -23,3 +23,5 @@ export type VoiceFeedbackDraft = {
     postCallTranscriptStatus: PostCallTranscriptStatus
     postCallTranscriptError: string
 }
+
+export type VoiceFeedbackDraftPersistence = Partial<VoiceFeedbackDraft>
