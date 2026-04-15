@@ -7,7 +7,7 @@ import CvAnalysisDashboard from "@/components/cv/CvAnalysisDashboard";
 import CvRoleMatchCard from "@/components/cv/CvRoleMatchCard";
 import CvScoreBreakdownCard from "@/components/cv/CvScoreBreakdownCard";
 import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
-import { useOptionalInterviewSession } from "@/lib/interview-session/context";
+import { useInterviewSession } from "@/lib/interview-session/context";
 
 type ActiveCvSummary = {
     id: string;
@@ -65,13 +65,8 @@ async function requestCvFeedback(interviewId: string, force = false) {
 }
 
 export default function CvFeedbackStep() {
-    const session = useOptionalInterviewSession();
-    const config = session?.config ?? {
-        role: "Backend Developer",
-        experience: "",
-        companySize: "",
-        interviewType: "",
-    };
+    const session = useInterviewSession();
+    const config = session.config;
 
     const [storedCv, setStoredCv] = useState<ActiveCvSummary | null>(null);
     const [loadingStoredCv, setLoadingStoredCv] = useState(true);
@@ -83,11 +78,6 @@ export default function CvFeedbackStep() {
         let cancelled = false;
 
         async function hydrateStep() {
-            if (!session?.interviewId) {
-                setLoadingStoredCv(false);
-                return;
-            }
-
             setLoadingStoredCv(true);
             setLoading(false);
             setError("");
@@ -123,14 +113,9 @@ export default function CvFeedbackStep() {
         return () => {
             cancelled = true;
         };
-    }, [session?.interviewId]);
+    }, [session.interviewId]);
 
     async function handleRefreshFeedback() {
-        if (!session?.interviewId) {
-            setError("Interview-Kontext fehlt.");
-            return;
-        }
-
         setLoading(true);
         setError("");
 

@@ -50,6 +50,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => null)) as
         | {
+              templateId?: unknown;
               role?: unknown;
               experience?: unknown;
               companySize?: unknown;
@@ -58,11 +59,30 @@ export async function POST(request: Request) {
         | null;
 
     const config = readConfig(body);
+    const templateId =
+        body && typeof body.templateId === "string" ? body.templateId.trim() : "";
 
-    if (!config.role) {
-        return Response.json({ error: "Role is required" }, { status: 400 });
+    if (!templateId && !config.role) {
+        return Response.json(
+            { error: "templateId or role is required" },
+            { status: 400 }
+        );
     }
 
-    const interview = await createInterviewForUser(currentUser.id, config);
-    return Response.json({ interview });
+    try {
+        const interview = await createInterviewForUser({
+            userId: currentUser.id,
+            templateId: templateId || undefined,
+            config,
+        });
+        return Response.json({ interview });
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Interview konnte nicht erstellt werden.";
+        const status = message === "Interview template not found" ? 404 : 400;
+
+        return Response.json({ error: message }, { status });
+    }
 }

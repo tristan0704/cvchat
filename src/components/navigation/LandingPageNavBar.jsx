@@ -1,7 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
+
+const LANDING_LINKS = [
+  { href: "#product", label: "Produkt" },
+  { href: "#features", label: "Funktionen" },
+  { href: "#how-it-works", label: "Wie es funktioniert" },
+];
 
 export default function LandingPageNavBar() {
   const [open, setOpen] = useState(false);
@@ -9,35 +16,40 @@ export default function LandingPageNavBar() {
   return (
     <header className="absolute inset-x-0 top-0 z-50">
       <nav className="flex items-center justify-between p-6 lg:px-8">
-
-        {/* Logo */}
         <div className="flex lg:flex-1">
-          <a className="-m-1.5 p-1.5">
-            <img
-              src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500"
-              className="h-8 w-auto"
-            />
-          </a>
+          <Link href="/" className="-m-1.5 flex items-center gap-3 p-1.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-500 text-sm font-semibold text-white">
+              CP
+            </span>
+            <span className="text-sm font-semibold text-white">CareerPitch</span>
+          </Link>
         </div>
 
-        {/* Mobile button */}
         <div className="flex lg:hidden">
-          <button onClick={() => setOpen(true)} className="text-gray-200">
-            <img
-                  src="/icons/bars-solid-full.svg"
-                  className="h-5 w-5 brightness-0 invert"
-                />
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="text-gray-200"
+            aria-label="Menue oeffnen"
+          >
+            <Image
+              src="/icons/bars-solid-full.svg"
+              width={20}
+              height={20}
+              className="h-5 w-5 brightness-0 invert"
+              alt=""
+            />
           </button>
         </div>
 
-        {/* Desktop Nav */}
         <div className="hidden lg:flex lg:gap-x-12">
-          <a href="#product" className="text-sm font-semibold text-white">Produkt</a>
-          <a href="#features" className="text-sm font-semibold text-white">Funktionen</a>
-          <a href="#how-it-works" className="text-sm font-semibold text-white">Wie es funktioniert</a>
+          {LANDING_LINKS.map((item) => (
+            <a key={item.href} href={item.href} className="text-sm font-semibold text-white">
+              {item.label}
+            </a>
+          ))}
         </div>
 
-        {/* Login */}
         <div className="hidden lg:flex lg:flex-1 lg:justify-end">
           <Link href="/auth/login" className="text-sm font-semibold text-white">
             Log in
@@ -45,26 +57,42 @@ export default function LandingPageNavBar() {
         </div>
       </nav>
 
-      {/* Mobile Menu */}
       {open && (
         <div className="fixed inset-0 z-50 bg-gray-900 p-6 lg:hidden">
           <div className="flex justify-between">
-            <img
-              src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500"
-              className="h-8"
-            />
-            <button onClick={() => setOpen(false)}>
-            <img
-                  src="/icons/xmark-solid-full.svg"
-                  className="h-5 w-5 brightness-0 invert"
-                />
+            <Link href="/" className="flex items-center gap-3" onClick={() => setOpen(false)}>
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-500 text-sm font-semibold text-white">
+                CP
+              </span>
+              <span className="text-sm font-semibold text-white">CareerPitch</span>
+            </Link>
+            <button type="button" onClick={() => setOpen(false)} aria-label="Menue schliessen">
+              <Image
+                src="/icons/xmark-solid-full.svg"
+                width={20}
+                height={20}
+                className="h-5 w-5 brightness-0 invert"
+                alt=""
+              />
             </button>
           </div>
 
           <div className="mt-6 space-y-4">
-            <a className="block text-white">Produkt</a>
-            <a href="#features" className="block text-white">Funktionen</a>
-            <Link href="/auth/login" className="block text-white">
+            {LANDING_LINKS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="block text-white"
+              >
+                {item.label}
+              </a>
+            ))}
+            <Link
+              href="/auth/login"
+              onClick={() => setOpen(false)}
+              className="block text-white"
+            >
               Log in
             </Link>
           </div>

@@ -41,9 +41,20 @@ export async function GET(request: Request) {
         return Response.json({ draft });
     } catch (error) {
         console.error("[api/interview/coding-challenge]", error);
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Unable to load coding challenge";
+        const status =
+            message === "Interview not found"
+                ? 404
+                : message === "Interview feedback must be completed first"
+                  ? 409
+                  : 500;
+
         return Response.json(
-            { error: "Unable to load coding challenge" },
-            { status: 500 }
+            { error: message },
+            { status }
         );
     }
 }

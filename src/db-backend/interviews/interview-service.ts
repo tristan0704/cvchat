@@ -10,19 +10,24 @@ import type {
 } from "@prisma/client";
 
 import { db } from "@/db-backend/prisma/client";
+import { acquireTransactionalAdvisoryLock } from "@/db-backend/prisma/advisory-lock";
 import { getLatestCodingChallengeAttempt } from "@/db-backend/coding-challenge/coding-challenge-service";
 import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
+import {
+    getInterviewTemplateById,
+    resolveInterviewTemplateForConfig,
+} from "@/db-backend/interviews/interview-template-service";
 import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback/types";
 import { buildTranscriptQaExport } from "@/lib/interview-transcript";
 import type { TranscriptEntry, TranscriptQaPair } from "@/lib/interview-transcript/types";
 import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
 import type { FaceAnalysisReport } from "@/lib/face-analysis";
 import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback/types";
-import { getInterviewQuestionPool } from "@/lib/interview";
 import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 
 export type InterviewListItem = {
     id: string;
+    templateId: string | null;
     title: string;
     role: string;
     status: InterviewStatus;
@@ -34,6 +39,7 @@ export type InterviewListItem = {
 
 export type InterviewDetail = {
     id: string;
+    templateId: string | null;
     title: string;
     role: string;
     experience: string;
@@ -116,8 +122,37 @@ function resolveStatusForStep(step: number): InterviewStatus {
     return "ready";
 }
 
+function resolveMaxAccessibleStep(args: {
+    hasCvFeedback: boolean;
+    transcriptStatus: InterviewTranscriptStatus | null;
+    hasInterviewFeedback: boolean;
+    hasCodingEvaluation: boolean;
+}) {
+    if (args.hasCodingEvaluation) {
+        return 6;
+    }
+
+    if (args.hasInterviewFeedback) {
+        return 4;
+    }
+
+    if (
+        args.transcriptStatus &&
+        args.transcriptStatus !== "idle"
+    ) {
+        return 3;
+    }
+
+    if (args.hasCvFeedback) {
+        return 2;
+    }
+
+    return 1;
+}
+
 function mapInterviewListItem(item: {
     id: string;
+    templateId: string | null;
     title: string | null;
     role: string;
     status: InterviewStatus;
@@ -128,6 +163,7 @@ function mapInterviewListItem(item: {
 }) {
     return {
         id: item.id,
+        templateId: item.templateId,
         title: item.title ?? buildInterviewTitle({
             role: item.role,
             experience: "",
@@ -407,11 +443,24 @@ function mapCvFeedbackAnalysis(analysis: {
     };
 }
 
-export async function createInterviewForUser(userId: string, config: InterviewCvConfig) {
-    const normalizedConfig = normalizeConfig(config);
+export async function createInterviewForUser(args: {
+    userId: string;
+    templateId?: string;
+    config?: InterviewCvConfig;
+}) {
+    const template = args.templateId
+        ? await getInterviewTemplateById(args.templateId)
+        : args.config
+          ? await resolveInterviewTemplateForConfig(normalizeConfig(args.config))
+          : null;
+
+    if (!template) {
+        throw new Error("Interview template not found");
+    }
+
     const activeCv = await db.cvVersion.findFirst({
         where: {
-            userId,
+            userId: args.userId,
             isActive: true,
         },
         orderBy: {
@@ -421,30 +470,31 @@ export async function createInterviewForUser(userId: string, config: InterviewCv
             id: true,
         },
     });
-    const questionPlan = getInterviewQuestionPool(normalizedConfig.role);
 
     const interview = await db.interview.create({
         data: {
-            userId,
+            userId: args.userId,
+            templateId: template.id,
             cvVersionId: activeCv?.id ?? null,
-            title: buildInterviewTitle(normalizedConfig),
-            role: normalizedConfig.role,
-            experience: normalizedConfig.experience,
-            companySize: normalizedConfig.companySize,
-            interviewType: normalizedConfig.interviewType,
+            title: template.title,
+            role: template.role,
+            experience: template.experience,
+            companySize: template.companySize,
+            interviewType: template.interviewType,
             currentStep: 1,
             status: "ready",
             plannedQuestions: {
-                create: questionPlan.map((question, index) => ({
-                    sequence: index + 1,
-                    questionKey: question.id,
-                    text: question.text,
-                    priority: question.priority,
+                create: template.questions.map((question) => ({
+                    sequence: question.sequence,
+                    questionKey: question.question.id,
+                    text: question.textOverride?.trim() || question.question.text,
+                    priority: question.priority ?? question.question.priority,
                 })),
             },
         },
         select: {
             id: true,
+            templateId: true,
             title: true,
             role: true,
             status: true,
@@ -468,6 +518,7 @@ export async function listInterviewsForUser(userId: string) {
         },
         select: {
             id: true,
+            templateId: true,
             title: true,
             role: true,
             status: true,
@@ -529,6 +580,7 @@ export async function getInterviewDetailForUser(userId: string, interviewId: str
 
     return {
         id: interview.id,
+        templateId: interview.templateId,
         title:
             interview.title ??
             buildInterviewTitle({
@@ -614,9 +666,6 @@ export async function updateInterviewProgressForUser(args: {
     interviewId: string;
     currentStep: number;
 }) {
-    const currentStep = Math.max(1, Math.min(6, Math.round(args.currentStep)));
-    const status = resolveStatusForStep(currentStep);
-
     const existing = await db.interview.findFirst({
         where: {
             id: args.interviewId,
@@ -626,12 +675,48 @@ export async function updateInterviewProgressForUser(args: {
             id: true,
             startedAt: true,
             completedAt: true,
+            cvFeedbackAnalysisId: true,
+            transcript: {
+                select: {
+                    transcriptStatus: true,
+                },
+            },
+            feedback: {
+                select: {
+                    id: true,
+                },
+            },
+            codingChallengeAttempts: {
+                orderBy: [{ attemptNumber: "desc" }, { createdAt: "desc" }],
+                take: 1,
+                select: {
+                    evaluation: {
+                        select: {
+                            id: true,
+                        },
+                    },
+                },
+            },
         },
     });
 
     if (!existing) {
         throw new Error("Interview not found");
     }
+
+    const maxAccessibleStep = resolveMaxAccessibleStep({
+        hasCvFeedback: Boolean(existing.cvFeedbackAnalysisId),
+        transcriptStatus: existing.transcript?.transcriptStatus ?? null,
+        hasInterviewFeedback: Boolean(existing.feedback),
+        hasCodingEvaluation: Boolean(
+            existing.codingChallengeAttempts[0]?.evaluation
+        ),
+    });
+    const currentStep = Math.max(
+        1,
+        Math.min(maxAccessibleStep, Math.round(args.currentStep))
+    );
+    const status = resolveStatusForStep(currentStep);
 
     const updatedInterview = await db.interview.update({
         where: {
@@ -651,6 +736,7 @@ export async function updateInterviewProgressForUser(args: {
         },
         select: {
             id: true,
+            templateId: true,
             title: true,
             role: true,
             status: true,
@@ -727,65 +813,73 @@ export async function saveInterviewTranscript(args: {
               })
             : "";
 
-    await db.interviewTranscript.upsert({
-        where: {
-            interviewId: interview.id,
-        },
-        update: {
-            transcriptStatus: args.transcriptStatus,
-            transcriptError: args.transcriptError?.trim() || null,
-            candidateTranscript: args.candidateTranscript?.trim() || null,
-            transcriptExport: transcriptExport || null,
-            transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
-            interviewerQuestions: args.interviewerQuestions ?? [],
-            recapStatus: args.recapStatus ?? "idle",
-            recapError: args.recapError?.trim() || null,
-            recapCaptureNote: args.recapCaptureNote?.trim() || null,
-            entries: {
-                deleteMany: {},
-                create: entries.map((entry, index) => ({
-                    sequence: index + 1,
-                    speaker: entry.speaker,
-                    text: entry.text,
-                })),
+    await db.$transaction(async (tx) => {
+        await acquireTransactionalAdvisoryLock(
+            tx,
+            "interview-transcript",
+            interview.id
+        );
+
+        await tx.interviewTranscript.upsert({
+            where: {
+                interviewId: interview.id,
             },
-            qaPairs: {
-                deleteMany: {},
-                create: qaPairs.map((pair, index) => ({
-                    sequence: index + 1,
-                    question: pair.question,
-                    answer: pair.answer,
-                    source: "ai_mapped",
-                })),
+            update: {
+                transcriptStatus: args.transcriptStatus,
+                transcriptError: args.transcriptError?.trim() || null,
+                candidateTranscript: args.candidateTranscript?.trim() || null,
+                transcriptExport: transcriptExport || null,
+                transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
+                interviewerQuestions: args.interviewerQuestions ?? [],
+                recapStatus: args.recapStatus ?? "idle",
+                recapError: args.recapError?.trim() || null,
+                recapCaptureNote: args.recapCaptureNote?.trim() || null,
+                entries: {
+                    deleteMany: {},
+                    create: entries.map((entry, index) => ({
+                        sequence: index + 1,
+                        speaker: entry.speaker,
+                        text: entry.text,
+                    })),
+                },
+                qaPairs: {
+                    deleteMany: {},
+                    create: qaPairs.map((pair, index) => ({
+                        sequence: index + 1,
+                        question: pair.question,
+                        answer: pair.answer,
+                        source: "ai_mapped",
+                    })),
+                },
             },
-        },
-        create: {
-            interviewId: interview.id,
-            transcriptStatus: args.transcriptStatus,
-            transcriptError: args.transcriptError?.trim() || null,
-            candidateTranscript: args.candidateTranscript?.trim() || null,
-            transcriptExport: transcriptExport || null,
-            transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
-            interviewerQuestions: args.interviewerQuestions ?? [],
-            recapStatus: args.recapStatus ?? "idle",
-            recapError: args.recapError?.trim() || null,
-            recapCaptureNote: args.recapCaptureNote?.trim() || null,
-            entries: {
-                create: entries.map((entry, index) => ({
-                    sequence: index + 1,
-                    speaker: entry.speaker,
-                    text: entry.text,
-                })),
+            create: {
+                interviewId: interview.id,
+                transcriptStatus: args.transcriptStatus,
+                transcriptError: args.transcriptError?.trim() || null,
+                candidateTranscript: args.candidateTranscript?.trim() || null,
+                transcriptExport: transcriptExport || null,
+                transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
+                interviewerQuestions: args.interviewerQuestions ?? [],
+                recapStatus: args.recapStatus ?? "idle",
+                recapError: args.recapError?.trim() || null,
+                recapCaptureNote: args.recapCaptureNote?.trim() || null,
+                entries: {
+                    create: entries.map((entry, index) => ({
+                        sequence: index + 1,
+                        speaker: entry.speaker,
+                        text: entry.text,
+                    })),
+                },
+                qaPairs: {
+                    create: qaPairs.map((pair, index) => ({
+                        sequence: index + 1,
+                        question: pair.question,
+                        answer: pair.answer,
+                        source: "ai_mapped",
+                    })),
+                },
             },
-            qaPairs: {
-                create: qaPairs.map((pair, index) => ({
-                    sequence: index + 1,
-                    question: pair.question,
-                    answer: pair.answer,
-                    source: "ai_mapped",
-                })),
-            },
-        },
+        });
     });
 }
 

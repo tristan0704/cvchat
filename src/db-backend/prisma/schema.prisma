@@ -176,9 +176,78 @@ model CvFeedbackAnalysis {
   @@index([role, analyzedAt])
 }
 
+model InterviewTemplate {
+  id                      String                         @id
+  title                   String
+  role                    String
+  roleKey                 String
+  experience              String                         @default("")
+  companySize             String                         @default("")
+  interviewType           String                         @default("")
+  summary                 String?                        @db.Text
+  isActive                Boolean                        @default(true)
+  sortOrder               Int                            @default(0)
+  interviews              Interview[]
+  questions               InterviewTemplateQuestion[]
+  codingChallenges        InterviewTemplateCodingChallenge[]
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+
+  @@unique([role, experience, companySize, interviewType])
+  @@index([isActive, sortOrder])
+  @@index([roleKey, isActive, sortOrder])
+}
+
+model InterviewQuestionLibrary {
+  id                      String                         @id
+  roleKey                 String?
+  isGeneral               Boolean                        @default(false)
+  text                    String                         @db.Text
+  priority                Int
+  isActive                Boolean                        @default(true)
+  templateMappings        InterviewTemplateQuestion[]
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+
+  @@index([roleKey, isActive, priority])
+  @@index([isGeneral, isActive, priority])
+}
+
+model InterviewTemplateQuestion {
+  id                      String                         @id @default(uuid()) @db.Uuid
+  templateId              String
+  questionId              String
+  sequence                Int
+  priority                Int?
+  textOverride            String?                        @db.Text
+  template                InterviewTemplate              @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  question                InterviewQuestionLibrary       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                       @default(now())
+
+  @@unique([templateId, sequence])
+  @@unique([templateId, questionId])
+  @@index([templateId, priority])
+}
+
+model InterviewTemplateCodingChallenge {
+  id                      String                         @id @default(uuid()) @db.Uuid
+  templateId              String
+  taskId                  String
+  sequence                Int
+  isDefault               Boolean                        @default(false)
+  template                InterviewTemplate              @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  task                    CodingChallengeTask            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                       @default(now())
+
+  @@unique([templateId, sequence])
+  @@unique([templateId, taskId])
+  @@index([taskId])
+}
+
 model Interview {
   id                      String                  @id @default(uuid()) @db.Uuid
   userId                  String                  @db.Uuid
+  templateId              String?
   cvVersionId             String?                 @db.Uuid
   cvFeedbackAnalysisId    String?                 @db.Uuid
   title                   String?
@@ -192,6 +261,7 @@ model Interview {
   completedAt             DateTime?
   archivedAt              DateTime?
   user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template                InterviewTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
   cvVersion               CvVersion?              @relation(fields: [cvVersionId], references: [id], onDelete: SetNull)
   cvFeedbackAnalysis      CvFeedbackAnalysis?     @relation("InterviewCvFeedbackAnalysis", fields: [cvFeedbackAnalysisId], references: [id], onDelete: SetNull)
   plannedQuestions        InterviewPlannedQuestion[]
@@ -206,6 +276,7 @@ model Interview {
 
   @@index([userId, createdAt])
   @@index([userId, status, createdAt])
+  @@index([templateId])
   @@index([cvVersionId])
   @@index([cvFeedbackAnalysisId])
 }
@@ -402,6 +473,7 @@ model CodingChallengeTask {
   isActive                Boolean                 @default(true)
   solution                CodingChallengeTaskSolution?
   attempts                CodingChallengeAttempt[]
+  templateMappings        InterviewTemplateCodingChallenge[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 

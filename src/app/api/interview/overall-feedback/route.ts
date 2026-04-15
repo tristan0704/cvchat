@@ -54,7 +54,12 @@ export async function POST(request: Request) {
             error instanceof Error
                 ? error.message
                 : "Unable to build overall feedback";
-        const status = message === "Interview not found" ? 404 : 500;
+        const status =
+            message === "Interview not found"
+                ? 404
+                : message === "Interview is not ready for overall feedback"
+                  ? 409
+                  : 500;
 
         return Response.json({ error: message }, { status });
     }

@@ -2,7 +2,6 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 import type { Session } from "@google/genai"
 import type { FaceLandmarkPanelHandle } from "@/lib/face-landmark-panel-handle"
 import type {
-    PostCallTranscriptStatus,
     Speaker,
     VoiceFeedbackDraftPersistence,
 } from "@/lib/interview-transcript"

@@ -186,11 +186,11 @@ export async function createOrRefreshInterviewOverallFeedback(args: {
     } satisfies AggregatedFeedbackSource;
 
     if (
-        source.cvScore === null &&
-        source.interviewScore === null &&
+        source.cvScore === null ||
+        source.interviewScore === null ||
         source.codingChallengeScore === null
     ) {
-        throw new Error("No step feedback available");
+        throw new Error("Interview is not ready for overall feedback");
     }
 
     const fallback = buildFallbackOverallFeedback(source);

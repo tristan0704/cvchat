@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -19,8 +20,10 @@ export default async function LoginPage({ searchParams }) {
     <div className="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-gray-900">
       {/* Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-        <img
+        <Image
           src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500"
+          width={40}
+          height={40}
           className="mx-auto h-10 w-auto"
           alt="Logo"
         />
@@ -95,7 +98,7 @@ export default async function LoginPage({ searchParams }) {
               href="/"
               className="flex w-full justify-center rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white"
             >
-              Zurück
+              Zurueck
             </Link>
             <button
               type="submit"

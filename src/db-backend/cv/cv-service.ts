@@ -107,8 +107,44 @@ async function createCvFeedbackAnalysis(args: {
         config,
     });
 
-    const analysis = await db.cvFeedbackAnalysis.create({
-        data: {
+    const analysis = await db.cvFeedbackAnalysis.upsert({
+        where: {
+            cvVersionId_role_experience_companySize_interviewType: {
+                cvVersionId: cvVersion.id,
+                role: config.role,
+                experience: config.experience,
+                companySize: config.companySize,
+                interviewType: config.interviewType,
+            },
+        },
+        update: {
+            analyzedAt: new Date(),
+            fileName: result.fileName,
+            overallScore: result.quality.overallScore,
+            keywordScore: result.scoreBreakdown.keywordScore,
+            llmScore: result.scoreBreakdown.llmScore,
+            blendedScore: result.scoreBreakdown.blendedScore,
+            keywordWeight: result.scoreBreakdown.keywordWeight,
+            llmWeight: result.scoreBreakdown.llmWeight,
+            sectionsScore: result.quality.sections.score,
+            sectionsFeedback: result.quality.sections.feedback,
+            impactScore: result.quality.impact.score,
+            impactFeedback: result.quality.impact.feedback,
+            lengthScore: result.quality.length.score,
+            lengthFeedback: result.quality.length.feedback,
+            contactScore: result.quality.contact.score,
+            contactFeedback: result.quality.contact.feedback,
+            clarityScore: result.quality.clarity.score,
+            clarityFeedback: result.quality.clarity.feedback,
+            improvements: result.quality.improvements,
+            roleMatchScore: result.roleAnalysis.score,
+            matchedKeywords: result.roleAnalysis.matched,
+            missingMustHaveKeywords: result.roleAnalysis.missingMustHave,
+            niceToHaveMatches: result.roleAnalysis.niceToHaveMatches,
+            bonusMatches: result.roleAnalysis.bonusMatches,
+            roleSummary: result.roleAnalysis.summary,
+        },
+        create: {
             cvVersionId: cvVersion.id,
             role: config.role,
             experience: config.experience,

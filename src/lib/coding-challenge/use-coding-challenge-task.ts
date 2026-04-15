@@ -100,7 +100,7 @@ export function useCodingChallengeTask({
             }
         }
 
-        if (interviewId && interviewId !== "standalone") {
+        if (interviewId) {
             void loadTask();
         } else {
             setIsLoading(false);
@@ -113,7 +113,7 @@ export function useCodingChallengeTask({
     }, [interviewId, roleLabel]);
 
     useEffect(() => {
-        if (!draft || !interviewId || interviewId === "standalone") {
+        if (!draft || !interviewId) {
             return;
         }
 

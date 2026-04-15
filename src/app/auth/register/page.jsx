@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -19,8 +20,10 @@ export default async function RegisterPage({ searchParams }) {
 
       {/* HEADER */}
       <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-sm">
-        <img
+        <Image
           src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500"
+          width={40}
+          height={40}
           className="mx-auto h-10 w-auto"
           alt="Logo"
         />
@@ -72,7 +75,7 @@ export default async function RegisterPage({ searchParams }) {
           {/* Confirm Password */}
           <div>
             <label className="block text-sm font-medium text-gray-100">
-              Passwort bestätigen
+              Passwort bestaetigen
             </label>
             <div className="mt-2">
               <input
@@ -90,7 +93,7 @@ export default async function RegisterPage({ searchParams }) {
               href="/"
               className="flex w-full items-center justify-center rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white"
             >
-              Zurück
+              Zurueck
             </Link>
 
             <button

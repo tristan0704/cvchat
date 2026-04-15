@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 
 import {
     DIFFICULTY_LABELS,
@@ -11,15 +10,14 @@ import type {
     CodingChallengeDraft,
     CodingChallengeEvaluation,
 } from "@/lib/coding-challenge/types";
-import { useOptionalInterviewSession } from "@/lib/interview-session/context";
-import { getInterviewSessionId } from "@/lib/interview-session/session-id";
+import { useInterviewSession } from "@/lib/interview-session/context";
 
 function getScoreTone(score: number) {
     if (score >= 75) {
         return {
             badge: "bg-green-500/20 text-green-300",
             bar: "bg-green-400",
-            label: "Strong",
+            label: "Stark",
         };
     }
 
@@ -27,14 +25,14 @@ function getScoreTone(score: number) {
         return {
             badge: "bg-yellow-500/20 text-yellow-300",
             bar: "bg-yellow-400",
-            label: "Mixed",
+            label: "Solide",
         };
     }
 
     return {
         badge: "bg-red-500/20 text-red-300",
         bar: "bg-red-400",
-        label: "Weak",
+        label: "Schwach",
     };
 }
 
@@ -86,7 +84,7 @@ function ListCard({
                 {items.length > 0 ? (
                     items.map((item) => <li key={item}>{item}</li>)
                 ) : (
-                    <li className="text-gray-500">No items available.</li>
+                    <li className="text-gray-500">Keine Eintraege vorhanden.</li>
                 )}
             </ul>
         </section>
@@ -94,10 +92,8 @@ function ListCard({
 }
 
 export default function CodingChallengeFeedback() {
-    const params = useParams<{ id: string }>();
-    const session = useOptionalInterviewSession();
-    const interviewId = getInterviewSessionId(params.id);
-    const role = session?.role ?? "Backend Developer";
+    const session = useInterviewSession();
+    const interviewId = session.interviewId;
     const [draft, setDraft] = useState<CodingChallengeDraft | null>(null);
     const [evaluation, setEvaluation] = useState<CodingChallengeEvaluation | null>(
         null
@@ -109,30 +105,28 @@ export default function CodingChallengeFeedback() {
 
         async function hydrateFeedback() {
             try {
-                const searchParams = new URLSearchParams({
-                    interviewId,
-                    role,
+                const response = await fetch(`/api/interviews/${interviewId}`, {
+                    method: "GET",
+                    cache: "no-store",
                 });
-                const response = await fetch(
-                    `/api/interview/coding-challenge?${searchParams.toString()}`,
-                    {
-                        method: "GET",
-                        cache: "no-store",
-                    }
-                );
                 const data = (await response.json().catch(() => null)) as
-                    | { draft?: CodingChallengeDraft; error?: string }
+                    | {
+                          interview?: {
+                              codingChallenge?: CodingChallengeDraft | null;
+                          };
+                          error?: string;
+                      }
                     | null;
 
-                if (!response.ok || !data?.draft) {
+                if (!response.ok || !data?.interview?.codingChallenge) {
                     throw new Error(
                         data?.error || "Coding challenge konnte nicht geladen werden."
                     );
                 }
 
                 if (!cancelled) {
-                    setDraft(data.draft);
-                    setEvaluation(data.draft.evaluation ?? null);
+                    setDraft(data.interview.codingChallenge);
+                    setEvaluation(data.interview.codingChallenge.evaluation ?? null);
                     setError("");
                 }
             } catch (loadError) {
@@ -146,14 +140,12 @@ export default function CodingChallengeFeedback() {
             }
         }
 
-        if (interviewId && interviewId !== "standalone") {
-            void hydrateFeedback();
-        }
+        void hydrateFeedback();
 
         return () => {
             cancelled = true;
         };
-    }, [interviewId, role]);
+    }, [interviewId]);
 
     if (error) {
         return (
@@ -166,7 +158,8 @@ export default function CodingChallengeFeedback() {
     if (!evaluation) {
         return (
             <div className="rounded-xl border border-white/10 bg-gray-900 p-6 text-sm text-gray-300">
-                Submit a coding solution in step 4 to view feedback here.
+                Reiche zuerst in Schritt 4 eine Coding-Loesung ein, damit hier
+                das persistierte Feedback erscheint.
             </div>
         );
     }
@@ -183,11 +176,15 @@ export default function CodingChallengeFeedback() {
                             {task ? <span>{task.role}</span> : null}
                             {task ? <span>{DIFFICULTY_LABELS[task.difficulty]}</span> : null}
                             {task ? <span>{LANGUAGE_LABELS[task.language]}</span> : null}
-                            <span>{evaluation.passedLikely ? "Likely pass" : "Needs work"}</span>
+                            <span>
+                                {evaluation.passedLikely
+                                    ? "Wahrscheinlich passend"
+                                    : "Noch Nacharbeit noetig"}
+                            </span>
                         </div>
 
                         <h2 className="text-xl font-semibold text-white">
-                            {task?.name ?? "Coding challenge feedback"}
+                            {task?.name ?? "Coding-Challenge Feedback"}
                         </h2>
                         <p className="max-w-3xl text-sm text-gray-300">
                             {evaluation.summary}
@@ -196,7 +193,7 @@ export default function CodingChallengeFeedback() {
 
                     <div className="min-w-[180px] rounded-xl border border-white/10 bg-gray-950 p-4">
                         <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm text-gray-400">Overall score</p>
+                            <p className="text-sm text-gray-400">Gesamtscore</p>
                             <span className={`rounded-full px-3 py-1 text-xs ${overallTone.badge}`}>
                                 {overallTone.label}
                             </span>
@@ -216,26 +213,26 @@ export default function CodingChallengeFeedback() {
 
             <div className="grid gap-4 lg:grid-cols-3">
                 <ScoreCard
-                    title="Correctness"
+                    title="Korrektheit"
                     value={evaluation.correctness.score}
                     feedback={evaluation.correctness.feedback}
                 />
                 <ScoreCard
-                    title="Code Quality"
+                    title="Code-Qualitaet"
                     value={evaluation.codeQuality.score}
                     feedback={evaluation.codeQuality.feedback}
                 />
                 <ScoreCard
-                    title="Problem Solving"
+                    title="Problemloesung"
                     value={evaluation.problemSolving.score}
                     feedback={evaluation.problemSolving.feedback}
                 />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
-                <ListCard title="Strengths" items={evaluation.strengths} />
-                <ListCard title="Issues" items={evaluation.issues} />
-                <ListCard title="Improvements" items={evaluation.improvements} />
+                <ListCard title="Staerken" items={evaluation.strengths} />
+                <ListCard title="Risiken" items={evaluation.issues} />
+                <ListCard title="Verbesserungen" items={evaluation.improvements} />
             </div>
         </div>
     );

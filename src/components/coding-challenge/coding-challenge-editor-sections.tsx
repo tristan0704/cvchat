@@ -30,7 +30,7 @@ function TaskPanel({
 export function CodingChallengeLoadingState() {
   return (
     <div className="rounded-xl border border-white/10 bg-gray-900 p-6 text-sm text-gray-300">
-      Loading coding challenge...
+      Coding-Challenge wird geladen...
     </div>
   );
 }
@@ -104,14 +104,14 @@ export function CodingChallengeHeader({
           disabled={isRefreshing}
           className="rounded-md border border-white/15 px-3 py-2 text-sm text-white transition hover:bg-white/5 disabled:opacity-50"
         >
-          {isRefreshing ? "Loading..." : "New task"}
+          {isRefreshing ? "Lade..." : "Neue Aufgabe"}
         </button>
         <button
           type="button"
           onClick={onResetCode}
           className="rounded-md bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-400"
         >
-          Reset code
+          Code zuruecksetzen
         </button>
         <button
           type="button"
@@ -119,7 +119,7 @@ export function CodingChallengeHeader({
           disabled={isSubmitting}
           className="rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-400 disabled:opacity-50"
         >
-          {isSubmitting ? "Submitting..." : "Submit solution"}
+          {isSubmitting ? "Sende..." : "Loesung einreichen"}
         </button>
       </div>
     </div>
@@ -133,13 +133,13 @@ export function CodingChallengeSidebar({
 }) {
   return (
     <aside className="space-y-4">
-      <TaskPanel title="Task">
+      <TaskPanel title="Aufgabe">
         <p className="mt-3 whitespace-pre-line text-sm leading-6 text-gray-200">
           {task.statement}
         </p>
       </TaskPanel>
 
-      <TaskPanel title="Requirements">
+      <TaskPanel title="Anforderungen">
         <ul className="mt-3 space-y-2 text-sm text-gray-200">
           {task.requirements.map((requirement) => (
             <li key={requirement}>{requirement}</li>
@@ -148,7 +148,7 @@ export function CodingChallengeSidebar({
       </TaskPanel>
 
       {task.examples.length > 0 ? (
-        <TaskPanel title="Examples">
+        <TaskPanel title="Beispiele">
           <ul className="mt-3 space-y-2 text-sm text-gray-200">
             {task.examples.map((example) => (
               <li key={example}>{example}</li>
@@ -180,8 +180,8 @@ export function CodingChallengeWorkspace({
           <span className="font-semibold text-white">
             {LANGUAGE_LABELS[language]}
           </span>
-          <span>{lineCount} lines</span>
-          <span>{characterCount} chars</span>
+          <span>{lineCount} Zeilen</span>
+          <span>{characterCount} Zeichen</span>
         </div>
 
         <div className="rounded-full border border-white/10 px-3 py-1">

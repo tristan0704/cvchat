@@ -1,7 +1,5 @@
 "use client";
 
-import { useParams } from "next/navigation";
-
 import {
   CodingChallengeErrorState,
   CodingChallengeHeader,
@@ -12,14 +10,12 @@ import {
 } from "@/components/coding-challenge/coding-challenge-editor-sections";
 import { useCodingChallengeSubmission } from "@/lib/coding-challenge/use-coding-challenge-submission";
 import { useCodingChallengeTask } from "@/lib/coding-challenge/use-coding-challenge-task";
-import { useOptionalInterviewSession } from "@/lib/interview-session/context";
-import { getInterviewSessionId } from "@/lib/interview-session/session-id";
+import { useInterviewSession } from "@/lib/interview-session/context";
 
 export default function CodingChallengeEditor() {
-  const params = useParams<{ id: string }>();
-  const session = useOptionalInterviewSession();
-  const interviewId = getInterviewSessionId(params.id);
-  const roleLabel = session?.role ?? "Backend Developer";
+  const session = useInterviewSession();
+  const interviewId = session.interviewId;
+  const roleLabel = session.role;
   const {
     draft,
     error,
@@ -48,7 +44,7 @@ export default function CodingChallengeEditor() {
   if (!draft) {
     return (
       <CodingChallengeErrorState
-        message={error || "No coding challenge available."}
+        message={error || "Keine Coding-Challenge verfuegbar."}
       />
     );
   }
@@ -90,13 +86,13 @@ export default function CodingChallengeEditor() {
 
       {!submitError && isSubmitting ? (
         <CodingChallengeSubmitState
-          message="Submitting solution for review..."
+          message="Loesung wird zur Bewertung eingereicht..."
         />
       ) : null}
 
       {!submitError && !isSubmitting && hasSubmittedCurrentTask ? (
         <CodingChallengeSubmitState
-          message="Solution submitted. The GPT evaluation was stored for the next step."
+          message="Loesung eingereicht. Die GPT-Bewertung wurde fuer den naechsten Schritt gespeichert."
           tone="success"
         />
       ) : null}

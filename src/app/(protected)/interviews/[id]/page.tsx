@@ -12,12 +12,19 @@ import { InterviewSessionProvider } from "@/lib/interview-session/context";
 
 type InterviewDetail = {
     id: string;
+    templateId: string | null;
     title: string;
     role: string;
     experience: string;
     companySize: string;
     interviewType: string;
     currentStep: number;
+    cv: {
+        id: string;
+        fileName: string;
+        fileSizeBytes: number | null;
+        uploadedAt: string;
+    } | null;
     plannedQuestions: Array<{
         id: string;
         sequence: number;
@@ -25,6 +32,9 @@ type InterviewDetail = {
         text: string;
         priority: number | null;
     }>;
+    transcript: {
+        transcriptStatus: "idle" | "recording" | "transcribing" | "ready" | "error";
+    } | null;
     cvFeedback: {
         quality: {
             overallScore: number;
@@ -58,6 +68,74 @@ type InterviewDetail = {
         } | null;
     } | null;
 };
+
+async function fetchInterviewDetail(interviewId: string) {
+    const response = await fetch(`/api/interviews/${interviewId}`, {
+        method: "GET",
+        cache: "no-store",
+    });
+    const data = (await response.json().catch(() => null)) as
+        | { interview?: InterviewDetail; error?: string }
+        | null;
+
+    if (!response.ok || !data?.interview) {
+        throw new Error(data?.error || "Interview konnte nicht geladen werden.");
+    }
+
+    return data.interview;
+}
+
+function getMaxAccessibleStep(interview: InterviewDetail) {
+    if (interview.codingChallenge?.evaluation) {
+        return 6;
+    }
+
+    if (interview.feedback) {
+        return 4;
+    }
+
+    if (
+        interview.transcript?.transcriptStatus &&
+        interview.transcript.transcriptStatus !== "idle"
+    ) {
+        return 3;
+    }
+
+    if (interview.cvFeedback) {
+        return 2;
+    }
+
+    return 1;
+}
+
+function getNextStepRequirement(step: number, interview: InterviewDetail) {
+    if (step === 1) {
+        return interview.cvFeedback
+            ? null
+            : "Schritt 1 braucht zuerst ein gespeichertes CV-Feedback.";
+    }
+
+    if (step === 2) {
+        return interview.transcript?.transcriptStatus &&
+            interview.transcript.transcriptStatus !== "idle"
+            ? null
+            : "Schritt 2 braucht zuerst einen beendeten Call, damit das Transkript gestartet wird.";
+    }
+
+    if (step === 3) {
+        return interview.feedback
+            ? null
+            : "Schritt 3 braucht zuerst das persistierte Interview-Feedback.";
+    }
+
+    if (step === 4) {
+        return interview.codingChallenge?.evaluation
+            ? null
+            : "Schritt 4 braucht zuerst eine abgegebene und bewertete Coding-Challenge.";
+    }
+
+    return null;
+}
 
 function SummaryCard({
     label,
@@ -278,7 +356,7 @@ function OverallFeedbackBlock({
                 </div>
             ) : (
                 <div className="mt-4 rounded-lg bg-gray-900 p-4 text-sm text-gray-300">
-                    Schließe zuerst CV, Interview und Coding-Challenge ab, damit
+                    Schliesse zuerst CV, Interview und Coding-Challenge ab, damit
                     hier eine Gesamtbewertung erscheint.
                 </div>
             )}
@@ -303,23 +381,11 @@ function InterviewDetailPageContent() {
             setError("");
 
             try {
-                const response = await fetch(`/api/interviews/${interviewId}`, {
-                    method: "GET",
-                    cache: "no-store",
-                });
-                const data = (await response.json().catch(() => null)) as
-                    | { interview?: InterviewDetail; error?: string }
-                    | null;
-
-                if (!response.ok || !data?.interview) {
-                    throw new Error(
-                        data?.error || "Interview konnte nicht geladen werden."
-                    );
-                }
+                const nextInterview = await fetchInterviewDetail(interviewId);
 
                 if (!cancelled) {
-                    setInterview(data.interview);
-                    setStep(data.interview.currentStep || 1);
+                    setInterview(nextInterview);
+                    setStep(nextInterview.currentStep || 1);
                 }
             } catch (interviewError) {
                 if (!cancelled) {
@@ -343,6 +409,29 @@ function InterviewDetailPageContent() {
         };
     }, [interviewId]);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        const intervalId = window.setInterval(() => {
+            void (async () => {
+                try {
+                    const refreshedInterview = await fetchInterviewDetail(interviewId);
+
+                    if (!cancelled) {
+                        setInterview(refreshedInterview);
+                    }
+                } catch {
+                    // Silent refresh keeps step gating aligned with persisted data.
+                }
+            })();
+        }, 4_000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+        };
+    }, [interviewId]);
+
     const config = useMemo(
         () =>
             interview
@@ -362,41 +451,33 @@ function InterviewDetailPageContent() {
     );
 
     async function persistStep(nextStep: number) {
-        setStep(nextStep);
+        const boundedStep = Math.max(1, Math.min(6, nextStep));
+        setStep(boundedStep);
 
         try {
-            await fetch(`/api/interviews/${interviewId}`, {
+            const response = await fetch(`/api/interviews/${interviewId}`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    currentStep: nextStep,
+                    currentStep: boundedStep,
                 }),
             });
 
-            const refreshedResponse = await fetch(`/api/interviews/${interviewId}`, {
-                method: "GET",
-                cache: "no-store",
-            });
-            const refreshedData = (await refreshedResponse
-                .json()
-                .catch(() => null)) as { interview?: InterviewDetail } | null;
+            const refreshedInterview = await fetchInterviewDetail(interviewId);
 
-            if (refreshedData?.interview) {
-                setInterview(refreshedData.interview);
-            } else {
-                setInterview((currentInterview) =>
-                    currentInterview
-                        ? {
-                              ...currentInterview,
-                              currentStep: nextStep,
-                          }
-                        : currentInterview
-                );
+            if (!response.ok) {
+                throw new Error("Interview-Schritt konnte nicht gespeichert werden.");
             }
-        } catch {
-            // Optimistic UI is sufficient here; detail data is reloaded on revisit.
+            setInterview(refreshedInterview);
+            setStep(refreshedInterview.currentStep || boundedStep);
+        } catch (persistError) {
+            setError(
+                persistError instanceof Error
+                    ? persistError.message
+                    : "Interview-Schritt konnte nicht gespeichert werden."
+            );
         }
     }
 
@@ -416,6 +497,11 @@ function InterviewDetailPageContent() {
         );
     }
 
+    const maxAccessibleStep = getMaxAccessibleStep(interview);
+    const nextStepRequirement = getNextStepRequirement(step, interview);
+    const canAdvance =
+        step < 6 && step + 1 <= maxAccessibleStep && nextStepRequirement === null;
+
     return (
         <InterviewSessionProvider
             interviewId={interview.id}
@@ -426,6 +512,36 @@ function InterviewDetailPageContent() {
                 <main className="mx-auto max-w-7xl px-4 py-10">
                     <h1 className="text-3xl font-bold">{interview.title}</h1>
                     <p className="mt-2 text-gray-400">Schritt {step} von 6</p>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {[
+                            "CV",
+                            "Voice",
+                            "Interview",
+                            "Code",
+                            "Code Review",
+                            "Gesamt",
+                        ].map((label, index) => {
+                            const stepNumber = index + 1;
+                            const isActive = stepNumber === step;
+                            const isUnlocked = stepNumber <= maxAccessibleStep;
+
+                            return (
+                                <span
+                                    key={label}
+                                    className={`rounded-full px-3 py-1 text-xs ${
+                                        isActive
+                                            ? "bg-indigo-500 text-white"
+                                            : isUnlocked
+                                              ? "bg-white/10 text-gray-200"
+                                              : "bg-white/5 text-gray-500"
+                                    }`}
+                                >
+                                    {stepNumber}. {label}
+                                </span>
+                            );
+                        })}
+                    </div>
 
                     {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
 
@@ -466,12 +582,21 @@ function InterviewDetailPageContent() {
                             </button>
 
                             {step < 6 ? (
-                                <button
-                                    onClick={() => void persistStep(step + 1)}
-                                    className="rounded-md bg-indigo-500 px-4 py-2"
-                                >
-                                    Weiter
-                                </button>
+                                <div className="text-right">
+                                    {nextStepRequirement ? (
+                                        <p className="mb-2 text-xs text-amber-300">
+                                            {nextStepRequirement}
+                                        </p>
+                                    ) : null}
+
+                                    <button
+                                        onClick={() => void persistStep(step + 1)}
+                                        disabled={!canAdvance}
+                                        className="rounded-md bg-indigo-500 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        Weiter
+                                    </button>
+                                </div>
                             ) : (
                                 <div className="flex gap-2">
                                     <button

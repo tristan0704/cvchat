@@ -1,12 +1,10 @@
 "use client";
 
-import { Suspense, type ReactNode } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { type ReactNode } from "react";
 
 import { FaceLandmarkPanel } from "@/components/interviews/face-landmark-panel";
 import { formatCountdown } from "@/lib/interview";
-import { useOptionalInterviewSession } from "@/lib/interview-session/context";
-import { getInterviewSessionId } from "@/lib/interview-session/session-id";
+import { useInterviewSession } from "@/lib/interview-session/context";
 import { LAST_MINUTE_THRESHOLD_SECONDS } from "@/lib/voice-interview/session/endgame";
 import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-voice-interview-controller";
 
@@ -188,10 +186,10 @@ function VoiceInterviewContent({
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
-                            Live Interview
+                            Live-Interview
                         </p>
                         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-                            Voice Call
+                            Sprach-Call
                         </h1>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
                             Reduzierte Live-Ansicht fuer den laufenden Call mit{" "}
@@ -314,42 +312,14 @@ function VoiceInterviewContent({
     );
 }
 
-function StandaloneInterviewVoiceStepContent() {
-    const searchParams = useSearchParams();
-    const role = searchParams.get("role") ?? "Backend Developer";
-    const controller = useVoiceInterviewController(role);
-    const params = useParams<{ id?: string }>();
-    const interviewSessionId = getInterviewSessionId(params?.id);
+export default function InterviewVoiceStep() {
+    const session = useInterviewSession();
 
     return (
         <VoiceInterviewContent
-            key={role}
-            role={role}
-            controller={controller}
-            interviewSessionId={interviewSessionId}
+            role={session.role}
+            controller={session.voiceInterview}
+            interviewSessionId={session.interviewId}
         />
-    );
-}
-
-export default function InterviewVoiceStep() {
-    const session = useOptionalInterviewSession();
-    const controller = session?.voiceInterview;
-    const params = useParams<{ id?: string }>();
-    const interviewSessionId = getInterviewSessionId(params?.id);
-
-    if (controller) {
-        return (
-            <VoiceInterviewContent
-                role={session.role}
-                controller={controller}
-                interviewSessionId={interviewSessionId}
-            />
-        );
-    }
-
-    return (
-        <Suspense fallback={<div className="min-h-[320px] rounded-xl bg-gray-800/50 outline outline-1 outline-white/10" />}>
-            <StandaloneInterviewVoiceStepContent />
-        </Suspense>
     );
 }

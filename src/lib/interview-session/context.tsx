@@ -105,3 +105,13 @@ export function InterviewSessionProvider({
 export function useOptionalInterviewSession() {
     return useContext(InterviewSessionContext);
 }
+
+export function useInterviewSession() {
+    const session = useContext(InterviewSessionContext);
+
+    if (!session) {
+        throw new Error("Interview session context is missing.");
+    }
+
+    return session;
+}

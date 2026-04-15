@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useParams } from "next/navigation";
 
 import type { FaceAnalysisParameterReport, FaceAnalysisReport } from "@/lib/face-analysis";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback/fingerprint";
@@ -11,8 +10,7 @@ import type {
     InterviewFeedbackEvaluation,
     InterviewFeedbackEvaluationDimension,
 } from "@/lib/interview-feedback/types";
-import { useOptionalInterviewSession } from "@/lib/interview-session/context";
-import { getInterviewSessionId } from "@/lib/interview-session/session-id";
+import { useInterviewSession } from "@/lib/interview-session/context";
 import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 import {
     formatMetricSeconds,
@@ -164,7 +162,9 @@ function ListCard({
 
             <ul className="mt-3 space-y-2 text-sm text-gray-200">
                 {items.length > 0 ? (
-                    items.map((item) => <li key={`${title}-${item}`}>{item}</li>)
+                    items.map((item, index) => (
+                        <li key={`${title}-${index}-${item}`}>{item}</li>
+                    ))
                 ) : (
                     <li className="text-gray-500">{emptyLabel}</li>
                 )}
@@ -263,7 +263,7 @@ function AnalysisStateCard(args: {
                         </div>
 
                         <h2 className="text-xl font-semibold text-white">
-                            Interview Feedback
+                            Interview-Feedback
                         </h2>
                         <p className="max-w-3xl text-sm text-gray-300">
                             {args.summary}
@@ -272,7 +272,7 @@ function AnalysisStateCard(args: {
 
                     <div className="min-w-[220px] rounded-xl border border-white/10 bg-gray-950 p-4">
                         <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm text-gray-400">Overall score</p>
+                            <p className="text-sm text-gray-400">Gesamtscore</p>
                             <span
                                 className={`rounded-full px-3 py-1 text-xs ${tone.badge}`}
                             >
@@ -399,14 +399,13 @@ type PersistedInterviewFeedbackState = {
 };
 
 export default function InterviewFeedback() {
-    const session = useOptionalInterviewSession();
-    const params = useParams<{ id?: string }>();
-    const interviewId = session?.interviewId ?? getInterviewSessionId(params?.id);
-    const controller = session?.voiceInterview ?? null;
-    const role = session?.role ?? "Backend Developer";
-    const experience = session?.config.experience ?? "";
-    const companySize = session?.config.companySize ?? "";
-    const interviewType = session?.config.interviewType ?? "";
+    const session = useInterviewSession();
+    const interviewId = session.interviewId;
+    const controller = session.voiceInterview;
+    const role = session.role;
+    const experience = session.config.experience ?? "";
+    const companySize = session.config.companySize ?? "";
+    const interviewType = session.config.interviewType ?? "";
     const [persistedState, setPersistedState] =
         useState<PersistedInterviewFeedbackState | null>(null);
     const [loadError, setLoadError] = useState("");
@@ -415,10 +414,6 @@ export default function InterviewFeedback() {
         let cancelled = false;
 
         async function hydratePersistedInterview() {
-            if (!interviewId || interviewId === "standalone") {
-                return;
-            }
-
             try {
                 const response = await fetch(`/api/interviews/${interviewId}`, {
                     method: "GET",
@@ -471,11 +466,7 @@ export default function InterviewFeedback() {
     }, [interviewId]);
 
     useEffect(() => {
-        if (
-            !controller?.hasTimingMetrics ||
-            !interviewId ||
-            interviewId === "standalone"
-        ) {
+        if (!controller?.hasTimingMetrics) {
             return;
         }
 
@@ -540,7 +531,7 @@ export default function InterviewFeedback() {
 
     const analysis = useInterviewFeedbackAnalysis({
         interviewId,
-        enabled: interviewId !== "standalone" && analysisEnabled,
+        enabled: analysisEnabled,
         role,
         experience,
         companySize,
@@ -588,17 +579,17 @@ export default function InterviewFeedback() {
                 <>
                     <div className="grid gap-4 lg:grid-cols-3">
                         <ScoreCard
-                            title="Communication"
+                            title="Kommunikation"
                             value={evaluation.communication.score}
                             feedback={evaluation.communication.feedback}
                         />
                         <ScoreCard
-                            title="Answer Quality"
+                            title="Antwortqualitaet"
                             value={evaluation.answerQuality.score}
                             feedback={evaluation.answerQuality.feedback}
                         />
                         <ScoreCard
-                            title="Role Fit"
+                            title="Rollenfit"
                             value={evaluation.roleFit.score}
                             feedback={evaluation.roleFit.feedback}
                         />
@@ -627,8 +618,8 @@ export default function InterviewFeedback() {
             <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
                 <SurfaceCard>
                     <SectionHeading
-                        eyebrow="Media"
-                        title="Interview Replay"
+                        eyebrow="Replay"
+                        title="Interview-Wiedergabe"
                         description="Replay der gemeinsamen Aufnahme mit Interviewer- und Kandidatenstimme."
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
@@ -681,8 +672,8 @@ export default function InterviewFeedback() {
 
                 <SurfaceCard>
                     <SectionHeading
-                        eyebrow="Transcript"
-                        title="Interview Transcript"
+                        eyebrow="Transkript"
+                        title="Interview-Transkript"
                         description="Dieselbe strukturierte Export-Basis wird fuer die GPT-Auswertung verwendet."
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
@@ -718,7 +709,7 @@ export default function InterviewFeedback() {
             <SurfaceCard>
                 <SectionHeading
                     eyebrow="Timing"
-                    title="Timing Metrics"
+                    title="Timing-Metriken"
                     description="WPM und Antwort-Timing bleiben als eigene Signale neben der GPT-Auswertung sichtbar."
                     badge={
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
@@ -797,7 +788,7 @@ export default function InterviewFeedback() {
             <SurfaceCard>
                 <SectionHeading
                     eyebrow="Face"
-                    title="Face Metrics"
+                    title="Face-Metriken"
                     description="Video-Metriken bleiben erhalten und werden im selben dunklen Feedback-System dargestellt."
                     badge={
                         faceAnalysisReport ? (
@@ -866,7 +857,7 @@ export default function InterviewFeedback() {
                                 emptyLabel="Keine besonderen Risiken erkannt."
                             />
                             <ListCard
-                                title="Next Steps"
+                                title="Naechste Schritte"
                                 items={faceAnalysisReport.summary.nextSteps}
                                 emptyLabel="Keine naechsten Schritte vorhanden."
                             />
@@ -874,7 +865,7 @@ export default function InterviewFeedback() {
 
                         {faceAnalysisReport.alerts.length > 0 ? (
                             <ListCard
-                                title="Alerts"
+                                title="Hinweise"
                                 items={faceAnalysisReport.alerts.map(
                                     (alert) => alert.message
                                 )}

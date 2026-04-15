@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -69,8 +70,10 @@ export default function UpdatePasswordPage() {
     return (
         <div className="flex min-h-screen flex-col justify-center bg-gray-900 px-6 py-12 lg:px-8">
             <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-                <img
+                <Image
                     src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500"
+                    width={40}
+                    height={40}
                     className="mx-auto h-10 w-auto"
                     alt="Logo"
                 />

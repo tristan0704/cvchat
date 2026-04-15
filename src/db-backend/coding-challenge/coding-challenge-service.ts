@@ -8,6 +8,7 @@ import type {
 } from "@prisma/client";
 
 import taskManifest from "@/lib/coding-challenge/tasks.json";
+import { acquireTransactionalAdvisoryLock } from "@/db-backend/prisma/advisory-lock";
 import { db } from "@/db-backend/prisma/client";
 import { evaluateCodingChallengeSubmission } from "@/lib/coding-challenge/server/evaluate-submission";
 import type {
@@ -124,7 +125,7 @@ function mapDraft(args: {
     };
 }
 
-async function ensureCodingChallengeTasksSeeded() {
+export async function ensureCodingChallengeTasksSeeded() {
     const taskCount = await db.codingChallengeTask.count();
     if (taskCount >= manifestTasks.length) {
         return;
@@ -189,6 +190,13 @@ async function getOwnedInterview(userId: string, interviewId: string) {
             id: interviewId,
             userId,
         },
+        include: {
+            feedback: {
+                select: {
+                    id: true,
+                },
+            },
+        },
     });
 
     if (!interview) {
@@ -238,92 +246,124 @@ export async function assignCodingChallengeAttempt(args: {
     await ensureCodingChallengeTasksSeeded();
     const interview = await getOwnedInterview(args.userId, args.interviewId);
 
-    if (!args.excludeTaskId) {
-        const latestAttempt = await db.codingChallengeAttempt.findFirst({
+    if (!interview.feedback) {
+        throw new Error("Interview feedback must be completed first");
+    }
+
+    return db.$transaction(async (tx) => {
+        await acquireTransactionalAdvisoryLock(
+            tx,
+            "coding-challenge-attempt",
+            interview.id
+        );
+
+        if (!args.excludeTaskId) {
+            const latestAttempt = await tx.codingChallengeAttempt.findFirst({
+                where: {
+                    interviewId: interview.id,
+                },
+                orderBy: {
+                    attemptNumber: "desc",
+                },
+                include: {
+                    task: true,
+                    evaluation: true,
+                },
+            });
+
+            if (latestAttempt) {
+                return mapDraft({
+                    attempt: latestAttempt,
+                    task: latestAttempt.task,
+                    evaluation: latestAttempt.evaluation,
+                });
+            }
+        }
+
+        const mappedTasks = interview.templateId
+            ? (
+                  await tx.interviewTemplateCodingChallenge.findMany({
+                      where: {
+                          templateId: interview.templateId,
+                          task: {
+                              isActive: true,
+                          },
+                      },
+                      orderBy: [{ sequence: "asc" }, { createdAt: "asc" }],
+                      include: {
+                          task: true,
+                      },
+                  })
+              ).map((item) => item.task)
+            : [];
+
+        const roleTasks =
+            mappedTasks.length > 0
+                ? mappedTasks
+                : await tx.codingChallengeTask.findMany({
+                      where: {
+                          isActive: true,
+                          role: normalizeCodingChallengeRole(args.role),
+                      },
+                      orderBy: {
+                          createdAt: "asc",
+                      },
+                  });
+
+        const fallbackTasks =
+            roleTasks.length > 0
+                ? roleTasks
+                : await tx.codingChallengeTask.findMany({
+                      where: {
+                          isActive: true,
+                          role: "fullstack",
+                      },
+                      orderBy: {
+                          createdAt: "asc",
+                      },
+                  });
+
+        const availableTasks =
+            args.excludeTaskId && fallbackTasks.length > 1
+                ? fallbackTasks.filter((task) => task.id !== args.excludeTaskId)
+                : fallbackTasks;
+
+        const taskPool =
+            availableTasks.length > 0 ? availableTasks : fallbackTasks;
+        const selectedTask =
+            taskPool[Math.floor(Math.random() * taskPool.length)] ?? taskPool[0];
+
+        if (!selectedTask) {
+            throw new Error("No coding challenge available");
+        }
+
+        const latestAttempt = await tx.codingChallengeAttempt.findFirst({
             where: {
                 interviewId: interview.id,
             },
             orderBy: {
                 attemptNumber: "desc",
             },
-            include: {
-                task: true,
-                evaluation: true,
+            select: {
+                attemptNumber: true,
             },
         });
 
-        if (latestAttempt) {
-            return mapDraft({
-                attempt: latestAttempt,
-                task: latestAttempt.task,
-                evaluation: latestAttempt.evaluation,
-            });
-        }
-    }
+        const attempt = await tx.codingChallengeAttempt.create({
+            data: {
+                interviewId: interview.id,
+                taskId: selectedTask.id,
+                attemptNumber: (latestAttempt?.attemptNumber ?? 0) + 1,
+                status: "assigned",
+                draftCode: selectedTask.starterCode,
+                taskSnapshot: toPublicTask(selectedTask),
+            },
+        });
 
-    const normalizedRole = normalizeCodingChallengeRole(args.role);
-    const roleTasks = await db.codingChallengeTask.findMany({
-        where: {
-            isActive: true,
-            role: normalizedRole,
-        },
-        orderBy: {
-            createdAt: "asc",
-        },
-    });
-
-    const fallbackTasks =
-        roleTasks.length > 0
-            ? roleTasks
-            : await db.codingChallengeTask.findMany({
-                  where: {
-                      isActive: true,
-                      role: "fullstack",
-                  },
-                  orderBy: {
-                      createdAt: "asc",
-                  },
-              });
-
-    const availableTasks =
-        args.excludeTaskId && fallbackTasks.length > 1
-            ? fallbackTasks.filter((task) => task.id !== args.excludeTaskId)
-            : fallbackTasks;
-
-    const taskPool = availableTasks.length > 0 ? availableTasks : fallbackTasks;
-    const selectedTask =
-        taskPool[Math.floor(Math.random() * taskPool.length)] ?? taskPool[0];
-
-    if (!selectedTask) {
-        throw new Error("No coding challenge available");
-    }
-
-    const latestAttempt = await db.codingChallengeAttempt.findFirst({
-        where: {
-            interviewId: interview.id,
-        },
-        orderBy: {
-            attemptNumber: "desc",
-        },
-        select: {
-            attemptNumber: true,
-        },
-    });
-
-    const attempt = await db.codingChallengeAttempt.create({
-        data: {
-            interviewId: interview.id,
-            taskId: selectedTask.id,
-            attemptNumber: (latestAttempt?.attemptNumber ?? 0) + 1,
-            status: "assigned",
-            draftCode: selectedTask.starterCode,
-            taskSnapshot: toPublicTask(selectedTask),
-        },
-    });
-
-    return mapDraft({
-        attempt,
-        task: selectedTask,
+        return mapDraft({
+            attempt,
+            task: selectedTask,
+        });
     });
 }
 
