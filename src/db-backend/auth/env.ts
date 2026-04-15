@@ -1,29 +1,9 @@
-function readEnvValue(...keys: string[]) {
-    for (const key of keys) {
-        const value = process.env[key]?.trim();
-
-        if (value) {
-            return value;
-        }
-    }
-
-    return null;
-}
-
 export function getSupabaseUrl() {
-    return readEnvValue(
-        "NEXT_PUBLIC_SUPABASE_URL",
-        "STORAGE_SUPABASE_URL",
-    );
+    return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || null;
 }
 
 export function getSupabasePublishableKey() {
-    return readEnvValue(
-        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-        "STORAGE_SUPABASE_PUBLISHABLE_KEY",
-        "NEXT_PUBLIC_STORAGE_SUPABASE_PUBLISHABLE_KEY",
-        "NEXT_PUBLIC_STORAGE_SUPABASE_ANON_KEY",
-    );
+    return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || null;
 }
 
 export function requireSupabaseEnv() {
@@ -32,7 +12,7 @@ export function requireSupabaseEnv() {
 
     if (!url || !publishableKey) {
         throw new Error(
-            "Missing Supabase environment variables. Expected NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or STORAGE_SUPABASE_URL/STORAGE_SUPABASE_PUBLISHABLE_KEY.",
+            "Missing Supabase environment variables. Expected NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
         );
     }
 

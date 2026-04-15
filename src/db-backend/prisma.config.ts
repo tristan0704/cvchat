@@ -1,16 +1,19 @@
-import "dotenv/config";
-
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { config as loadEnv } from "dotenv";
 import { defineConfig } from "prisma/config";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(currentDir, "..", "..");
-const prismaDatasourceUrl =
-    process.env.DIRECT_URL?.trim() ||
-    process.env.DATABASE_URL?.trim() ||
-    "postgresql://postgres:postgres@localhost:5432/postgres";
+loadEnv({ path: path.join(workspaceRoot, ".env.local") });
+
+const directUrl = process.env.DIRECT_URL?.trim();
+const databaseUrl = process.env.DATABASE_URL?.trim();
+
+if (!databaseUrl) {
+    throw new Error("Missing DATABASE_URL in environment.");
+}
 
 export default defineConfig({
     schema: path.join(currentDir, "prisma/schema.prisma"),
@@ -19,6 +22,6 @@ export default defineConfig({
     },
     engine: "classic",
     datasource: {
-        url: prismaDatasourceUrl,
+        url: directUrl || databaseUrl,
     },
 });
