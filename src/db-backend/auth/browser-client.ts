@@ -1,8 +1,11 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { requireSupabaseEnv } from "@/db-backend/auth/env";
 
 export function createClient() {
+    const { url, publishableKey } = requireSupabaseEnv();
+
     return createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+        url,
+        publishableKey,
     );
 }
