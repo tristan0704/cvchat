@@ -1,6 +1,9 @@
 import "server-only";
 
 import { PrismaClient } from "@prisma/client";
+import { applyEnvAliases } from "@/db-backend/env";
+
+applyEnvAliases();
 
 const globalForPrisma = globalThis as typeof globalThis & {
     prisma?: PrismaClient;

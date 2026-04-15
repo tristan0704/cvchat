@@ -1,6 +1,7 @@
 import { db } from "@/db-backend/prisma/client";
 import { createClient } from "@/db-backend/auth/server-client";
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { requireSupabaseEnv } from "@/db-backend/auth/env";
 import { removeAvatarForUser } from "@/db-backend/profile/avatar-service";
 import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -8,9 +9,11 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 function createStatelessSupabaseClient() {
+    const { url, publishableKey } = requireSupabaseEnv();
+
     return createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+        url,
+        publishableKey,
         {
             auth: {
                 autoRefreshToken: false,

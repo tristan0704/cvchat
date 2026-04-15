@@ -1,10 +1,7 @@
-export function getSupabaseUrl() {
-    return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || null;
-}
-
-export function getSupabasePublishableKey() {
-    return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || null;
-}
+import {
+    getSupabasePublishableKey,
+    getSupabaseUrl,
+} from "@/db-backend/env";
 
 export function requireSupabaseEnv() {
     const url = getSupabaseUrl();
@@ -12,7 +9,7 @@ export function requireSupabaseEnv() {
 
     if (!url || !publishableKey) {
         throw new Error(
-            "Missing Supabase environment variables. Expected NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+            "Missing Supabase environment variables. Expected NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or the Vercel-provided SUPBASE_* equivalents.",
         );
     }
 
