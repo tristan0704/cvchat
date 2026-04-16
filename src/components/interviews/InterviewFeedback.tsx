@@ -396,8 +396,10 @@ type PersistedInterviewFeedbackState = {
 
 export default function InterviewFeedback({
     onEvaluationReady,
+    onNavigationStateChange,
 }: {
-    onEvaluationReady?: (evaluation: InterviewFeedbackEvaluation) => void;
+    onEvaluationReady?: () => void;
+    onNavigationStateChange?: (message: string | null) => void;
 }) {
     const session = useInterviewSession();
     const interviewId = session.interviewId;
@@ -485,17 +487,14 @@ export default function InterviewFeedback({
         });
     }, [controller?.hasTimingMetrics, controller?.interviewTimingMetrics, interviewId]);
 
-    const transcriptExport =
-        controller?.transcriptExport ??
-        persistedState?.transcript?.transcriptExport ??
-        "";
+    const transcriptExport = persistedState?.transcript?.transcriptExport ?? "";
     const transcriptStatus =
-        controller?.postCallTranscriptStatus ??
         persistedState?.transcript?.transcriptStatus ??
+        controller?.postCallTranscriptStatus ??
         "idle";
     const transcriptError =
-        controller?.postCallTranscriptError ??
         persistedState?.transcript?.transcriptError ??
+        controller?.postCallTranscriptError ??
         "";
     const recapStatus =
         controller?.interviewRecapStatus ??
@@ -540,6 +539,25 @@ export default function InterviewFeedback({
     });
 
     useEffect(() => {
+        if (!onNavigationStateChange) {
+            return;
+        }
+
+        const navigationLockMessage =
+            transcriptStatus === "recording" || transcriptStatus === "transcribing"
+                ? "Der Step-Wechsel bleibt gesperrt, waehrend das Transkript verarbeitet wird."
+                : analysis.status === "loading"
+                  ? "Der Step-Wechsel bleibt gesperrt, waehrend das Interview-Feedback gespeichert und geladen wird."
+                  : null;
+
+        onNavigationStateChange(navigationLockMessage);
+
+        return () => {
+            onNavigationStateChange(null);
+        };
+    }, [analysis.status, onNavigationStateChange, transcriptStatus]);
+
+    useEffect(() => {
         if (!analysis.evaluation) {
             return;
         }
@@ -550,7 +568,7 @@ export default function InterviewFeedback({
             faceAnalysis: currentState?.faceAnalysis ?? null,
             feedback: analysis.evaluation,
         }));
-        onEvaluationReady?.(analysis.evaluation);
+        onEvaluationReady?.();
     }, [analysis.evaluation, onEvaluationReady]);
 
     const faceAnalysisReport = persistedState?.faceAnalysis ?? null;

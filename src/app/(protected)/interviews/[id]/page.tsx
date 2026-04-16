@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import CodingChallengeEditor from "@/components/coding-challenge/coding-challenge-editor";
@@ -109,6 +109,45 @@ function getMaxAccessibleStep(args: {
     return 1;
 }
 
+function resolveVoiceNavigationLock(args: {
+    callLifecyclePhase:
+        | "idle"
+        | "opening"
+        | "interviewing"
+        | "closing"
+        | "stopping";
+    localTranscriptStatus: "idle" | "recording" | "transcribing" | "ready" | "error";
+    persistedTranscriptStatus:
+        | "idle"
+        | "recording"
+        | "transcribing"
+        | "ready"
+        | "error";
+}) {
+    if (args.callLifecyclePhase === "opening") {
+        return "Der Step-Wechsel bleibt gesperrt, waehrend die Voice-Session aufgebaut wird.";
+    }
+
+    if (
+        args.callLifecyclePhase === "interviewing" ||
+        args.callLifecyclePhase === "closing" ||
+        args.callLifecyclePhase === "stopping"
+    ) {
+        return "Der Step-Wechsel bleibt gesperrt, solange der Call noch laeuft oder beendet wird.";
+    }
+
+    if (
+        args.localTranscriptStatus === "recording" ||
+        args.localTranscriptStatus === "transcribing" ||
+        args.persistedTranscriptStatus === "recording" ||
+        args.persistedTranscriptStatus === "transcribing"
+    ) {
+        return "Der Step-Wechsel bleibt gesperrt, waehrend das Transkript verarbeitet wird.";
+    }
+
+    return null;
+}
+
 function getNextStepRequirement(args: {
     step: number;
     interview: InterviewDetail;
@@ -151,6 +190,10 @@ function InterviewDetailStepContent({
     router,
     persistStep,
     setInterview,
+    onRefreshInterview,
+    onFeedbackNavigationLockChange,
+    isPersistingStep,
+    feedbackNavigationLock,
 }: {
     interview: InterviewDetail;
     step: number;
@@ -158,12 +201,16 @@ function InterviewDetailStepContent({
     router: ReturnType<typeof useRouter>;
     persistStep: (nextStep: number) => Promise<void>;
     setInterview: React.Dispatch<React.SetStateAction<InterviewDetail | null>>;
+    onRefreshInterview: () => Promise<void>;
+    onFeedbackNavigationLockChange: (message: string | null) => void;
+    isPersistingStep: boolean;
+    feedbackNavigationLock: string | null;
 }) {
     const session = useOptionalInterviewSession();
-    const localTranscriptStatus = session?.voiceInterview.postCallTranscriptStatus ?? "idle";
-    const hasTranscriptProgress =
-        (interview.transcript?.transcriptStatus ?? "idle") !== "idle" ||
-        localTranscriptStatus !== "idle";
+    const persistedTranscriptStatus = interview.transcript?.transcriptStatus ?? "idle";
+    const localTranscriptStatus =
+        session?.voiceInterview.postCallTranscriptStatus ?? "idle";
+    const hasTranscriptProgress = persistedTranscriptStatus !== "idle";
     const hasInterviewFeedback = Boolean(interview.feedback);
     const maxAccessibleStep = getMaxAccessibleStep({
         interview,
@@ -178,6 +225,35 @@ function InterviewDetailStepContent({
     });
     const canAdvance =
         step < 6 && step + 1 <= maxAccessibleStep && nextStepRequirement === null;
+    const voiceNavigationLock =
+        step === 2
+            ? resolveVoiceNavigationLock({
+                  callLifecyclePhase:
+                      session?.voiceInterview.callLifecyclePhase ?? "idle",
+                  localTranscriptStatus,
+                  persistedTranscriptStatus,
+              })
+            : null;
+    const navigationLockMessage = voiceNavigationLock ?? feedbackNavigationLock;
+    const canNavigateBack = step > 1 && !isPersistingStep && !navigationLockMessage;
+    const canNavigateForward =
+        canAdvance && !isPersistingStep && !navigationLockMessage;
+
+    useEffect(() => {
+        if (step !== 2) {
+            return;
+        }
+
+        if (
+            localTranscriptStatus !== "transcribing" &&
+            localTranscriptStatus !== "ready" &&
+            localTranscriptStatus !== "error"
+        ) {
+            return;
+        }
+
+        void onRefreshInterview();
+    }, [localTranscriptStatus, onRefreshInterview, step]);
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
@@ -224,16 +300,8 @@ function InterviewDetailStepContent({
                         <InterviewVoiceStep />
                     ) : step === 3 ? (
                         <InterviewFeedback
-                            onEvaluationReady={(feedback) => {
-                                setInterview((currentInterview) =>
-                                    currentInterview
-                                        ? {
-                                              ...currentInterview,
-                                              feedback,
-                                          }
-                                        : currentInterview
-                                );
-                            }}
+                            onEvaluationReady={() => void onRefreshInterview()}
+                            onNavigationStateChange={onFeedbackNavigationLockChange}
                         />
                     ) : step === 4 ? (
                         <CodingChallengeEditor />
@@ -258,7 +326,7 @@ function InterviewDetailStepContent({
                     <div className="mt-6 flex justify-between">
                         <button
                             onClick={() => void persistStep(step - 1)}
-                            disabled={step === 1}
+                            disabled={!canNavigateBack}
                             className="text-sm text-gray-400 disabled:opacity-30"
                         >
                             Zurueck
@@ -266,7 +334,11 @@ function InterviewDetailStepContent({
 
                         {step < 6 ? (
                             <div className="text-right">
-                                {nextStepRequirement ? (
+                                {navigationLockMessage ? (
+                                    <p className="mb-2 text-xs text-amber-300">
+                                        {navigationLockMessage}
+                                    </p>
+                                ) : nextStepRequirement ? (
                                     <p className="mb-2 text-xs text-amber-300">
                                         {nextStepRequirement}
                                     </p>
@@ -274,7 +346,7 @@ function InterviewDetailStepContent({
 
                                 <button
                                     onClick={() => void persistStep(step + 1)}
-                                    disabled={!canAdvance}
+                                    disabled={!canNavigateForward}
                                     className="rounded-md bg-indigo-500 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     Weiter
@@ -538,21 +610,49 @@ function InterviewDetailPageContent() {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [isPersistingStep, setIsPersistingStep] = useState(false);
+    const [feedbackNavigationLock, setFeedbackNavigationLock] = useState<string | null>(
+        null
+    );
+
+    const refreshInterview = useCallback(
+        async (options?: { syncStep?: boolean; showLoading?: boolean }) => {
+            const { syncStep = false, showLoading = false } = options ?? {};
+
+            if (showLoading) {
+                setLoading(true);
+                setError("");
+            }
+
+            try {
+                const nextInterview = await fetchInterviewDetail(interviewId);
+                setInterview(nextInterview);
+
+                if (syncStep) {
+                    setStep(nextInterview.currentStep || 1);
+                }
+            } catch (interviewError) {
+                setError(
+                    interviewError instanceof Error
+                        ? interviewError.message
+                        : "Interview konnte nicht geladen werden."
+                );
+                throw interviewError;
+            } finally {
+                if (showLoading) {
+                    setLoading(false);
+                }
+            }
+        },
+        [interviewId]
+    );
 
     useEffect(() => {
         let cancelled = false;
 
         async function hydrateInterview() {
-            setLoading(true);
-            setError("");
-
             try {
-                const nextInterview = await fetchInterviewDetail(interviewId);
-
-                if (!cancelled) {
-                    setInterview(nextInterview);
-                    setStep(nextInterview.currentStep || 1);
-                }
+                await refreshInterview({ syncStep: true, showLoading: true });
             } catch (interviewError) {
                 if (!cancelled) {
                     setError(
@@ -560,10 +660,6 @@ function InterviewDetailPageContent() {
                             ? interviewError.message
                             : "Interview konnte nicht geladen werden."
                     );
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
                 }
             }
         }
@@ -573,7 +669,7 @@ function InterviewDetailPageContent() {
         return () => {
             cancelled = true;
         };
-    }, [interviewId]);
+    }, [interviewId, refreshInterview]);
 
     useEffect(() => {
         let cancelled = false;
@@ -616,7 +712,7 @@ function InterviewDetailPageContent() {
 
     async function persistStep(nextStep: number) {
         const boundedStep = Math.max(1, Math.min(6, nextStep));
-        setStep(boundedStep);
+        setIsPersistingStep(true);
 
         try {
             const response = await fetch(`/api/interviews/${interviewId}`, {
@@ -629,11 +725,11 @@ function InterviewDetailPageContent() {
                 }),
             });
 
-            const refreshedInterview = await fetchInterviewDetail(interviewId);
-
             if (!response.ok) {
                 throw new Error("Interview-Schritt konnte nicht gespeichert werden.");
             }
+
+            const refreshedInterview = await fetchInterviewDetail(interviewId);
             setInterview(refreshedInterview);
             setStep(refreshedInterview.currentStep || boundedStep);
         } catch (persistError) {
@@ -642,6 +738,8 @@ function InterviewDetailPageContent() {
                     ? persistError.message
                     : "Interview-Schritt konnte nicht gespeichert werden."
             );
+        } finally {
+            setIsPersistingStep(false);
         }
     }
 
@@ -674,6 +772,10 @@ function InterviewDetailPageContent() {
                 router={router}
                 persistStep={persistStep}
                 setInterview={setInterview}
+                onRefreshInterview={() => refreshInterview()}
+                onFeedbackNavigationLockChange={setFeedbackNavigationLock}
+                isPersistingStep={isPersistingStep}
+                feedbackNavigationLock={feedbackNavigationLock}
             />
         </InterviewSessionProvider>
     );
