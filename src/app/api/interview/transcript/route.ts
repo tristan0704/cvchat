@@ -16,8 +16,10 @@ import type {
     TranscriptQaPair,
 } from "@/lib/interview-transcript/types";
 import {
+    buildTranscriptQaPairs,
     buildTranscriptQaExport,
     extractInterviewerQuestions,
+    normalizeTranscriptText,
 } from "@/lib/interview-transcript";
 import {
     parseInterviewerQuestions,
@@ -128,6 +130,19 @@ function parseTranscriptStatus(value: unknown): PostCallTranscriptStatus {
         : "idle";
 }
 
+function buildFallbackTranscriptResult(entries: TranscriptEntry[]) {
+    const candidateTurns = entries
+        .filter((entry) => entry.speaker === "candidate")
+        .map((entry) => normalizeTranscriptText(entry.text))
+        .filter((entry) => !!entry);
+    const transcriptText = candidateTurns.join(" ").trim();
+
+    return {
+        transcriptText,
+        qaPairs: buildTranscriptQaPairs(entries),
+    };
+}
+
 export async function POST(req: Request) {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
@@ -194,6 +209,56 @@ export async function POST(req: Request) {
         return Response.json(result);
     } catch (error) {
         if (error instanceof TranscriptServiceError) {
+            const fallbackResult = buildFallbackTranscriptResult(transcriptEntries);
+
+            if (fallbackResult.transcriptText) {
+                if (interviewId) {
+                    const currentUser = await getCurrentAppUser();
+
+                    if (currentUser) {
+                        const transcriptExport = buildTranscriptQaExport(
+                            role,
+                            transcriptEntries,
+                            {
+                                qaPairs: fallbackResult.qaPairs,
+                                candidateTranscript:
+                                    fallbackResult.transcriptText,
+                            }
+                        );
+
+                        await saveInterviewTranscript({
+                            userId: currentUser.id,
+                            interviewId,
+                            role,
+                            transcriptStatus: "ready",
+                            candidateTranscript:
+                                fallbackResult.transcriptText,
+                            transcriptFingerprint:
+                                buildInterviewTranscriptFingerprint(
+                                    transcriptExport
+                                ),
+                            interviewerQuestions,
+                            entries: transcriptEntries,
+                            qaPairs: fallbackResult.qaPairs,
+                        }).catch(() => undefined);
+                    }
+                }
+
+                console.error("[api/interview/transcript][fallback]", {
+                    stage: error.stage,
+                    message: error.message,
+                    interviewId,
+                    transcriptEntryCount: transcriptEntries.length,
+                });
+
+                return Response.json({
+                    ...fallbackResult,
+                    model: "live-transcript-fallback",
+                    qaMappingModel: "live-transcript-fallback",
+                    qaMappingError: error.message,
+                });
+            }
+
             if (interviewId) {
                 const currentUser = await getCurrentAppUser();
 

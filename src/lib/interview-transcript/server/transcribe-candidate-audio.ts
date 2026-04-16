@@ -8,9 +8,37 @@ import {
   type TranscriptQaPair,
 } from "@/lib/interview-transcript";
 
+const GEMINI_API_VERSION = "v1alpha";
 const PRIMARY_TRANSCRIPTION_MODEL =
-  process.env.GEMINI_TRANSCRIPTION_MODEL || "gemini-2.5-flash";
-const TRANSCRIPTION_MODEL_FALLBACKS = ["gemini-2.5-flash"];
+  process.env.GEMINI_TRANSCRIPTION_MODEL || "models/gemini-2.5-flash";
+const TRANSCRIPTION_MODEL_FALLBACKS = ["models/gemini-2.5-flash"];
+
+function normalizeModelName(model: string) {
+  const normalized = model.trim();
+  if (!normalized) return "models/gemini-2.5-flash";
+  if (
+    normalized.startsWith("models/") ||
+    normalized.startsWith("publishers/") ||
+    normalized.startsWith("projects/")
+  ) {
+    return normalized;
+  }
+
+  return `models/${normalized}`;
+}
+
+function isModelLoadError(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes("model") &&
+    (normalizedMessage.includes("not found") ||
+      normalizedMessage.includes("not loaded") ||
+      normalizedMessage.includes("not supported") ||
+      normalizedMessage.includes("unavailable") ||
+      normalizedMessage.includes("failed_precondition"))
+  );
+}
 
 function logTranscriptRouteError(stage: string, details: Record<string, unknown>) {
   console.error("[interview/transcript]", {
@@ -68,7 +96,12 @@ export async function transcribeCandidateAudio({
   role,
   interviewerQuestions,
 }: TranscribeCandidateAudioArgs): Promise<TranscribeCandidateAudioResult> {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      apiVersion: GEMINI_API_VERSION,
+    },
+  });
   const uploadedFile = await ai.files
     .upload({
       file: audio,
@@ -103,7 +136,11 @@ export async function transcribeCandidateAudio({
     }
 
     const modelsToTry = Array.from(
-      new Set([PRIMARY_TRANSCRIPTION_MODEL, ...TRANSCRIPTION_MODEL_FALLBACKS])
+      new Set(
+        [PRIMARY_TRANSCRIPTION_MODEL, ...TRANSCRIPTION_MODEL_FALLBACKS].map(
+          normalizeModelName
+        )
+      )
     );
     let lastError = "Gemini transcription failed";
 
@@ -186,6 +223,9 @@ export async function transcribeCandidateAudio({
         logTranscriptRouteError("transcribe", {
           role,
           model,
+          errorType: isModelLoadError(lastError)
+            ? "model_load"
+            : "provider_runtime",
           interviewerQuestionCount: interviewerQuestions.length,
           audioType: audio.type || "audio/webm",
           audioSize: audio.size,

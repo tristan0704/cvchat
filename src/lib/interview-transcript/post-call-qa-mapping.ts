@@ -2,8 +2,8 @@ import { GoogleGenAI } from "@google/genai"
 import { normalizeTranscriptText } from "@/lib/interview-transcript/text"
 import type { TranscriptQaPair } from "@/lib/interview-transcript/types"
 
-const PRIMARY_QA_MAPPING_MODEL = process.env.GEMINI_QA_MAPPING_MODEL || "gemini-2.5-flash"
-const QA_MAPPING_MODEL_FALLBACKS = ["gemini-2.5-flash"]
+const PRIMARY_QA_MAPPING_MODEL = process.env.GEMINI_QA_MAPPING_MODEL || "models/gemini-2.5-flash"
+const QA_MAPPING_MODEL_FALLBACKS = ["models/gemini-2.5-flash"]
 
 const QA_MAPPING_RESPONSE_SCHEMA = {
     type: "object",
@@ -28,6 +28,20 @@ type MapPostCallTranscriptToQaPairsArgs = {
     role: string
     interviewerQuestions: string[]
     candidateTranscript: string
+}
+
+function normalizeModelName(model: string): string {
+    const normalized = model.trim()
+    if (!normalized) return "models/gemini-2.5-flash"
+    if (
+        normalized.startsWith("models/") ||
+        normalized.startsWith("publishers/") ||
+        normalized.startsWith("projects/")
+    ) {
+        return normalized
+    }
+
+    return `models/${normalized}`
 }
 
 function normalizeQuestions(interviewerQuestions: string[]): string[] {
@@ -81,7 +95,9 @@ export async function mapPostCallTranscriptToQaPairs(args: MapPostCallTranscript
         }
     }
 
-    const modelsToTry = Array.from(new Set([PRIMARY_QA_MAPPING_MODEL, ...QA_MAPPING_MODEL_FALLBACKS]))
+    const modelsToTry = Array.from(
+        new Set([PRIMARY_QA_MAPPING_MODEL, ...QA_MAPPING_MODEL_FALLBACKS].map(normalizeModelName))
+    )
     let lastError = "Gemini QA mapping failed"
 
     for (const model of modelsToTry) {
