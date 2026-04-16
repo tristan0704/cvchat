@@ -13,21 +13,17 @@ import { db } from "@/db-backend/prisma/client";
 import { acquireTransactionalAdvisoryLock } from "@/db-backend/prisma/advisory-lock";
 import { getLatestCodingChallengeAttempt } from "@/db-backend/coding-challenge/coding-challenge-service";
 import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
-import {
-    getInterviewTemplateById,
-    resolveInterviewTemplateForConfig,
-} from "@/db-backend/interviews/interview-template-service";
+import { getInterviewTemplateById } from "@/db-backend/interviews/interview-template-service";
 import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback/types";
 import { buildTranscriptQaExport } from "@/lib/interview-transcript";
 import type { TranscriptEntry, TranscriptQaPair } from "@/lib/interview-transcript/types";
-import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
+import type { CvFeedbackResult } from "@/lib/cv/types";
 import type { FaceAnalysisReport } from "@/lib/face-analysis";
 import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback/types";
 import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 
 export type InterviewListItem = {
     id: string;
-    templateId: string | null;
     title: string;
     role: string;
     status: InterviewStatus;
@@ -39,12 +35,10 @@ export type InterviewListItem = {
 
 export type InterviewDetail = {
     id: string;
-    templateId: string | null;
     title: string;
     role: string;
     experience: string;
     companySize: string;
-    interviewType: string;
     currentStep: number;
     status: InterviewStatus;
     createdAt: string;
@@ -96,16 +90,11 @@ export type InterviewDetail = {
     codingChallenge: Awaited<ReturnType<typeof getLatestCodingChallengeAttempt>>;
 };
 
-function normalizeConfig(config: InterviewCvConfig): InterviewCvConfig {
-    return {
-        role: config.role.trim() || "Backend Developer",
-        experience: config.experience.trim(),
-        companySize: config.companySize.trim(),
-        interviewType: config.interviewType.trim(),
-    };
-}
-
-function buildInterviewTitle(config: InterviewCvConfig) {
+function buildInterviewTitle(config: {
+    role: string;
+    experience: string;
+    companySize: string;
+}) {
     const role = config.role.trim() || "Backend Developer";
     return `${role} Interview`;
 }
@@ -152,7 +141,6 @@ function resolveMaxAccessibleStep(args: {
 
 function mapInterviewListItem(item: {
     id: string;
-    templateId: string | null;
     title: string | null;
     role: string;
     status: InterviewStatus;
@@ -163,12 +151,10 @@ function mapInterviewListItem(item: {
 }) {
     return {
         id: item.id,
-        templateId: item.templateId,
         title: item.title ?? buildInterviewTitle({
             role: item.role,
             experience: "",
             companySize: "",
-            interviewType: "",
         }),
         role: item.role,
         status: item.status,
@@ -363,7 +349,6 @@ function mapCvFeedbackAnalysis(analysis: {
     role: string;
     experience: string;
     companySize: string;
-    interviewType: string;
     overallScore: number;
     keywordScore: number;
     llmScore: number;
@@ -399,7 +384,6 @@ function mapCvFeedbackAnalysis(analysis: {
             role: analysis.role,
             experience: analysis.experience,
             companySize: analysis.companySize,
-            interviewType: analysis.interviewType,
         },
         quality: {
             overallScore: analysis.overallScore,
@@ -445,14 +429,9 @@ function mapCvFeedbackAnalysis(analysis: {
 
 export async function createInterviewForUser(args: {
     userId: string;
-    templateId?: string;
-    config?: InterviewCvConfig;
+    templateId: string;
 }) {
-    const template = args.templateId
-        ? await getInterviewTemplateById(args.templateId)
-        : args.config
-          ? await resolveInterviewTemplateForConfig(normalizeConfig(args.config))
-          : null;
+    const template = await getInterviewTemplateById(args.templateId);
 
     if (!template) {
         throw new Error("Interview template not found");
@@ -474,27 +453,24 @@ export async function createInterviewForUser(args: {
     const interview = await db.interview.create({
         data: {
             userId: args.userId,
-            templateId: template.id,
             cvVersionId: activeCv?.id ?? null,
             title: template.title,
             role: template.role,
             experience: template.experience,
             companySize: template.companySize,
-            interviewType: template.interviewType,
             currentStep: 1,
             status: "ready",
             plannedQuestions: {
-                create: template.questions.map((question) => ({
-                    sequence: question.sequence,
-                    questionKey: question.question.id,
-                    text: question.textOverride?.trim() || question.question.text,
-                    priority: question.priority ?? question.question.priority,
+                create: template.questions.map((question, index) => ({
+                    sequence: index + 1,
+                    questionKey: question.id,
+                    text: question.text,
+                    priority: question.priority,
                 })),
             },
         },
         select: {
             id: true,
-            templateId: true,
             title: true,
             role: true,
             status: true,
@@ -518,7 +494,6 @@ export async function listInterviewsForUser(userId: string) {
         },
         select: {
             id: true,
-            templateId: true,
             title: true,
             role: true,
             status: true,
@@ -580,19 +555,16 @@ export async function getInterviewDetailForUser(userId: string, interviewId: str
 
     return {
         id: interview.id,
-        templateId: interview.templateId,
         title:
             interview.title ??
             buildInterviewTitle({
                 role: interview.role,
                 experience: interview.experience,
                 companySize: interview.companySize,
-                interviewType: interview.interviewType,
             }),
         role: interview.role,
         experience: interview.experience,
         companySize: interview.companySize,
-        interviewType: interview.interviewType,
         currentStep: interview.currentStep,
         status: interview.status,
         createdAt: interview.createdAt.toISOString(),
@@ -736,7 +708,6 @@ export async function updateInterviewProgressForUser(args: {
         },
         select: {
             id: true,
-            templateId: true,
             title: true,
             role: true,
             status: true,

@@ -10,7 +10,6 @@ type InterviewTemplateSummary = {
     roleKey: string;
     experience: string;
     companySize: string;
-    interviewType: string;
     summary: string;
 };
 
@@ -18,7 +17,6 @@ type InterviewTemplateCatalog = {
     roles: string[];
     experiences: string[];
     companySizes: string[];
-    interviewTypes: string[];
     templates: InterviewTemplateSummary[];
 };
 
@@ -52,7 +50,6 @@ export default function NewInterviewPage() {
     const [role, setRole] = useState("");
     const [experience, setExperience] = useState("");
     const [companySize, setCompanySize] = useState("");
-    const [interviewType, setInterviewType] = useState("");
     const [loadingCatalog, setLoadingCatalog] = useState(true);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState("");
@@ -125,28 +122,12 @@ export default function NewInterviewPage() {
             [...new Set(companySizeTemplates.map((template) => template.companySize))],
         [companySizeTemplates]
     );
-    const interviewTypeTemplates = useMemo(
-        () =>
-            companySizeTemplates.filter(
-                (template) => template.companySize === companySize
-            ),
-        [companySize, companySizeTemplates]
-    );
-    const interviewTypeOptions = useMemo(
-        () =>
-            [
-                ...new Set(
-                    interviewTypeTemplates.map((template) => template.interviewType)
-                ),
-            ],
-        [interviewTypeTemplates]
-    );
     const selectedTemplate = useMemo(
         () =>
-            interviewTypeTemplates.find(
-                (template) => template.interviewType === interviewType
+            companySizeTemplates.find(
+                (template) => template.companySize === companySize
             ) ?? null,
-        [interviewType, interviewTypeTemplates]
+        [companySize, companySizeTemplates]
     );
 
     async function handleCreateInterview() {
@@ -194,18 +175,15 @@ export default function NewInterviewPage() {
         setRole(value);
         setExperience("");
         setCompanySize("");
-        setInterviewType("");
     }
 
     function selectExperience(value: string) {
         setExperience(value);
         setCompanySize("");
-        setInterviewType("");
     }
 
     function selectCompanySize(value: string) {
         setCompanySize(value);
-        setInterviewType("");
     }
 
     if (loadingCatalog) {
@@ -229,7 +207,7 @@ export default function NewInterviewPage() {
                 </p>
 
                 <div className="mt-8 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
-                    <p className="mb-4 text-sm text-gray-400">Schritt {step} von 4</p>
+                    <p className="mb-4 text-sm text-gray-400">Schritt {step} von 3</p>
 
                     {step === 1 ? (
                         <div className="space-y-4">
@@ -284,30 +262,13 @@ export default function NewInterviewPage() {
                         </div>
                     ) : null}
 
-                    {step === 4 ? (
-                        <div className="space-y-4">
-                            <h2 className="text-lg font-semibold">4. Interviewtyp</h2>
-                            <div className="grid gap-3">
-                                {interviewTypeOptions.map((item) => (
-                                    <StepButton
-                                        key={item}
-                                        active={interviewType === item}
-                                        onClick={() => setInterviewType(item)}
-                                    >
-                                        {item}
-                                    </StepButton>
-                                ))}
-                            </div>
-
-                            {selectedTemplate ? (
-                                <div className="rounded-lg bg-gray-900 p-4 text-sm text-gray-300 outline outline-1 outline-white/10">
-                                    <p className="font-medium text-white">
-                                        {selectedTemplate.title}
-                                    </p>
-                                    {selectedTemplate.summary ? (
-                                        <p className="mt-2">{selectedTemplate.summary}</p>
-                                    ) : null}
-                                </div>
+                    {step === 3 && selectedTemplate ? (
+                        <div className="mt-4 rounded-lg bg-gray-900 p-4 text-sm text-gray-300 outline outline-1 outline-white/10">
+                            <p className="font-medium text-white">
+                                {selectedTemplate.title}
+                            </p>
+                            {selectedTemplate.summary ? (
+                                <p className="mt-2">{selectedTemplate.summary}</p>
                             ) : null}
                         </div>
                     ) : null}
@@ -324,7 +285,7 @@ export default function NewInterviewPage() {
                             Zurueck
                         </button>
 
-                        {step < 4 ? (
+                        {step < 3 ? (
                             <button
                                 type="button"
                                 onClick={() => setStep((currentStep) => currentStep + 1)}

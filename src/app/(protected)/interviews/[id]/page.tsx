@@ -8,16 +8,14 @@ import CodingChallengeFeedback from "@/components/coding-challenge/coding-challe
 import CvFeedbackStep from "@/components/cv/CvFeedbackStep";
 import InterviewFeedback from "@/components/interviews/InterviewFeedback";
 import InterviewVoiceStep from "@/components/interviews/InterviewVoiceStep";
-import { InterviewSessionProvider } from "@/lib/interview-session/context";
+import { InterviewSessionProvider, useOptionalInterviewSession } from "@/lib/interview-session/context";
 
 type InterviewDetail = {
     id: string;
-    templateId: string | null;
     title: string;
     role: string;
     experience: string;
     companySize: string;
-    interviewType: string;
     currentStep: number;
     cv: {
         id: string;
@@ -85,19 +83,22 @@ async function fetchInterviewDetail(interviewId: string) {
     return data.interview;
 }
 
-function getMaxAccessibleStep(interview: InterviewDetail) {
+function getMaxAccessibleStep(args: {
+    interview: InterviewDetail;
+    hasTranscriptProgress: boolean;
+    hasInterviewFeedback: boolean;
+}) {
+    const { interview, hasTranscriptProgress, hasInterviewFeedback } = args;
+
     if (interview.codingChallenge?.evaluation) {
         return 6;
     }
 
-    if (interview.feedback) {
+    if (hasInterviewFeedback) {
         return 4;
     }
 
-    if (
-        interview.transcript?.transcriptStatus &&
-        interview.transcript.transcriptStatus !== "idle"
-    ) {
+    if (hasTranscriptProgress) {
         return 3;
     }
 
@@ -108,7 +109,14 @@ function getMaxAccessibleStep(interview: InterviewDetail) {
     return 1;
 }
 
-function getNextStepRequirement(step: number, interview: InterviewDetail) {
+function getNextStepRequirement(args: {
+    step: number;
+    interview: InterviewDetail;
+    hasTranscriptProgress: boolean;
+    hasInterviewFeedback: boolean;
+}) {
+    const { step, interview, hasTranscriptProgress, hasInterviewFeedback } = args;
+
     if (step === 1) {
         return interview.cvFeedback
             ? null
@@ -116,16 +124,15 @@ function getNextStepRequirement(step: number, interview: InterviewDetail) {
     }
 
     if (step === 2) {
-        return interview.transcript?.transcriptStatus &&
-            interview.transcript.transcriptStatus !== "idle"
+        return hasTranscriptProgress
             ? null
-            : "Schritt 2 braucht zuerst einen beendeten Call, damit das Transkript gestartet wird.";
+            : "Schritt 2 braucht zuerst einen beendeten Call mit gestarteter Transkriptverarbeitung.";
     }
 
     if (step === 3) {
-        return interview.feedback
+        return hasInterviewFeedback
             ? null
-            : "Schritt 3 braucht zuerst das persistierte Interview-Feedback.";
+            : "Schritt 3 braucht zuerst ein fertiges Interview-Feedback.";
     }
 
     if (step === 4) {
@@ -135,6 +142,165 @@ function getNextStepRequirement(step: number, interview: InterviewDetail) {
     }
 
     return null;
+}
+
+function InterviewDetailStepContent({
+    interview,
+    step,
+    error,
+    router,
+    persistStep,
+    setInterview,
+}: {
+    interview: InterviewDetail;
+    step: number;
+    error: string;
+    router: ReturnType<typeof useRouter>;
+    persistStep: (nextStep: number) => Promise<void>;
+    setInterview: React.Dispatch<React.SetStateAction<InterviewDetail | null>>;
+}) {
+    const session = useOptionalInterviewSession();
+    const localTranscriptStatus = session?.voiceInterview.postCallTranscriptStatus ?? "idle";
+    const hasTranscriptProgress =
+        (interview.transcript?.transcriptStatus ?? "idle") !== "idle" ||
+        localTranscriptStatus !== "idle";
+    const hasInterviewFeedback = Boolean(interview.feedback);
+    const maxAccessibleStep = getMaxAccessibleStep({
+        interview,
+        hasTranscriptProgress,
+        hasInterviewFeedback,
+    });
+    const nextStepRequirement = getNextStepRequirement({
+        step,
+        interview,
+        hasTranscriptProgress,
+        hasInterviewFeedback,
+    });
+    const canAdvance =
+        step < 6 && step + 1 <= maxAccessibleStep && nextStepRequirement === null;
+
+    return (
+        <div className="min-h-screen bg-gray-900 text-white">
+            <main className="mx-auto max-w-7xl px-4 py-10">
+                <h1 className="text-3xl font-bold">{interview.title}</h1>
+                <p className="mt-2 text-gray-400">Schritt {step} von 6</p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                    {[
+                        "CV",
+                        "Voice",
+                        "Interview",
+                        "Code",
+                        "Code Review",
+                        "Gesamt",
+                    ].map((label, index) => {
+                        const stepNumber = index + 1;
+                        const isActive = stepNumber === step;
+                        const isUnlocked = stepNumber <= maxAccessibleStep;
+
+                        return (
+                            <span
+                                key={label}
+                                className={`rounded-full px-3 py-1 text-xs ${
+                                    isActive
+                                        ? "bg-indigo-500 text-white"
+                                        : isUnlocked
+                                          ? "bg-white/10 text-gray-200"
+                                          : "bg-white/5 text-gray-500"
+                                }`}
+                            >
+                                {stepNumber}. {label}
+                            </span>
+                        );
+                    })}
+                </div>
+
+                {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
+
+                <div className="mt-8 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
+                    {step === 1 ? (
+                        <CvFeedbackStep />
+                    ) : step === 2 ? (
+                        <InterviewVoiceStep />
+                    ) : step === 3 ? (
+                        <InterviewFeedback
+                            onEvaluationReady={(feedback) => {
+                                setInterview((currentInterview) =>
+                                    currentInterview
+                                        ? {
+                                              ...currentInterview,
+                                              feedback,
+                                          }
+                                        : currentInterview
+                                );
+                            }}
+                        />
+                    ) : step === 4 ? (
+                        <CodingChallengeEditor />
+                    ) : step === 5 ? (
+                        <CodingChallengeFeedback />
+                    ) : (
+                        <OverallFeedbackBlock
+                            interview={interview}
+                            onOverallFeedbackChange={(overallFeedback) => {
+                                setInterview((currentInterview) =>
+                                    currentInterview
+                                        ? {
+                                              ...currentInterview,
+                                              overallFeedback,
+                                          }
+                                        : currentInterview
+                                );
+                            }}
+                        />
+                    )}
+
+                    <div className="mt-6 flex justify-between">
+                        <button
+                            onClick={() => void persistStep(step - 1)}
+                            disabled={step === 1}
+                            className="text-sm text-gray-400 disabled:opacity-30"
+                        >
+                            Zurueck
+                        </button>
+
+                        {step < 6 ? (
+                            <div className="text-right">
+                                {nextStepRequirement ? (
+                                    <p className="mb-2 text-xs text-amber-300">
+                                        {nextStepRequirement}
+                                    </p>
+                                ) : null}
+
+                                <button
+                                    onClick={() => void persistStep(step + 1)}
+                                    disabled={!canAdvance}
+                                    className="rounded-md bg-indigo-500 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    Weiter
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex gap-2">
+                                <button
+                                    className="rounded-md bg-gray-700 px-4 py-2 text-sm hover:bg-gray-600"
+                                    onClick={() => router.push("/interviews/new")}
+                                >
+                                    Neu starten
+                                </button>
+                                <button
+                                    onClick={() => router.push("/interviews")}
+                                    className="rounded-md bg-indigo-500 px-4 py-2 text-sm hover:bg-indigo-400"
+                                >
+                                    Abschliessen
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
 }
 
 function SummaryCard({
@@ -439,13 +605,11 @@ function InterviewDetailPageContent() {
                       role: interview.role,
                       experience: interview.experience,
                       companySize: interview.companySize,
-                      interviewType: interview.interviewType,
                   }
                 : {
                       role: "Backend Developer",
                       experience: "",
                       companySize: "",
-                      interviewType: "",
                   },
         [interview]
     );
@@ -497,126 +661,20 @@ function InterviewDetailPageContent() {
         );
     }
 
-    const maxAccessibleStep = getMaxAccessibleStep(interview);
-    const nextStepRequirement = getNextStepRequirement(step, interview);
-    const canAdvance =
-        step < 6 && step + 1 <= maxAccessibleStep && nextStepRequirement === null;
-
     return (
         <InterviewSessionProvider
             interviewId={interview.id}
             config={config}
             plannedQuestions={interview.plannedQuestions}
         >
-            <div className="min-h-screen bg-gray-900 text-white">
-                <main className="mx-auto max-w-7xl px-4 py-10">
-                    <h1 className="text-3xl font-bold">{interview.title}</h1>
-                    <p className="mt-2 text-gray-400">Schritt {step} von 6</p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        {[
-                            "CV",
-                            "Voice",
-                            "Interview",
-                            "Code",
-                            "Code Review",
-                            "Gesamt",
-                        ].map((label, index) => {
-                            const stepNumber = index + 1;
-                            const isActive = stepNumber === step;
-                            const isUnlocked = stepNumber <= maxAccessibleStep;
-
-                            return (
-                                <span
-                                    key={label}
-                                    className={`rounded-full px-3 py-1 text-xs ${
-                                        isActive
-                                            ? "bg-indigo-500 text-white"
-                                            : isUnlocked
-                                              ? "bg-white/10 text-gray-200"
-                                              : "bg-white/5 text-gray-500"
-                                    }`}
-                                >
-                                    {stepNumber}. {label}
-                                </span>
-                            );
-                        })}
-                    </div>
-
-                    {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
-
-                    <div className="mt-8 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
-                        {step === 1 ? (
-                            <CvFeedbackStep />
-                        ) : step === 2 ? (
-                            <InterviewVoiceStep />
-                        ) : step === 3 ? (
-                            <InterviewFeedback />
-                        ) : step === 4 ? (
-                            <CodingChallengeEditor />
-                        ) : step === 5 ? (
-                            <CodingChallengeFeedback />
-                        ) : (
-                            <OverallFeedbackBlock
-                                interview={interview}
-                                onOverallFeedbackChange={(overallFeedback) => {
-                                    setInterview((currentInterview) =>
-                                        currentInterview
-                                            ? {
-                                                  ...currentInterview,
-                                                  overallFeedback,
-                                              }
-                                            : currentInterview
-                                    );
-                                }}
-                            />
-                        )}
-
-                        <div className="mt-6 flex justify-between">
-                            <button
-                                onClick={() => void persistStep(step - 1)}
-                                disabled={step === 1}
-                                className="text-sm text-gray-400 disabled:opacity-30"
-                            >
-                                Zurueck
-                            </button>
-
-                            {step < 6 ? (
-                                <div className="text-right">
-                                    {nextStepRequirement ? (
-                                        <p className="mb-2 text-xs text-amber-300">
-                                            {nextStepRequirement}
-                                        </p>
-                                    ) : null}
-
-                                    <button
-                                        onClick={() => void persistStep(step + 1)}
-                                        disabled={!canAdvance}
-                                        className="rounded-md bg-indigo-500 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        Weiter
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="flex gap-2">
-                                    <button
-                                        className="rounded-md bg-gray-700 px-4 py-2 text-sm hover:bg-gray-600"
-                                        onClick={() => router.push("/interviews/new")}
-                                    >
-                                        Neu starten
-                                    </button>
-                                    <button
-                                        onClick={() => router.push("/interviews")}
-                                        className="rounded-md bg-indigo-500 px-4 py-2 text-sm hover:bg-indigo-400"
-                                    >
-                                        Abschliessen
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </main>
-            </div>
+            <InterviewDetailStepContent
+                interview={interview}
+                step={step}
+                error={error}
+                router={router}
+                persistStep={persistStep}
+                setInterview={setInterview}
+            />
         </InterviewSessionProvider>
     );
 }

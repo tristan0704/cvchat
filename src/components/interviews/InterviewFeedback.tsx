@@ -232,7 +232,6 @@ function AnalysisStateCard(args: {
     role: string;
     experience: string;
     companySize: string;
-    interviewType: string;
     transcriptStatus: string;
     transcriptError: string;
     analysisStatus: "idle" | "loading" | "ready" | "error";
@@ -252,9 +251,6 @@ function AnalysisStateCard(args: {
                             <span>{args.role}</span>
                             {args.experience ? <span>{args.experience}</span> : null}
                             {args.companySize ? <span>{args.companySize}</span> : null}
-                            {args.interviewType ? (
-                                <span>{args.interviewType}</span>
-                            ) : null}
                             <span>
                                 {args.passedLikely
                                     ? "Wahrscheinlich passend"
@@ -398,14 +394,17 @@ type PersistedInterviewFeedbackState = {
     faceAnalysis: FaceAnalysisReport | null;
 };
 
-export default function InterviewFeedback() {
+export default function InterviewFeedback({
+    onEvaluationReady,
+}: {
+    onEvaluationReady?: (evaluation: InterviewFeedbackEvaluation) => void;
+}) {
     const session = useInterviewSession();
     const interviewId = session.interviewId;
     const controller = session.voiceInterview;
     const role = session.role;
     const experience = session.config.experience ?? "";
     const companySize = session.config.companySize ?? "";
-    const interviewType = session.config.interviewType ?? "";
     const [persistedState, setPersistedState] =
         useState<PersistedInterviewFeedbackState | null>(null);
     const [loadError, setLoadError] = useState("");
@@ -535,7 +534,6 @@ export default function InterviewFeedback() {
         role,
         experience,
         companySize,
-        interviewType,
         transcript: transcriptExport,
         transcriptFingerprint,
         existingEvaluation: persistedState?.feedback ?? null,
@@ -552,7 +550,8 @@ export default function InterviewFeedback() {
             faceAnalysis: currentState?.faceAnalysis ?? null,
             feedback: analysis.evaluation,
         }));
-    }, [analysis.evaluation]);
+        onEvaluationReady?.(analysis.evaluation);
+    }, [analysis.evaluation, onEvaluationReady]);
 
     const faceAnalysisReport = persistedState?.faceAnalysis ?? null;
     const evaluation = analysis.evaluation ?? persistedState?.feedback ?? null;
@@ -565,7 +564,6 @@ export default function InterviewFeedback() {
                 role={role}
                 experience={experience}
                 companySize={companySize}
-                interviewType={interviewType}
                 transcriptStatus={transcriptStatus}
                 transcriptError={transcriptError}
                 analysisStatus={analysis.status}

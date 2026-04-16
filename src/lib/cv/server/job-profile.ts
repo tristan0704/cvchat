@@ -86,17 +86,5 @@ export function buildRoleProfile(config: InterviewCvConfig): RoleProfile {
     profile.niceToHave.push("Stakeholder alignment", "Structured delivery");
   }
 
-  if (config.interviewType.toLowerCase().includes("technical")) {
-    profile.mustHave.push("Technical depth");
-  }
-
-  if (config.interviewType.toLowerCase().includes("hr")) {
-    profile.niceToHave.push("Communication", "Motivation");
-  }
-
-  if (config.interviewType.toLowerCase().includes("case")) {
-    profile.niceToHave.push("Problem solving");
-  }
-
   return profile;
 }

@@ -18,12 +18,9 @@ type ActiveCvSummary = {
 };
 
 function buildConfigBadges(config: InterviewCvConfig) {
-    return [
-        config.role,
-        config.experience,
-        config.companySize,
-        config.interviewType,
-    ].filter((value) => value.trim().length > 0);
+    return [config.role, config.experience, config.companySize].filter(
+        (value) => value.trim().length > 0
+    );
 }
 
 function formatDateTime(value: string) {

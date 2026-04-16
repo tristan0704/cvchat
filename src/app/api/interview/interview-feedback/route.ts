@@ -69,10 +69,6 @@ export async function POST(request: Request) {
                 body && typeof body.companySize === "string"
                     ? body.companySize.trim()
                     : "",
-            interviewType:
-                body && typeof body.interviewType === "string"
-                    ? body.interviewType.trim()
-                    : "",
             transcript,
             transcriptFingerprint,
         });

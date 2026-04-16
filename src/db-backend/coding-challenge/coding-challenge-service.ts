@@ -280,35 +280,15 @@ export async function assignCodingChallengeAttempt(args: {
             }
         }
 
-        const mappedTasks = interview.templateId
-            ? (
-                  await tx.interviewTemplateCodingChallenge.findMany({
-                      where: {
-                          templateId: interview.templateId,
-                          task: {
-                              isActive: true,
-                          },
-                      },
-                      orderBy: [{ sequence: "asc" }, { createdAt: "asc" }],
-                      include: {
-                          task: true,
-                      },
-                  })
-              ).map((item) => item.task)
-            : [];
-
-        const roleTasks =
-            mappedTasks.length > 0
-                ? mappedTasks
-                : await tx.codingChallengeTask.findMany({
-                      where: {
-                          isActive: true,
-                          role: normalizeCodingChallengeRole(args.role),
-                      },
-                      orderBy: {
-                          createdAt: "asc",
-                      },
-                  });
+        const roleTasks = await tx.codingChallengeTask.findMany({
+            where: {
+                isActive: true,
+                role: normalizeCodingChallengeRole(args.role),
+            },
+            orderBy: {
+                createdAt: "asc",
+            },
+        });
 
         const fallbackTasks =
             roleTasks.length > 0

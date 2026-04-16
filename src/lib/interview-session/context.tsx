@@ -85,7 +85,6 @@ export function InterviewSessionProvider({
         role,
         config.experience,
         config.companySize,
-        config.interviewType,
         plannedQuestions.map((question) => question.questionKey ?? question.text).join("|"),
     ].join("|");
 

@@ -2,7 +2,6 @@ export type InterviewCvConfig = {
   role: string;
   experience: string;
   companySize: string;
-  interviewType: string;
 };
 
 export type CvQualityDimension = {

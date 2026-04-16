@@ -22,7 +22,6 @@ export type InterviewFeedbackRequest = {
     role: string
     experience?: string
     companySize?: string
-    interviewType?: string
     transcript: string
     transcriptFingerprint: string
 }

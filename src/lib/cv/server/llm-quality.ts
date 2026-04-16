@@ -54,7 +54,6 @@ function buildPrompt(cvText: string, config: InterviewCvConfig) {
       `Role: ${config.role || "Unknown"}`,
       `Experience: ${config.experience || "Not specified"}`,
       `Company size: ${config.companySize || "Not specified"}`,
-      `Interview type: ${config.interviewType || "Not specified"}`,
       "",
       "CV CONTENT:",
       cvText,

@@ -18,7 +18,6 @@ function normalizeConfig(config: InterviewCvConfig): InterviewCvConfig {
         role: config.role.trim() || "Backend Developer",
         experience: config.experience.trim(),
         companySize: config.companySize.trim(),
-        interviewType: config.interviewType.trim(),
     };
 }
 
@@ -32,7 +31,6 @@ function mapCvFeedbackAnalysisToResult(
             role: analysis.role,
             experience: analysis.experience,
             companySize: analysis.companySize,
-            interviewType: analysis.interviewType,
         },
         quality: {
             overallScore: analysis.overallScore,
@@ -109,12 +107,11 @@ async function createCvFeedbackAnalysis(args: {
 
     const analysis = await db.cvFeedbackAnalysis.upsert({
         where: {
-            cvVersionId_role_experience_companySize_interviewType: {
+            cvVersionId_role_experience_companySize: {
                 cvVersionId: cvVersion.id,
                 role: config.role,
                 experience: config.experience,
                 companySize: config.companySize,
-                interviewType: config.interviewType,
             },
         },
         update: {
@@ -149,7 +146,6 @@ async function createCvFeedbackAnalysis(args: {
             role: config.role,
             experience: config.experience,
             companySize: config.companySize,
-            interviewType: config.interviewType,
             fileName: result.fileName,
             overallScore: result.quality.overallScore,
             keywordScore: result.scoreBreakdown.keywordScore,
@@ -287,7 +283,6 @@ export async function getOrCreateCvFeedbackAnalysisForInterview(args: {
         role: interview.role,
         experience: interview.experience,
         companySize: interview.companySize,
-        interviewType: interview.interviewType,
     });
 
     if (interview.cvFeedbackAnalysis && !args.force) {
@@ -300,12 +295,11 @@ export async function getOrCreateCvFeedbackAnalysisForInterview(args: {
     if (!args.force) {
         const existing = await db.cvFeedbackAnalysis.findUnique({
             where: {
-                cvVersionId_role_experience_companySize_interviewType: {
+                cvVersionId_role_experience_companySize: {
                     cvVersionId: cvVersion.id,
                     role: config.role,
                     experience: config.experience,
                     companySize: config.companySize,
-                    interviewType: config.interviewType,
                 },
             },
         });

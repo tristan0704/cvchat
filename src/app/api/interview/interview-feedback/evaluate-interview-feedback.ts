@@ -86,7 +86,6 @@ function buildPrompt(args: InterviewFeedbackRequest) {
             `Rolle: ${args.role}`,
             `Erfahrung: ${args.experience?.trim() || "nicht angegeben"}`,
             `Unternehmensgroesse: ${args.companySize?.trim() || "nicht angegeben"}`,
-            `Interview-Typ: ${args.interviewType?.trim() || "nicht angegeben"}`,
             `Transcript-Fingerprint: ${args.transcriptFingerprint}`,
             "",
             "Interview-Export:",
