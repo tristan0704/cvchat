@@ -20,6 +20,14 @@ export default function Hero() {
         <div className="mb-8 hidden justify-center sm:flex">
         </div>
 
+
+          <div className="mb-8 hidden justify-center sm:flex">
+            <div className="relative rounded-full px-3 py-1 text-sm text-gray-400 ring-1 ring-white/10 hover:ring-white/20">
+             trusted by students of fh upper austria
+            </div>
+          </div>
+
+
         <div className="text-center">
           <div className="mb-8 flex justify-center sm:mb-10">
             <img
@@ -30,11 +38,11 @@ export default function Hero() {
           </div>
 
           <h1 className="text-5xl font-semibold text-white sm:text-5xl">
-            Show that you can do more than code - prove that you can explain it.
+            Get better at tech interviews. Fast.
           </h1>
 
           <p className="mt-8 text-lg text-gray-400 sm:text-xl">
-            Commit verbindet Communication + IT: Trainiere reale Tech-Interviews, verbessere Soft Skills und technisches Verständnis und baue dir einen echten Vorteil im Bewerbungsprozess auf.
+            Commit helps tech students improve communication, technical understanding, and real interview performance.
           </p>
 
           <div className="mt-10 flex justify-center gap-x-6">
