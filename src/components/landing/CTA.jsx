@@ -4,7 +4,7 @@ export default function CTA() {
   return (
     <section className="bg-gray-900 py-24 text-center text-white">
       <h2 className="text-3xl font-semibold">
-        Bereit fuer dein erstes Interview?
+        Bereit für dein erstes Interview?
       </h2>
 
       <div className="mt-8">

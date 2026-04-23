@@ -10,7 +10,7 @@ export default function Features() {
           </h2>
 
           <p className="mt-2 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            Alles fuer dein perfektes Interview
+            Alles für dein perfektes Interview
           </p>
 
           <p className="mt-6 text-lg text-gray-300">
@@ -36,7 +36,7 @@ export default function Features() {
               </dt>
               <dd className="mt-2 text-base text-gray-400">
                 Lade deinen Lebenslauf hoch und erhalte direkt Feedback zu Inhalt,
-                Struktur und Optimierungsmoeglichkeiten.
+                Struktur und Optimierungsmöglichkeiten.
               </dd>
             </div>
 
@@ -54,7 +54,7 @@ export default function Features() {
                 Realistische Interviews
               </dt>
               <dd className="mt-2 text-base text-gray-400">
-                Simuliere echte Bewerbungsgespraeche mit typischen Fragen aus
+                Simuliere echte Bewerbungsgespräche mit typischen Fragen aus
                 Tech-Interviews.
               </dd>
             </div>
@@ -73,8 +73,8 @@ export default function Features() {
                 Coding-Challenges
               </dt>
               <dd className="mt-2 text-base text-gray-400">
-                Teste dein technisches Koennen mit praxisnahen Aufgaben und
-                verbessere deine Problemloesungsfaehigkeiten.
+                Teste dein technisches Können mit praxisnahen Aufgaben und
+                verbessere deine Problemlösungsfähigkeiten.
               </dd>
             </div>
 

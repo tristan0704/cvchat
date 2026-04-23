@@ -16,21 +16,25 @@ export default function Hero() {
         />
       </div>
 
-      <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
+      <div className="mx-auto max-w-2xl py-16 sm:py-28 lg:py-32">
         <div className="mb-8 hidden justify-center sm:flex">
-          <div className="relative rounded-full px-3 py-1 text-sm text-gray-400 ring-1 ring-white/10 hover:ring-white/20">
-            Simuliere echte Interviews fuer reale Rollen
-          </div>
         </div>
 
         <div className="text-center">
-          <h1 className="text-5xl font-semibold text-white sm:text-7xl">
-            Simuliere dein Tech Interview
+          <div className="mb-8 flex justify-center sm:mb-10">
+            <img
+              src="/commit_logo.png"
+              alt="Commit Logo"
+              className="h-24 w-auto object-contain sm:h-32 lg:h-36"
+            />
+          </div>
+
+          <h1 className="text-5xl font-semibold text-white sm:text-5xl">
+            Show that you can do more than code - prove that you can explain it.
           </h1>
 
           <p className="mt-8 text-lg text-gray-400 sm:text-xl">
-            Lade deinen CV hoch, durchlaufe realistische Interviews und erhalte
-            sofort konkretes Feedback zu Antworten, Code und Praesenz.
+            Commit verbindet Communication + IT: Trainiere reale Tech-Interviews, verbessere Soft Skills und technisches Verständnis und baue dir einen echten Vorteil im Bewerbungsprozess auf.
           </p>
 
           <div className="mt-10 flex justify-center gap-x-6">

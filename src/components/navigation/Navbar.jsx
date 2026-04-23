@@ -131,11 +131,12 @@ export default function Navbar() {
 
           <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
             <Link href="/home" className="flex shrink-0 items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-500 text-sm font-semibold text-white">
-                CP
-              </span>
-              <span className="hidden text-sm font-semibold text-white sm:block">
-                CareerPitch
+              <span className="flex h-10 w-20 items-center justify-center rounded-md text-sm font-semibold text-white">
+                <img
+                  src="/commit_logo.png"
+                  alt="Commit Logo"
+                  className="h-full w-full object-contain"
+                />
               </span>
             </Link>
 
@@ -159,7 +160,7 @@ export default function Navbar() {
                 {profile.username || "Profil"}
               </p>
               <p className="text-xs text-gray-400">
-                {profile.email || "CareerPitch"}
+                {profile.email || "commit"}
               </p>
             </div>
 
@@ -168,7 +169,7 @@ export default function Navbar() {
                 type="button"
                 onClick={() => setProfileOpen((currentValue) => !currentValue)}
                 className="relative flex rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                aria-label="Profilmenue oeffnen"
+                aria-label="Profilmenü oeffnen"
               >
                 {profile.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
