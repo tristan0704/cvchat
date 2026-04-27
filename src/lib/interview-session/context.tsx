@@ -3,7 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 import type { InterviewCvConfig } from "@/lib/cv/types";
-import type { InterviewQuestion } from "@/lib/interview";
+import type { InterviewQuestion } from "@/lib/questionpool";
 import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-voice-interview-controller";
 
 type PlannedQuestion = {

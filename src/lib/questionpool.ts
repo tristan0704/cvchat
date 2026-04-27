@@ -4,8 +4,7 @@ export type InterviewQuestion = {
     priority: number
 }
 //Question Pool
-
-//TODO: durch DB ersetzen (später)
+//TODO: besseres System der Priorisierung
 const GENERAL_QUESTIONS: InterviewQuestion[] = [
     {
         id: "motivation",

@@ -1,4 +1,4 @@
-import { getInterviewQuestionPool, type InterviewQuestion } from "@/lib/interview";
+import { getInterviewQuestionPool, type InterviewQuestion } from "@/lib/questionpool";
 
 export type InterviewTemplateSummary = {
     id: string;

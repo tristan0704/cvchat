@@ -4,7 +4,7 @@
 CareerPitch is an AI-driven interview and assessment platform focused on realistic interview simulation and skill evaluation. Optimize for quality, clarity, and maintainability over fast feature output.
 
 ## Project Structure & Module Organization
-This is a Next.js 16 App Router project in TypeScript. Routes and API handlers live in `src/app`, including interview pages under `src/app/simulate/**` and server routes in `src/app/api/**/route.ts`. Reusable UI belongs in `src/components`, with interview-specific UI in `src/components/interview`. Shared logic belongs in `src/lib` such as `audio.ts`, `interview.ts`, and `face-analysis.ts`. Static assets live in `images/`.
+This is a Next.js 16 App Router project in TypeScript. Routes and API handlers live in `src/app`, including interview pages under `src/app/simulate/**` and server routes in `src/app/api/**/route.ts`. Reusable UI belongs in `src/components`, with interview-specific UI in `src/components/interview`. Shared logic belongs in `src/lib` such as `audio.ts`, `questionpool.ts`, and `face-analysis.ts`. Static assets live in `images/`.
 
 ## Required Workflow
 Before making any code change, explain what will change, why it is needed, and which files or modules are affected. Wait for approval before implementing, especially for bug fixes or refactors. Do not make silent changes or large rewrites without prior agreement.

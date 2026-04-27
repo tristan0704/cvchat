@@ -1,4 +1,4 @@
-﻿// DATEIUEBERSICHT: Gemeinsamer OpenAI-Client mit Timeout und einheitlichem Fehlerhandling.
+﻿// Gemeinsamer OpenAI-Client mit Timeout und einheitlichem Fehlerhandling.
 type OpenAiChatArgs = {
     prompt: string
     question?: string

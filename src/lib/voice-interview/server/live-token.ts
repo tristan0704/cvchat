@@ -5,7 +5,7 @@ import { GoogleGenAI, MediaResolution, Modality } from "@google/genai";
 import {
   getInterviewQuestionPool,
   getRegionalTechContextGuidance,
-} from "@/lib/interview";
+} from "@/lib/questionpool";
 
 const LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025";
 const LIVE_VOICE = "Zephyr";

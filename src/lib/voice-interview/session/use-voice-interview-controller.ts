@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react"
 import type { Session } from "@google/genai"
 import type { FaceLandmarkPanelHandle } from "@/lib/face-landmark-panel-handle"
-import { getInterviewQuestionPool } from "@/lib/interview"
+import { getInterviewQuestionPool } from "@/lib/questionpool"
 import { useHostPlayback } from "@/lib/voice-interview/playback/use-host-playback"
 import { CALL_DURATION_SECONDS } from "@/lib/voice-interview/core/config"
 import type { CallLifecyclePhase, ConnectionStatus } from "@/lib/voice-interview/core/types"

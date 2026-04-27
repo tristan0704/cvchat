@@ -3,7 +3,7 @@
 import { type ReactNode } from "react";
 
 import { FaceLandmarkPanel } from "@/components/interviews/face-landmark-panel";
-import { formatCountdown } from "@/lib/interview";
+import { formatCountdown } from "@/lib/questionpool";
 import { useInterviewSession } from "@/lib/interview-session/context";
 import { LAST_MINUTE_THRESHOLD_SECONDS } from "@/lib/voice-interview/session/endgame";
 import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-voice-interview-controller";
