@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/db-backend/prisma/client";
 import { callOpenAiChat } from "@/lib/openai";
-import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback/types";
+import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback-types/types";
 
 type AggregatedFeedbackSource = {
     cvScore: number | null;

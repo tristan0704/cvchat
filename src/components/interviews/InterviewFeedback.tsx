@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { FaceAnalysisParameterReport, FaceAnalysisReport } from "@/lib/face-analysis";
-import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback/fingerprint";
-import { useInterviewFeedbackAnalysis } from "@/lib/interview-feedback/use-interview-feedback-analysis";
+import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback-fetch/fingerprint";
+import { useInterviewFeedbackAnalysis } from "@/lib/interview-feedback-fetch/use-interview-feedback-analysis";
 import { formatCountdown } from "@/lib/questionpool";
 import type {
     InterviewFeedbackEvaluation,
     InterviewFeedbackEvaluationDimension,
-} from "@/lib/interview-feedback/types";
+} from "@/lib/interview-feedback-fetch/types";
 import { useInterviewSession } from "@/lib/interview-session/context";
 import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 import {

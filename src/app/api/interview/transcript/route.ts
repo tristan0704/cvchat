@@ -8,7 +8,7 @@
 
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { saveInterviewTranscript } from "@/db-backend/interviews/interview-service";
-import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback/fingerprint";
+import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback-fetch/fingerprint";
 import type {
     PostCallTranscriptStatus,
     Speaker,

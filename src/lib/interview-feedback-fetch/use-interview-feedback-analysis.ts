@@ -6,7 +6,7 @@ import type {
     InterviewFeedbackEvaluation,
     InterviewFeedbackRequest,
     InterviewFeedbackResponse,
-} from "@/lib/interview-feedback/types";
+} from "@/lib/interview-feedback-fetch/types";
 
 type UseInterviewFeedbackAnalysisArgs = InterviewFeedbackRequest & {
     interviewId: string;

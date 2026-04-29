@@ -1,6 +1,6 @@
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
-import type { InterviewOverallFeedbackResponse } from "@/lib/interview-overall-feedback/types";
+import type { InterviewOverallFeedbackResponse } from "@/lib/interview-overall-feedback-types/types";
 
 export const runtime = "nodejs";
 

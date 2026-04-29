@@ -4,7 +4,7 @@ import { evaluateInterviewFeedback } from "@/app/api/interview/interview-feedbac
 import type {
     InterviewFeedbackRequest,
     InterviewFeedbackResponse,
-} from "@/lib/interview-feedback/types";
+} from "@/lib/interview-feedback-fetch/types";
 
 export const runtime = "nodejs";
 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
             evaluation,
         } satisfies InterviewFeedbackResponse);
     } catch (error) {
-        console.error("[api/interview/interview-feedback]", error);
+        console.error("[api/interview/interview-feedback-fetch-fetch]", error);
 
         return Response.json(
             { error: "Unable to analyze interview feedback" },

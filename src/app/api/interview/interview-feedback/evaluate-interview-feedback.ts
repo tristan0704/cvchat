@@ -3,7 +3,7 @@ import type {
     InterviewFeedbackEvaluation,
     InterviewFeedbackEvaluationDimension,
     InterviewFeedbackRequest,
-} from "@/lib/interview-feedback/types"
+} from "@/lib/interview-feedback-fetch/types"
 
 const FALLBACK_FEEDBACK = "Analyse nicht verfuegbar."
 

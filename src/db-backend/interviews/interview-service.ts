@@ -14,12 +14,12 @@ import { acquireTransactionalAdvisoryLock } from "@/db-backend/prisma/advisory-l
 import { getLatestCodingChallengeAttempt } from "@/db-backend/coding-challenge/coding-challenge-service";
 import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
 import { getInterviewTemplateById } from "@/db-backend/interviews/interview-template-service";
-import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback/types";
+import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback-types/types";
 import { buildTranscriptQaExport } from "@/lib/interview-transcript";
 import type { TranscriptEntry, TranscriptQaPair } from "@/lib/interview-transcript/types";
 import type { CvFeedbackResult } from "@/lib/cv/types";
 import type { FaceAnalysisReport } from "@/lib/face-analysis";
-import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback/types";
+import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback-fetch/types";
 import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 
 export type InterviewListItem = {
