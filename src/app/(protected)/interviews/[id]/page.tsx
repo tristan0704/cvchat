@@ -329,7 +329,7 @@ function InterviewDetailStepContent({
                             disabled={!canNavigateBack}
                             className="text-sm text-gray-400 disabled:opacity-30"
                         >
-                            Zurueck
+                            Zurück
                         </button>
 
                         {step < 6 ? (

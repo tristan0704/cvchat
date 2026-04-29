@@ -84,7 +84,7 @@ function ListCard({
                 {items.length > 0 ? (
                     items.map((item) => <li key={item}>{item}</li>)
                 ) : (
-                    <li className="text-gray-500">Keine Eintraege vorhanden.</li>
+                    <li className="text-gray-500">Keine Einträge vorhanden.</li>
                 )}
             </ul>
         </section>
@@ -158,7 +158,7 @@ export default function CodingChallengeFeedback() {
     if (!evaluation) {
         return (
             <div className="rounded-xl border border-white/10 bg-gray-900 p-6 text-sm text-gray-300">
-                Reiche zuerst in Schritt 4 eine Coding-Loesung ein, damit hier
+                Reiche zuerst in Schritt 4 eine Coding-Lösung ein, damit hier
                 das persistierte Feedback erscheint.
             </div>
         );
@@ -179,7 +179,7 @@ export default function CodingChallengeFeedback() {
                             <span>
                                 {evaluation.passedLikely
                                     ? "Wahrscheinlich passend"
-                                    : "Noch Nacharbeit noetig"}
+                                    : "Noch Nacharbeit nötig"}
                             </span>
                         </div>
 
@@ -218,12 +218,12 @@ export default function CodingChallengeFeedback() {
                     feedback={evaluation.correctness.feedback}
                 />
                 <ScoreCard
-                    title="Code-Qualitaet"
+                    title="Code-Qualität"
                     value={evaluation.codeQuality.score}
                     feedback={evaluation.codeQuality.feedback}
                 />
                 <ScoreCard
-                    title="Problemloesung"
+                    title="Problemlösung"
                     value={evaluation.problemSolving.score}
                     feedback={evaluation.problemSolving.feedback}
                 />

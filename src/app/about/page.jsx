@@ -6,10 +6,10 @@ export const metadata = {
 };
 
 const TEAM_MEMBERS = [
-    { name: "Tristan Trunez", role: "Founder" },
+    { name: "Tristan Trunez", role: "Founder & Lead Developer" },
     { name: "Max S.", role: "Developer" },
     { name: "Christoph B.", role: "Developer" },
-    { name: "Moritz K.", role: "Marketing und Vertrieb" },
+    { name: "Moritz K.", role: "Strategy und Marketing" },
 ];
 
 const ABOUT_SECTIONS = [

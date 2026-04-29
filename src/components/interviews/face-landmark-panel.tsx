@@ -689,7 +689,7 @@ export const FaceLandmarkPanel = forwardRef<FaceLandmarkPanelHandle, FaceLandmar
         }
 
         if (!navigator.mediaDevices?.getUserMedia) {
-            setCameraError("getUserMedia ist in diesem Browser oder Kontext nicht verfuegbar.")
+            setCameraError("getUserMedia ist in diesem Browser oder Kontext nicht verfügbar.")
             return
         }
 

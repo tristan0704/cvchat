@@ -66,8 +66,8 @@ export function analyzeKeywordMatch(
 
   const summary =
     missingMustHave.length > 0
-      ? `Solider Match fuer ${profile.role}, aber einige Must-Haves sind im CV nicht klar belegt.`
-      : `Guter Keyword-Match fuer ${profile.role} mit mehreren passenden Signalen im CV.`;
+      ? `Solider Fit für ${profile.role}, aber einige Muss-Kriterien sind im Lebenslauf nicht klar belegt.`
+      : `Guter Fit für ${profile.role} mit mehreren passenden Signalen im Lebenslauf.`;
 
   return {
     score,

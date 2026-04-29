@@ -37,7 +37,7 @@ function formatUploadDate(value: string) {
 
 function formatFileSize(bytes: number | null) {
     if (!bytes) {
-        return "Unbekannte Dateigroesse";
+        return "Unbekannte Dateigröße";
     }
 
     const megabytes = bytes / 1_000_000;
@@ -130,14 +130,14 @@ export default function ProfilePageContent() {
         }
 
         if (file.type !== "application/pdf") {
-            setError("Bitte einen PDF-Lebenslauf auswaehlen.");
+            setError("Bitte einen PDF-Lebenslauf auswählen.");
             setStatus("");
             setSelectedCv(null);
             return;
         }
 
         if (file.size > PROFILE_CV_MAX_FILE_BYTES) {
-            setError("Die PDF-Datei darf maximal 20 MB gross sein.");
+            setError("Die PDF-Datei darf maximal 20 MB groß sein.");
             setStatus("");
             setSelectedCv(null);
             return;
@@ -156,13 +156,13 @@ export default function ProfilePageContent() {
         }
 
         if (!PROFILE_AVATAR_MIME_TYPES.has(file.type)) {
-            setError("Bitte ein Bild als PNG, JPG, WEBP oder GIF auswaehlen.");
+            setError("Bitte ein Bild als PNG, JPG, WEBP oder GIF auswählen.");
             setStatus("");
             return;
         }
 
         if (file.size > PROFILE_AVATAR_MAX_FILE_BYTES) {
-            setError("Das Profilbild darf maximal 5 MB gross sein.");
+            setError("Das Profilbild darf maximal 5 MB groß sein.");
             setStatus("");
             return;
         }
@@ -322,7 +322,7 @@ export default function ProfilePageContent() {
             <main className="mx-auto max-w-7xl px-4 py-10">
                 <h1 className="text-3xl font-bold">Profil</h1>
                 <p className="mt-2 text-gray-400">
-                    Verwalte deine persoenlichen Daten
+                    Verwalte deine persönlichen Daten
                 </p>
 
                 <div className="mt-8 space-y-6 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
@@ -424,7 +424,7 @@ export default function ProfilePageContent() {
                         <div>
                             <p className="text-sm text-gray-400">Lebenslauf</p>
                             <p className="mt-1 text-xs text-gray-500">
-                                Dieser CV wird fuer jedes neue Interview-Feedback
+                                Dieser CV wird für jedes neue Interview-Feedback
                                 verwendet.
                             </p>
                         </div>
@@ -465,12 +465,12 @@ export default function ProfilePageContent() {
                                 htmlFor="profile-cv-upload"
                                 className="cursor-pointer rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
                             >
-                                Datei auswaehlen
+                                Datei auswählen
                             </label>
 
                             {selectedCv ? (
                                 <p className="mt-3 text-xs text-gray-300">
-                                    Ausgewaehlt: {selectedCv.name}
+                                    Ausgewählt: {selectedCv.name}
                                 </p>
                             ) : null}
                         </div>

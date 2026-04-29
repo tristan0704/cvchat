@@ -10,8 +10,7 @@ export default function InterviewsPage() {
           <div>
             <h1 className="text-3xl font-bold">Interviews</h1>
             <p className="mt-4 text-gray-400">
-              Verwalte deine DB-gestuetzten Interview-Simulationen und kehre in
-              jeden gespeicherten Schritt zurueck.
+              Verwalte deine Interview-Simulationen.
             </p>
           </div>
 

@@ -46,7 +46,7 @@ export default async function LearnPage() {
             <main className="mx-auto max-w-7xl px-4 py-10">
                 <h1 className="text-3xl font-bold">Lernen</h1>
                 <p className="mt-4 max-w-2xl text-gray-400">
-                    Dieser Bereich zeigt dir die naechsten sinnvollen Schritte
+                    Dieser Bereich zeigt dir die nächsten sinnvollen Schritte
                     auf Basis deiner gespeicherten Profil-, CV- und Interviewdaten.
                 </p>
 
@@ -54,13 +54,13 @@ export default async function LearnPage() {
                     <LearnCard
                         href="/interviews/new"
                         title="Neue Simulation starten"
-                        description="Waehle eine Interview-Konfiguration aus der DB und starte den naechsten Durchlauf."
+                        description="Wähle eine Interview-Konfiguration aus der DB und starte den nächsten Durchlauf."
                         detail={`${summary.totalInterviews} Interviews gespeichert`}
                     />
                     <LearnCard
                         href="/interviews"
-                        title="Vorherige Durchlaeufe auswerten"
-                        description="Oeffne gespeicherte Interview-Sessions, Coding-Challenges und Gesamtfeedback erneut."
+                        title="Vorherige Durchläufe auswerten"
+                        description="Öffne gespeicherte Interview-Sessions, Coding-Challenges und Gesamtfeedback erneut."
                         detail={`${summary.completedInterviews} Interviews abgeschlossen`}
                     />
                     <LearnCard

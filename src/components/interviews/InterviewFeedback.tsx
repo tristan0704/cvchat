@@ -75,10 +75,26 @@ function SurfaceCard({
 }) {
     return (
         <section
-            className={`rounded-xl border border-white/10 bg-gray-900 p-5 ${className}`.trim()}
+            className={`rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10 ${className}`.trim()}
         >
             {children}
         </section>
+    );
+}
+
+function SubtlePanel({
+    children,
+    className = "",
+}: {
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <div
+            className={`rounded-xl bg-gray-900/90 p-4 outline outline-1 outline-white/10 ${className}`.trim()}
+        >
+            {children}
+        </div>
     );
 }
 
@@ -97,13 +113,13 @@ function SectionHeading({
         <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
                 {eyebrow ? (
-                    <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
                         {eyebrow}
                     </p>
                 ) : null}
-                <h2 className="mt-1 text-xl font-semibold text-white">{title}</h2>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">{title}</h2>
                 {description ? (
-                    <p className="mt-2 max-w-3xl text-sm text-gray-300">
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-300">
                         {description}
                     </p>
                 ) : null}
@@ -127,8 +143,8 @@ function ScoreCard({
     return (
         <SurfaceCard>
             <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-gray-200">{title}</p>
-                <span className={`rounded-full px-3 py-1 text-xs ${tone.badge}`}>
+                <p className="text-sm font-medium text-gray-100">{title}</p>
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${tone.badge}`}>
                     {value}%
                 </span>
             </div>
@@ -156,14 +172,19 @@ function ListCard({
 }) {
     return (
         <SurfaceCard>
-            <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
                 {title}
             </p>
 
             <ul className="mt-3 space-y-2 text-sm text-gray-200">
                 {items.length > 0 ? (
                     items.map((item, index) => (
-                        <li key={`${title}-${index}-${item}`}>{item}</li>
+                        <li
+                            key={`${title}-${index}-${item}`}
+                            className="rounded-lg bg-white/5 px-3 py-2"
+                        >
+                            {item}
+                        </li>
                     ))
                 ) : (
                     <li className="text-gray-500">{emptyLabel}</li>
@@ -183,13 +204,13 @@ function MetricCard({
     hint?: string;
 }) {
     return (
-        <div className="rounded-xl border border-white/10 bg-gray-950 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
+        <SubtlePanel>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
                 {label}
             </p>
             <p className="mt-2 text-xl font-semibold text-white">{value}</p>
             {hint ? <p className="mt-1 text-xs text-gray-400">{hint}</p> : null}
-        </div>
+        </SubtlePanel>
     );
 }
 
@@ -247,7 +268,7 @@ function AnalysisStateCard(args: {
             <SurfaceCard>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-400">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
                             <span>{args.role}</span>
                             {args.experience ? <span>{args.experience}</span> : null}
                             {args.companySize ? <span>{args.companySize}</span> : null}
@@ -266,11 +287,11 @@ function AnalysisStateCard(args: {
                         </p>
                     </div>
 
-                    <div className="min-w-[220px] rounded-xl border border-white/10 bg-gray-950 p-4">
+                    <SubtlePanel className="min-w-[220px]">
                         <div className="flex items-center justify-between gap-3">
                             <p className="text-sm text-gray-400">Gesamtscore</p>
                             <span
-                                className={`rounded-full px-3 py-1 text-xs ${tone.badge}`}
+                                className={`rounded-full px-3 py-1 text-xs font-medium ${tone.badge}`}
                             >
                                 {tone.label}
                             </span>
@@ -284,7 +305,7 @@ function AnalysisStateCard(args: {
                                 style={{ width: `${args.overallScore}%` }}
                             />
                         </div>
-                    </div>
+                    </SubtlePanel>
                 </div>
             </SurfaceCard>
         );
@@ -349,7 +370,7 @@ function AnalysisStateCard(args: {
             <SurfaceCard>
                 <SectionHeading
                     eyebrow="Interview Analyse"
-                    title="Transkript nicht verfuegbar"
+                    title="Transkript nicht verfügbar"
                     description={
                         args.transcriptError ||
                         "Das Interview konnte nicht in Text umgewandelt werden."
@@ -613,17 +634,17 @@ export default function InterviewFeedback({
 
                     <div className="grid gap-4 lg:grid-cols-3">
                         <ListCard
-                            title="Strengths"
+                            title="Staerken"
                             items={evaluation.strengths}
                             emptyLabel="Noch keine Staerken erkannt."
                         />
                         <ListCard
-                            title="Issues"
+                            title="Risiken"
                             items={evaluation.issues}
                             emptyLabel="Keine akuten Schwachstellen erkannt."
                         />
                         <ListCard
-                            title="Improvements"
+                            title="Verbesserungen"
                             items={evaluation.improvements}
                             emptyLabel="Keine konkreten Verbesserungen vorhanden."
                         />
@@ -674,7 +695,7 @@ export default function InterviewFeedback({
                             <p className="text-sm text-gray-400">
                                 Nach dem Interview erscheint hier die gemeinsame
                                 Replay-Aufnahme. Ohne gespeichertes Audio bleibt
-                                dieser Bereich nur in der Live-Session verfuegbar.
+                                dieser Bereich nur in der Live-Session verfügbar.
                             </p>
                         )}
 
@@ -700,9 +721,11 @@ export default function InterviewFeedback({
 
                     <div className="mt-4">
                         {transcriptExport ? (
-                            <pre className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-gray-950 p-4 text-sm leading-6 text-gray-200">
-                                {transcriptExport}
-                            </pre>
+                            <SubtlePanel className="max-h-[420px] overflow-y-auto">
+                                <pre className="whitespace-pre-wrap text-sm leading-6 text-gray-200">
+                                    {transcriptExport}
+                                </pre>
+                            </SubtlePanel>
                         ) : transcriptStatus === "transcribing" ? (
                             <p className="text-sm text-gray-400">
                                 Das Interview-Transkript wird gerade erzeugt.
@@ -863,12 +886,12 @@ export default function InterviewFeedback({
 
                         <div className="grid gap-4 lg:grid-cols-3">
                             <ListCard
-                                title="Strengths"
+                                title="Staerken"
                                 items={faceAnalysisReport.summary.strengths}
                                 emptyLabel="Keine besonderen Staerken erkannt."
                             />
                             <ListCard
-                                title="Risks"
+                                title="Risiken"
                                 items={faceAnalysisReport.summary.risks}
                                 emptyLabel="Keine besonderen Risiken erkannt."
                             />
@@ -892,7 +915,7 @@ export default function InterviewFeedback({
                 ) : (
                     <p className="mt-4 text-sm text-gray-400">
                         Fuer dieses Interview sind noch keine Face-Metriken
-                        verfuegbar. Aktiviere im Live-Call die Kamera, damit die
+                        verfügbar. Aktiviere im Live-Call die Kamera, damit die
                         Face-Auswertung Daten sammeln kann.
                     </p>
                 )}

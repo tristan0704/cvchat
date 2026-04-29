@@ -104,7 +104,7 @@ export default function SettingsPage() {
 
     async function handleDeleteAccount() {
         const confirmed = window.confirm(
-            "Willst du deinen Account wirklich dauerhaft loeschen?"
+            "Willst du deinen Account wirklich dauerhaft löschen?"
         );
 
         if (!confirmed) {
@@ -129,7 +129,7 @@ export default function SettingsPage() {
 
             if (!response.ok || !data) {
                 throw new Error(
-                    data?.error || "Account konnte nicht geloescht werden."
+                    data?.error || "Account konnte nicht gelöscht werden."
                 );
             }
 
@@ -140,7 +140,7 @@ export default function SettingsPage() {
             setError(
                 getErrorMessage(
                     deleteError,
-                    "Account konnte nicht geloescht werden."
+                    "Account konnte nicht gelöscht werden."
                 )
             );
         } finally {
@@ -208,7 +208,7 @@ export default function SettingsPage() {
 
                         <div>
                             <label className="mb-1 block text-sm text-red-200">
-                                Passwort bestaetigen
+                                Passwort bestätigen
                             </label>
                             <input
                                 type="password"

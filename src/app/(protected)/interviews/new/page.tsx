@@ -246,7 +246,7 @@ export default function NewInterviewPage() {
                     {step === 3 ? (
                         <div className="space-y-4">
                             <h2 className="text-lg font-semibold">
-                                3. Unternehmensgroesse
+                                3. Unternehmensgröße
                             </h2>
                             <div className="grid gap-3 md:grid-cols-3">
                                 {companySizeOptions.map((item) => (
@@ -282,7 +282,7 @@ export default function NewInterviewPage() {
                             disabled={step === 1 || creating}
                             className="text-sm text-gray-400 hover:text-white disabled:opacity-30"
                         >
-                            Zurueck
+                            Zurück
                         </button>
 
                         {step < 3 ? (

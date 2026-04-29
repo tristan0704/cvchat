@@ -68,7 +68,7 @@ export async function PATCH(request: Request) {
 
     if (password && password !== confirmPassword) {
         return Response.json(
-            { error: "Die Passwoerter stimmen nicht ueberein." },
+            { error: "Die Passwörter stimmen nicht überein." },
             { status: 400 }
         );
     }
@@ -105,7 +105,7 @@ export async function PATCH(request: Request) {
         responseEmail = data.user?.email ?? email;
 
         message =
-            "Profil gespeichert. Falls die E-Mail geaendert wurde, bitte die Bestaetigung pruefen.";
+            "Profil gespeichert. Falls die E-Mail geändert wurde, bitte die Bestätigung prüfen.";
     } else if (password) {
         const supabase = await createClient();
         const { error } = await supabase.auth.updateUser({

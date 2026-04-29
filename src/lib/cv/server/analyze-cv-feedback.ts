@@ -38,7 +38,7 @@ export async function analyzeCvFeedbackFromText({
 }: AnalyzeCvFeedbackFromTextArgs): Promise<CvFeedbackResult> {
   if (!cvText.trim()) {
     throw new CvFeedbackError(
-      "No readable text could be extracted from the PDF",
+      "Aus dem PDF konnte kein lesbarer Text extrahiert werden.",
       422
     );
   }

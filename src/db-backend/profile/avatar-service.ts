@@ -42,11 +42,11 @@ export async function createAvatarUrlForPath(
 
 export async function uploadAvatarForUser(userId: string, file: File) {
     if (!isSupportedAvatarMimeType(file.type)) {
-        throw new Error("Bitte ein Bild als PNG, JPG, WEBP oder GIF auswaehlen.");
+        throw new Error("Bitte ein Bild als PNG, JPG, WEBP oder GIF auswählen.");
     }
 
     if (file.size > MAX_AVATAR_FILE_BYTES) {
-        throw new Error("Das Profilbild darf maximal 5 MB gross sein.");
+        throw new Error("Das Profilbild darf maximal 5 MB groß sein.");
     }
 
     const avatarPath = getAvatarObjectPath(userId);

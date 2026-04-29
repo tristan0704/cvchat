@@ -607,7 +607,7 @@ export function useVoiceSessionLifecycle({
         }
 
         if (!recorderSupported) {
-            return "MediaRecorder ist fuer diese Aufnahme-Konfiguration nicht verfuegbar."
+            return "MediaRecorder ist für diese Aufnahme-Konfiguration nicht verfügbar."
         }
 
         return ""

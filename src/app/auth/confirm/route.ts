@@ -28,6 +28,6 @@ export async function GET(request: NextRequest) {
     }
 
     redirectTo.pathname = "/auth/login";
-    redirectTo.searchParams.set("error", "Bestaetigung fehlgeschlagen.");
+    redirectTo.searchParams.set("error", "Bestätigung fehlgeschlagen.");
     return NextResponse.redirect(redirectTo);
 }

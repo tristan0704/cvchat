@@ -148,7 +148,7 @@ export function useVoiceCapture({
         if (!navigator.mediaDevices?.getUserMedia) {
             return {
                 ok: false,
-                error: "Mikrofonzugriff ist in diesem Browser oder Kontext nicht verfuegbar. Nutze localhost oder HTTPS und pruefe die Browser-Berechtigung.",
+                error: "Mikrofonzugriff ist in diesem Browser oder Kontext nicht verfügbar. Nutze localhost oder HTTPS und prüfe die Browser-Berechtigung.",
             }
         }
 

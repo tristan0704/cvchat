@@ -32,7 +32,7 @@ export default function ResetPasswordPage() {
                 throw resetError;
             }
 
-            setStatus("Wir haben dir einen Link zum Zuruecksetzen gesendet.");
+            setStatus("Wir haben dir einen Link zum Zurücksetzen gesendet.");
         } catch (submitError) {
             setError(
                 submitError instanceof Error
@@ -95,7 +95,7 @@ export default function ResetPasswordPage() {
                             href="/auth/login"
                             className="flex w-full items-center justify-center rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white"
                         >
-                            Zurueck
+                            Zurück
                         </Link>
 
                         <button

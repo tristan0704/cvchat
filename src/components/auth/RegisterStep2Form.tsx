@@ -154,7 +154,7 @@ export default function RegisterStep2Form() {
                         htmlFor="cv-upload"
                         className="cursor-pointer rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
                     >
-                        Datei auswaehlen
+                        Datei auswählen
                     </label>
 
                     {selectedCv ? (
@@ -174,7 +174,7 @@ export default function RegisterStep2Form() {
                         onClick={() => window.history.back()}
                         className="flex w-full items-center justify-center rounded-md border border-white/10 py-2 text-sm font-semibold text-gray-300 hover:bg-white/5"
                     >
-                        Zurueck
+                        Zurück
                     </button>
 
                     <button

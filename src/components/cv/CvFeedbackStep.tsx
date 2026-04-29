@@ -136,14 +136,12 @@ export default function CvFeedbackStep() {
 
     return (
         <div className="space-y-6">
-            <div className="rounded-[24px] border bg-white p-6">
+            <div className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            CV Feedback
-                        </h2>
-                        <p className="mt-1 text-sm text-slate-600">
-                            Analyse fuer die ausgewaehlte Interview-Konfiguration.
+                        <h2 className="text-lg font-semibold text-white">CV-Feedback</h2>
+                        <p className="mt-1 text-sm text-gray-400">
+                            Analyse für die ausgewählte Interview-Konfiguration.
                         </p>
                     </div>
 
@@ -151,7 +149,7 @@ export default function CvFeedbackStep() {
                         {badges.map((badge) => (
                             <span
                                 key={badge}
-                                className="rounded-full border bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
+                                className="rounded-full bg-white/5 px-3 py-1.5 text-xs text-gray-300 outline outline-1 outline-white/10"
                             >
                                 {badge}
                             </span>
@@ -159,23 +157,23 @@ export default function CvFeedbackStep() {
                     </div>
                 </div>
 
-                <div className="mt-6 rounded-[24px] border bg-slate-50 p-4">
+                <div className="mt-6 rounded-xl bg-gray-900 p-4 outline outline-1 outline-white/10">
                     {loadingStoredCv ? (
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-gray-400">
                             Gespeicherter Lebenslauf wird geladen...
                         </p>
                     ) : storedCv ? (
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div>
-                                <p className="text-sm font-semibold text-slate-900">
+                                <p className="text-sm font-semibold text-white">
                                     {storedCv.fileName}
                                 </p>
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 text-xs text-gray-500">
                                     Im Profil gespeichert am{" "}
                                     {formatDateTime(storedCv.uploadedAt)}
                                 </p>
                                 {result?.analyzedAt ? (
-                                    <p className="mt-1 text-xs text-slate-500">
+                                    <p className="mt-1 text-xs text-gray-500">
                                         Letzte Analyse: {formatDateTime(result.analyzedAt)}
                                     </p>
                                 ) : null}
@@ -185,7 +183,7 @@ export default function CvFeedbackStep() {
                                 type="button"
                                 onClick={() => void handleRefreshFeedback()}
                                 disabled={loading}
-                                className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                                className="rounded-md bg-indigo-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-50"
                             >
                                 {loading
                                     ? "Analysiere..."
@@ -197,10 +195,10 @@ export default function CvFeedbackStep() {
                     ) : (
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div>
-                                <p className="text-sm font-semibold text-slate-900">
+                                <p className="text-sm font-semibold text-white">
                                     Kein Lebenslauf im Profil hinterlegt
                                 </p>
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 text-xs text-gray-400">
                                     Lade deinen CV zuerst im Profil hoch. Danach wird
                                     er hier pro Interview-Konfiguration automatisch
                                     analysiert.
@@ -209,7 +207,7 @@ export default function CvFeedbackStep() {
 
                             <Link
                                 href="/profile"
-                                className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
+                                className="rounded-md bg-white/5 px-4 py-3 text-sm font-semibold text-white outline outline-1 outline-white/10 transition hover:bg-white/10"
                             >
                                 Zum Profil
                             </Link>
@@ -217,11 +215,11 @@ export default function CvFeedbackStep() {
                     )}
                 </div>
 
-                {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+                {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
             </div>
 
             {loading ? (
-                <div className="rounded-[24px] border bg-white p-10 text-center text-sm text-slate-500">
+                <div className="rounded-xl bg-gray-800/50 p-10 text-center text-sm text-gray-400 outline outline-1 outline-white/10">
                     CV wird analysiert...
                 </div>
             ) : null}
@@ -235,7 +233,7 @@ export default function CvFeedbackStep() {
             ) : null}
 
             {!loading && !result ? (
-                <div className="rounded-[24px] border border-dashed bg-white p-10 text-center text-sm text-slate-500">
+                <div className="rounded-xl bg-gray-800/50 p-10 text-center text-sm text-gray-400 outline outline-1 outline-white/10">
                     Hinterlege deinen Lebenslauf im Profil, um hier ein
                     rollenbezogenes Feedback zu sehen.
                 </div>

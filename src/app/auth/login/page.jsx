@@ -98,7 +98,7 @@ export default async function LoginPage({ searchParams }) {
               href="/"
               className="flex w-full justify-center rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white"
             >
-              Zurueck
+              Zurück
             </Link>
             <button
               type="submit"

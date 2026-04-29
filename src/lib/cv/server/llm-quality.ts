@@ -4,16 +4,16 @@ import { callOpenAiChat } from "@/lib/openai";
 import type { CvQualityAnalysis, InterviewCvConfig } from "@/lib/cv/types";
 import { parseJsonObject } from "@/lib/cv/server/json";
 
-const FALLBACK_FEEDBACK = "Unable to analyze content.";
+const FALLBACK_FEEDBACK = "Inhalt konnte nicht analysiert werden.";
 
 export const FALLBACK_QUALITY_RESULT: CvQualityAnalysis = {
   overallScore: 50,
-  sections: { score: 50, feedback: "Unable to analyze sections." },
-  impact: { score: 50, feedback: "Unable to analyze impact." },
-  length: { score: 50, feedback: "Unable to analyze length." },
-  contact: { score: 50, feedback: "Unable to analyze contact info." },
-  clarity: { score: 50, feedback: "Unable to analyze clarity." },
-  improvements: ["Analysis unavailable"],
+  sections: { score: 50, feedback: "Abschnitte konnten nicht analysiert werden." },
+  impact: { score: 50, feedback: "Wirkung konnte nicht analysiert werden." },
+  length: { score: 50, feedback: "Länge konnte nicht analysiert werden." },
+  contact: { score: 50, feedback: "Kontaktinformationen konnten nicht analysiert werden." },
+  clarity: { score: 50, feedback: "Klarheit konnte nicht analysiert werden." },
+  improvements: ["Keine Analyse verfügbar."],
 };
 
 function clampScore(value: unknown): number {
@@ -42,23 +42,23 @@ function parseDimension(value: unknown) {
 function buildPrompt(cvText: string, config: InterviewCvConfig) {
   return {
     prompt: [
-      "You are an experienced recruiter and career coach.",
-      "Analyze the given CV for a specific interview target.",
-      "Use semantic understanding, not exact keyword counting.",
-      "Evaluate the CV holistically for the selected role and context.",
-      "Score these dimensions only: sections, impact, length, contact, clarity.",
-      "Return ONLY valid JSON with no explanation.",
+      "Du bist ein erfahrener Recruiter und Career Coach.",
+      "Analysiere den gegebenen Lebenslauf für ein konkretes Interviewziel.",
+      "Nutze semantisches Verständnis und keine reine Keyword-Zählung.",
+      "Bewerte den Lebenslauf ganzheitlich für die ausgewählte Rolle und den gegebenen Kontext.",
+      "Bewerte ausschließlich diese Dimensionen: sections, impact, length, contact, clarity.",
+      "Antworte ausschließlich mit gültigem JSON ohne zusätzliche Erklärung.",
     ].join(" "),
     question: [
-      "TARGET INTERVIEW:",
-      `Role: ${config.role || "Unknown"}`,
-      `Experience: ${config.experience || "Not specified"}`,
-      `Company size: ${config.companySize || "Not specified"}`,
+      "ZIELINTERVIEW:",
+      `Rolle: ${config.role || "Unbekannt"}`,
+      `Erfahrung: ${config.experience || "Nicht angegeben"}`,
+      `Unternehmensgröße: ${config.companySize || "Nicht angegeben"}`,
       "",
-      "CV CONTENT:",
+      "INHALT DES LEBENSLAUFS:",
       cvText,
       "",
-      "Return JSON in this exact format:",
+      "Gib JSON exakt in diesem Format zurück:",
       "{",
       '"overallScore": number (0-100),',
       '"sections": { "score": number, "feedback": string },',
@@ -69,11 +69,12 @@ function buildPrompt(cvText: string, config: InterviewCvConfig) {
       '"improvements": string[]',
       "}",
       "",
-      "Rules:",
-      "* Base the feedback on the CV content and the target interview context.",
-      "* Be concise and actionable.",
-      "* Do not hallucinate experience that is not visible in the CV.",
-      "* Improvements should help the candidate for this exact interview target.",
+      "Regeln:",
+      "* Formuliere sämtliches Feedback auf Deutsch.",
+      "* Begründe alles ausschließlich mit dem Inhalt des Lebenslaufs und dem Zielkontext.",
+      "* Sei präzise, kurz und konkret umsetzbar.",
+      "* Erfinde keine Erfahrungen, die im Lebenslauf nicht erkennbar sind.",
+      "* Verbesserungen sollen der Kandidatin oder dem Kandidaten genau für dieses Interviewziel helfen.",
     ].join("\n"),
   };
 }
@@ -123,7 +124,7 @@ export async function analyzeCvQualityWithLLM(
       improvements:
         improvements.length > 0
           ? improvements
-          : ["No specific improvements provided."],
+          : ["Keine konkreten Verbesserungen angegeben."],
     };
   } catch (error) {
     console.error("[cv-feedback]", error);

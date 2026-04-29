@@ -7,7 +7,7 @@ import type {
 } from "@/lib/coding-challenge/types";
 import { callOpenAiChat } from "@/lib/openai";
 
-const FALLBACK_FEEDBACK = "Unable to analyze submission.";
+const FALLBACK_FEEDBACK = "Abgabe konnte nicht analysiert werden.";
 
 function clampScore(value: unknown) {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -67,46 +67,47 @@ function extractJsonString(content: string) {
 function buildPrompt(task: CodingChallengeTask, code: string) {
   return {
     prompt: [
-      "You are a senior technical interviewer reviewing a candidate coding challenge submission.",
-      "Evaluate the candidate against the actual task, explicit requirements, evaluation focus, and hidden reference solution.",
-      "Prioritize correctness first, then code quality and problem solving.",
-      "Assume no code execution is available. Judge by static analysis only.",
-      "Return only valid JSON with no markdown and no extra explanation.",
-      "Do not mention the hidden reference solution directly in the feedback.",
+      "Du bist ein erfahrener technischer Interviewer und bewertest die Abgabe einer Coding-Challenge.",
+      "Bewerte die Kandidatin oder den Kandidaten anhand der tatsächlichen Aufgabe, der expliziten Anforderungen, des Bewertungsfokus und der versteckten Referenzlösung.",
+      "Priorisiere zuerst Korrektheit, dann Code-Qualität und Problemlösung.",
+      "Gehe davon aus, dass keine Codeausführung verfügbar ist. Beurteile nur per statischer Analyse.",
+      "Gib ausschließlich gültiges JSON ohne Markdown und ohne zusätzliche Erklärung zurück.",
+      "Erwähne die versteckte Referenzlösung nicht direkt im Feedback.",
+      "Formuliere sämtliches Feedback auf Deutsch.",
     ].join(" "),
     question: [
-      `Task name: ${task.name}`,
-      `Role: ${task.role}`,
-      `Language: ${task.language}`,
-      `Difficulty: ${task.difficulty}`,
+      `Aufgabenname: ${task.name}`,
+      `Rolle: ${task.role}`,
+      `Sprache: ${task.language}`,
+      `Schwierigkeit: ${task.difficulty}`,
       "",
-      "Description:",
+      "Beschreibung:",
       task.description,
       "",
-      "Task statement:",
+      "Aufgabenstellung:",
       task.statement,
       "",
-      "Requirements:",
+      "Anforderungen:",
       ...task.requirements.map((requirement) => `- ${requirement}`),
       "",
-      "Examples:",
+      "Beispiele:",
       ...(task.examples.length > 0
         ? task.examples.map((example) => `- ${example}`)
-        : ["- No examples provided"]),
+        : ["- Keine Beispiele angegeben"]),
       "",
-      "Evaluation focus:",
+      "Bewertungsfokus:",
       ...task.evaluationFocus.map((focus) => `- ${focus}`),
       "",
-      "Hidden reference approach:",
+      "Versteckter Referenzansatz:",
       task.solution.approach,
       "",
-      "Hidden reference solution:",
+      "Versteckte Referenzlösung:",
       task.solution.code,
       "",
-      "Candidate submission:",
+      "Abgabe der Kandidatin oder des Kandidaten:",
       code,
       "",
-      "Return JSON in this exact format:",
+      "Gib JSON exakt in diesem Format zurück:",
       "{",
       '"overallScore": number (0-100),',
       '"passedLikely": boolean,',
@@ -119,11 +120,11 @@ function buildPrompt(task: CodingChallengeTask, code: string) {
       '"improvements": string[]',
       "}",
       "",
-      "Rules:",
-      "- Be concise and concrete.",
-      "- Reflect incomplete or incorrect logic clearly.",
-      "- Do not hallucinate runtime behavior you cannot infer from the code.",
-      "- Keep strengths, issues, and improvements actionable.",
+      "Regeln:",
+      "- Sei kurz, konkret und technisch nachvollziehbar.",
+      "- Benenne unvollständige oder fehlerhafte Logik klar.",
+      "- Erfinde kein Laufzeitverhalten, das nicht aus dem Code ableitbar ist.",
+      "- Halte Stärken, Probleme und Verbesserungen umsetzbar.",
     ].join("\n"),
   };
 }
@@ -142,7 +143,7 @@ export async function evaluateCodingChallengeSubmission(
   });
 
   if (!ai.ok || !ai.content) {
-    throw new Error(ai.error ?? "OpenAI evaluation failed");
+    throw new Error(ai.error ?? "OpenAI-Bewertung fehlgeschlagen");
   }
 
   const parsed = JSON.parse(extractJsonString(ai.content)) as Record<

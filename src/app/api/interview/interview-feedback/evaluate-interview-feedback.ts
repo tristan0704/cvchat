@@ -5,7 +5,7 @@ import type {
     InterviewFeedbackRequest,
 } from "@/lib/interview-feedback-fetch/types"
 
-const FALLBACK_FEEDBACK = "Analyse nicht verfuegbar."
+const FALLBACK_FEEDBACK = "Analyse nicht verfügbar."
 
 function clampScore(value: unknown) {
     const numeric = typeof value === "number" ? value : Number(value)
@@ -75,23 +75,23 @@ function extractJsonString(content: string) {
 function buildPrompt(args: InterviewFeedbackRequest) {
     return {
         prompt: [
-            "You are a senior interviewer evaluating a mock interview transcript for coaching feedback.",
-            "Assess the candidate for the stated role and context only from the provided transcript.",
-            "Prioritize clarity, answer quality, and role fit.",
-            "Do not invent missing facts or claim certainty where the transcript is ambiguous.",
-            "Write all feedback in German.",
-            "Return only valid JSON with no markdown and no extra explanation.",
+            "Du bist ein erfahrener technischer Interviewer und bewertest das Transkript eines Mock-Interviews für Coaching-Feedback.",
+            "Bewerte die Kandidatin oder den Kandidaten nur auf Basis des bereitgestellten Transkripts für die angegebene Rolle und den Kontext.",
+            "Priorisiere Klarheit, Antwortqualität und Rollenfit.",
+            "Erfinde keine fehlenden Fakten und behaupte keine Sicherheit, wenn das Transkript mehrdeutig ist.",
+            "Formuliere sämtliches Feedback auf Deutsch.",
+            "Gib ausschließlich gültiges JSON ohne Markdown und ohne zusätzliche Erklärung zurück.",
         ].join(" "),
         question: [
             `Rolle: ${args.role}`,
             `Erfahrung: ${args.experience?.trim() || "nicht angegeben"}`,
-            `Unternehmensgroesse: ${args.companySize?.trim() || "nicht angegeben"}`,
-            `Transcript-Fingerprint: ${args.transcriptFingerprint}`,
+            `Unternehmensgröße: ${args.companySize?.trim() || "nicht angegeben"}`,
+            `Transkript-Fingerprint: ${args.transcriptFingerprint}`,
             "",
             "Interview-Export:",
             args.transcript,
             "",
-            "Return JSON in this exact format:",
+            "Gib JSON exakt in diesem Format zurück:",
             "{",
             '"overallScore": number (0-100),',
             '"passedLikely": boolean,',
@@ -104,12 +104,12 @@ function buildPrompt(args: InterviewFeedbackRequest) {
             '"improvements": string[]',
             "}",
             "",
-            "Rules:",
-            "- Be concise and concrete.",
-            "- Keep strengths, issues, and improvements actionable.",
-            "- Reflect weak or shallow answers clearly when the transcript shows them.",
-            "- Avoid generic praise.",
-            "- The summary should be 1 to 3 sentences.",
+            "Regeln:",
+            "- Sei kurz, konkret und nachvollziehbar.",
+            "- Halte Stärken, Probleme und Verbesserungen umsetzbar.",
+            "- Benenne schwache oder oberflächliche Antworten klar, wenn das Transkript sie zeigt.",
+            "- Vermeide generisches Lob.",
+            "- Die Zusammenfassung soll 1 bis 3 Sätze lang sein.",
         ].join("\n"),
     }
 }
@@ -127,7 +127,7 @@ export async function evaluateInterviewFeedback(
     })
 
     if (!ai.ok || !ai.content) {
-        throw new Error(ai.error ?? "OpenAI interview evaluation failed")
+        throw new Error(ai.error ?? "OpenAI-Interviewbewertung fehlgeschlagen")
     }
 
     const parsed = JSON.parse(extractJsonString(ai.content)) as Record<

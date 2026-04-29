@@ -44,7 +44,7 @@ export default function CodingChallengeEditor() {
   if (!draft) {
     return (
       <CodingChallengeErrorState
-        message={error || "Keine Coding-Challenge verfuegbar."}
+        message={error || "Keine Coding-Challenge verfügbar."}
       />
     );
   }
@@ -86,13 +86,13 @@ export default function CodingChallengeEditor() {
 
       {!submitError && isSubmitting ? (
         <CodingChallengeSubmitState
-          message="Loesung wird zur Bewertung eingereicht..."
+          message="Lösung wird zur Bewertung eingereicht..."
         />
       ) : null}
 
       {!submitError && !isSubmitting && hasSubmittedCurrentTask ? (
         <CodingChallengeSubmitState
-          message="Loesung eingereicht. Die GPT-Bewertung wurde fuer den naechsten Schritt gespeichert."
+          message="Lösung eingereicht. Die GPT-Bewertung wurde für den nächsten Schritt gespeichert."
           tone="success"
         />
       ) : null}
