@@ -2,193 +2,193 @@
   "tasks": [
     {
       "id": "frontend-product-filter",
-      "name": "Product Filter And Sorting",
+      "name": "Produktfilter und Sortierung",
       "role": "frontend",
       "language": "javascript",
       "difficulty": "easy",
       "estimatedMinutes": 20,
-      "description": "Prepare filtered data for a product listing view.",
-      "statement": "Implement `getVisibleProducts(products, search, activeCategory)`.\n\nThe function should return only products that match the search term in the product name and belong to the selected category. Search must be case-insensitive and trimmed. If `activeCategory` is `all`, no category filter should be applied.\n\nReturn a new array sorted by `rating` descending and then by `name` ascending. Each returned entry must contain only `id`, `name`, `category`, and `rating`.",
+      "description": "Bereite gefilterte Daten für eine Produktlistenansicht auf.",
+      "statement": "Implementiere `getVisibleProducts(products, search, activeCategory)`.\n\nDie Funktion soll nur Produkte zurückgeben, die zum Suchbegriff im Produktnamen passen und zur ausgewählten Kategorie gehören. Die Suche muss Groß- und Kleinschreibung ignorieren und getrimmt werden. Wenn `activeCategory` den Wert `all` hat, darf kein Kategorienfilter angewendet werden.\n\nGib ein neues Array zurück, das zuerst nach `rating` absteigend und danach nach `name` aufsteigend sortiert ist. Jeder zurückgegebene Eintrag darf nur `id`, `name`, `category` und `rating` enthalten.",
       "requirements": [
-        "Treat empty search as no text filter.",
-        "Treat category `all` as no category filter.",
-        "Do not mutate the input array.",
-        "Sort by rating descending, then name ascending.",
-        "Return only the required fields."
+        "Behandle eine leere Suche als keinen Textfilter.",
+        "Behandle die Kategorie `all` als keinen Kategorienfilter.",
+        "Verändere das Eingabearray nicht.",
+        "Sortiere nach Bewertung absteigend und danach nach Name aufsteigend.",
+        "Gib nur die geforderten Felder zurück."
       ],
       "evaluationFocus": [
-        "array transformations",
-        "readability",
-        "immutability",
-        "edge cases"
+        "Array-Transformationen",
+        "Lesbarkeit",
+        "Immutability",
+        "Randfälle"
       ],
       "starterCode": "function getVisibleProducts(products, search, activeCategory) {\n  // your code here\n}\n\nconst products = [\n  { id: 1, name: \"Desk Lamp\", category: \"home\", rating: 4.7, stock: 12 },\n  { id: 2, name: \"Keyboard\", category: \"tech\", rating: 4.9, stock: 5 },\n  { id: 3, name: \"Notebook\", category: \"office\", rating: 4.7, stock: 19 }\n];\n\nconsole.log(getVisibleProducts(products, \"  k  \", \"all\"));",
       "examples": [
-        "search = \"lamp\", activeCategory = \"home\" should return only Desk Lamp.",
-        "search = \"\", activeCategory = \"all\" should return all products sorted by rating desc then name asc."
+        "Bei `search = \"lamp\"` und `activeCategory = \"home\"` soll nur `Desk Lamp` zurückgegeben werden.",
+        "Bei `search = \"\"` und `activeCategory = \"all\"` sollen alle Produkte nach Bewertung absteigend und dann nach Name aufsteigend sortiert zurückgegeben werden."
       ],
       "solution": {
-        "approach": "Normalize the incoming search string and category first, then filter, map the visible fields, and finally sort the result without mutating the input.",
+        "approach": "Normalisiere zuerst Suchbegriff und Kategorie, filtere dann die Daten, mappe auf die sichtbaren Felder und sortiere das Ergebnis ohne Mutation des Eingabearrays.",
         "code": "function getVisibleProducts(products, search, activeCategory) {\n  const normalizedSearch = (search ?? \"\").trim().toLowerCase();\n  const normalizedCategory = (activeCategory ?? \"all\").trim().toLowerCase();\n\n  return products\n    .filter((product) => {\n      const matchesSearch =\n        normalizedSearch.length === 0 ||\n        product.name.toLowerCase().includes(normalizedSearch);\n      const matchesCategory =\n        normalizedCategory === \"all\" ||\n        product.category.toLowerCase() === normalizedCategory;\n\n      return matchesSearch && matchesCategory;\n    })\n    .map(({ id, name, category, rating }) => ({ id, name, category, rating }))\n    .sort((a, b) => {\n      if (b.rating !== a.rating) {\n        return b.rating - a.rating;\n      }\n\n      return a.name.localeCompare(b.name);\n    });\n}"
       }
     },
     {
       "id": "frontend-timeline-grouping",
-      "name": "Timeline Section Builder",
+      "name": "Timeline-Abschnitte aufbauen",
       "role": "frontend",
       "language": "javascript",
       "difficulty": "medium",
       "estimatedMinutes": 25,
-      "description": "Transform raw activity events into grouped timeline sections for rendering.",
-      "statement": "Implement `buildTimelineSections(events)`.\n\nEach event has `{ id, type, title, createdAt }`. Group events by calendar day in the format `YYYY-MM-DD`. Within each group, sort events by `createdAt` descending. Return an array of sections shaped like `{ date, items }`, where `items` contains `{ id, title, type, createdAt }`.\n\nThe sections themselves must also be sorted by date descending.",
+      "description": "Wandle rohe Aktivitätsereignisse in gruppierte Timeline-Abschnitte für das Rendering um.",
+      "statement": "Implementiere `buildTimelineSections(events)`.\n\nJedes Ereignis hat `{ id, type, title, createdAt }`. Gruppiere die Ereignisse nach Kalendertag im Format `YYYY-MM-DD`. Innerhalb jeder Gruppe sollen die Ereignisse nach `createdAt` absteigend sortiert werden. Gib ein Array von Abschnitten in der Form `{ date, items }` zurück, wobei `items` Objekte mit `{ id, title, type, createdAt }` enthält.\n\nAuch die Abschnitte selbst müssen nach Datum absteigend sortiert sein.",
       "requirements": [
-        "Do not mutate the input array.",
-        "Group by calendar day using the timestamp date portion.",
-        "Sort groups by date descending.",
-        "Sort items inside each group by createdAt descending.",
-        "Return an empty array for invalid or empty input."
+        "Verändere das Eingabearray nicht.",
+        "Gruppiere nach dem Datumsanteil des Zeitstempels.",
+        "Sortiere Gruppen nach Datum absteigend.",
+        "Sortiere Einträge innerhalb jeder Gruppe nach `createdAt` absteigend.",
+        "Gib für ungültige oder leere Eingaben ein leeres Array zurück."
       ],
       "evaluationFocus": [
-        "data shaping",
-        "sorting",
-        "clean function design",
-        "handling empty input"
+        "Datenstrukturierung",
+        "Sortierung",
+        "sauberes Funktionsdesign",
+        "Umgang mit leerer Eingabe"
       ],
       "starterCode": "function buildTimelineSections(events) {\n  // your code here\n}\n\nconst events = [\n  { id: \"e1\", type: \"comment\", title: \"Left a note\", createdAt: \"2026-04-13T09:30:00Z\" },\n  { id: \"e2\", type: \"status\", title: \"Moved to review\", createdAt: \"2026-04-12T16:10:00Z\" },\n  { id: \"e3\", type: \"comment\", title: \"Requested changes\", createdAt: \"2026-04-13T11:00:00Z\" }\n];\n\nconsole.log(buildTimelineSections(events));",
       "examples": [
-        "Events from 2026-04-13 and 2026-04-12 should create two sections.",
-        "Inside 2026-04-13, the later timestamp should appear first."
+        "Ereignisse vom 2026-04-13 und 2026-04-12 sollen zwei Abschnitte erzeugen.",
+        "Innerhalb von 2026-04-13 soll der spätere Zeitstempel zuerst erscheinen."
       ],
       "solution": {
-        "approach": "Guard against invalid input, collect events in a map by date key, normalize the output shape, then sort sections and section items separately.",
+        "approach": "Prüfe zuerst auf ungültige Eingaben, sammle die Ereignisse dann in einer Map nach Datumsschlüssel, normalisiere die Ausgabestruktur und sortiere danach Abschnitte und Einträge getrennt.",
         "code": "function buildTimelineSections(events) {\n  if (!Array.isArray(events) || events.length === 0) {\n    return [];\n  }\n\n  const grouped = new Map();\n\n  for (const event of events) {\n    if (!event || !event.createdAt) {\n      continue;\n    }\n\n    const date = String(event.createdAt).slice(0, 10);\n    const currentItems = grouped.get(date) ?? [];\n\n    currentItems.push({\n      id: event.id,\n      title: event.title,\n      type: event.type,\n      createdAt: event.createdAt,\n    });\n\n    grouped.set(date, currentItems);\n  }\n\n  return Array.from(grouped.entries())\n    .map(([date, items]) => ({\n      date,\n      items: items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),\n    }))\n    .sort((a, b) => b.date.localeCompare(a.date));\n}"
       }
     },
     {
       "id": "fullstack-order-overview",
-      "name": "Order Overview Aggregator",
+      "name": "Bestellübersicht aggregieren",
       "role": "fullstack",
       "language": "javascript",
       "difficulty": "medium",
       "estimatedMinutes": 30,
-      "description": "Combine order and refund data for a dashboard summary.",
-      "statement": "Implement `buildOrderOverview(orders, refunds)`.\n\nEach order has `{ id, customerId, total, status }`. Each refund has `{ orderId, amount }`.\n\nReturn an object with:\n- `totalOrders`\n- `pendingOrders`\n- `completedOrders`\n- `refundedAmount`\n- `netRevenue`\n- `topCustomers`\n\n`topCustomers` must be an array of up to three entries shaped like `{ customerId, spent }`, sorted by spent descending.\n\nOnly completed orders count toward customer spend. `netRevenue` is the sum of completed orders minus total refunds.",
+      "description": "Kombiniere Bestell- und Rückerstattungsdaten für eine Dashboard-Zusammenfassung.",
+      "statement": "Implementiere `buildOrderOverview(orders, refunds)`.\n\nJede Bestellung hat `{ id, customerId, total, status }`. Jede Rückerstattung hat `{ orderId, amount }`.\n\nGib ein Objekt mit folgenden Feldern zurück:\n- `totalOrders`\n- `pendingOrders`\n- `completedOrders`\n- `refundedAmount`\n- `netRevenue`\n- `topCustomers`\n\n`topCustomers` muss ein Array mit bis zu drei Einträgen in der Form `{ customerId, spent }` sein, sortiert nach `spent` absteigend.\n\nNur abgeschlossene Bestellungen zählen für die Kundenausgaben. `netRevenue` ist die Summe aller abgeschlossenen Bestellungen minus aller Rückerstattungen.",
       "requirements": [
-        "Ignore refunded orders when counting completed revenue only if status is not completed.",
-        "Sum all refunds into refundedAmount.",
-        "Count pending and completed statuses separately.",
-        "Return top three customers by completed spend.",
-        "Do not mutate input arrays."
+        "Ignoriere Bestellungen für den Umsatz nur dann, wenn ihr Status nicht `completed` ist.",
+        "Summiere alle Rückerstattungen zu `refundedAmount`.",
+        "Zähle die Status `pending` und `completed` getrennt.",
+        "Gib die Top drei Kundinnen oder Kunden nach Ausgaben abgeschlossener Bestellungen zurück.",
+        "Verändere die Eingabearrays nicht."
       ],
       "evaluationFocus": [
-        "business logic",
-        "aggregation",
-        "naming",
-        "correctness"
+        "Geschäftslogik",
+        "Aggregation",
+        "Benennung",
+        "Korrektheit"
       ],
       "starterCode": "function buildOrderOverview(orders, refunds) {\n  // your code here\n}\n\nconst orders = [\n  { id: \"o1\", customerId: \"c1\", total: 120, status: \"completed\" },\n  { id: \"o2\", customerId: \"c2\", total: 80, status: \"pending\" },\n  { id: \"o3\", customerId: \"c1\", total: 60, status: \"completed\" }\n];\n\nconst refunds = [\n  { orderId: \"o1\", amount: 20 }\n];\n\nconsole.log(buildOrderOverview(orders, refunds));",
       "examples": [
-        "The example above should produce totalOrders 3, pendingOrders 1, completedOrders 2, refundedAmount 20, netRevenue 160.",
-        "topCustomers should start with customer c1 and spent 180."
+        "Das Beispiel oben soll `totalOrders` 3, `pendingOrders` 1, `completedOrders` 2, `refundedAmount` 20 und `netRevenue` 160 ergeben.",
+        "`topCustomers` soll mit Kundin oder Kunde `c1` und `spent` 180 beginnen."
       ],
       "solution": {
-        "approach": "Count order states in a single pass, accumulate completed spend per customer in a map, sum refunds separately, and derive the final dashboard fields from those aggregates.",
+        "approach": "Zähle Bestellzustände in einem Durchlauf, sammle Ausgaben abgeschlossener Bestellungen pro Kundin oder Kunde in einer Map, summiere Rückerstattungen separat und leite daraus die finalen Dashboard-Felder ab.",
         "code": "function buildOrderOverview(orders, refunds) {\n  const customerSpend = new Map();\n  let pendingOrders = 0;\n  let completedOrders = 0;\n  let completedRevenue = 0;\n\n  for (const order of orders) {\n    if (order.status === \"pending\") {\n      pendingOrders += 1;\n    }\n\n    if (order.status === \"completed\") {\n      completedOrders += 1;\n      completedRevenue += order.total;\n      customerSpend.set(\n        order.customerId,\n        (customerSpend.get(order.customerId) ?? 0) + order.total\n      );\n    }\n  }\n\n  const refundedAmount = refunds.reduce(\n    (sum, refund) => sum + refund.amount,\n    0\n  );\n\n  const topCustomers = Array.from(customerSpend.entries())\n    .map(([customerId, spent]) => ({ customerId, spent }))\n    .sort((a, b) => b.spent - a.spent)\n    .slice(0, 3);\n\n  return {\n    totalOrders: orders.length,\n    pendingOrders,\n    completedOrders,\n    refundedAmount,\n    netRevenue: completedRevenue - refundedAmount,\n    topCustomers,\n  };\n}"
       }
     },
     {
       "id": "fullstack-feature-flags",
-      "name": "Feature Flag Resolver",
+      "name": "Feature-Flags auflösen",
       "role": "fullstack",
       "language": "python",
       "difficulty": "medium",
       "estimatedMinutes": 30,
-      "description": "Resolve the active feature flags for a user based on environment and segments.",
-      "statement": "Implement `resolve_flags(user, environment, flags)`.\n\n`user` contains `{ \"id\": str, \"segments\": list[str] }`.\nEach flag contains:\n- `key`: str\n- `enabled`: bool\n- `environments`: list[str]\n- `segments`: list[str]\n\nA flag is active when:\n- it is enabled,\n- the current environment is included in `environments`, and\n- either `segments` is empty or the user has at least one matching segment.\n\nReturn a sorted list of active flag keys.",
+      "description": "Bestimme die aktiven Feature-Flags für einen Nutzer anhand von Umgebung und Segmenten.",
+      "statement": "Implementiere `resolve_flags(user, environment, flags)`.\n\n`user` enthält `{ \"id\": str, \"segments\": list[str] }`.\nJeder Flag enthält:\n- `key`: str\n- `enabled`: bool\n- `environments`: list[str]\n- `segments`: list[str]\n\nEin Flag ist aktiv, wenn:\n- es aktiviert ist,\n- die aktuelle Umgebung in `environments` enthalten ist und\n- entweder `segments` leer ist oder der Nutzer mindestens ein passendes Segment hat.\n\nGib eine sortierte Liste der aktiven Flag-Keys zurück.",
       "requirements": [
-        "Return an empty list for empty input.",
-        "Do not return duplicate keys.",
-        "Sort the result alphabetically.",
-        "Treat an empty `segments` list on a flag as globally available.",
-        "Do not mutate input values."
+        "Gib bei leerer Eingabe eine leere Liste zurück.",
+        "Gib keine doppelten Keys zurück.",
+        "Sortiere das Ergebnis alphabetisch.",
+        "Behandle eine leere `segments`-Liste eines Flags als global verfügbar.",
+        "Verändere die Eingabewerte nicht."
       ],
       "evaluationFocus": [
-        "conditional logic",
-        "set usage",
-        "clarity",
-        "edge cases"
+        "Bedingungslogik",
+        "Set-Nutzung",
+        "Klarheit",
+        "Randfälle"
       ],
       "starterCode": "def resolve_flags(user, environment, flags):\n    # your code here\n    pass\n\nuser = {\"id\": \"u1\", \"segments\": [\"beta\", \"team-admin\"]}\nflags = [\n    {\"key\": \"new-dashboard\", \"enabled\": True, \"environments\": [\"staging\", \"production\"], \"segments\": [\"beta\"]},\n    {\"key\": \"internal-tools\", \"enabled\": True, \"environments\": [\"production\"], \"segments\": [\"team-admin\"]},\n    {\"key\": \"old-report\", \"enabled\": False, \"environments\": [\"production\"], \"segments\": []}\n]\n\nprint(resolve_flags(user, \"production\", flags))",
       "examples": [
-        "For the example above, the active flags should be ['internal-tools', 'new-dashboard'].",
-        "If the environment is 'development', the example should return an empty list."
+        "Für das Beispiel oben sollen die aktiven Flags `['internal-tools', 'new-dashboard']` sein.",
+        "Wenn die Umgebung `development` ist, soll das Beispiel eine leere Liste zurückgeben."
       ],
       "solution": {
-        "approach": "Convert the user segments into a set, skip disabled or environment-mismatched flags, and collect matching keys in a set before returning them in sorted order.",
+        "approach": "Wandle die Nutzersegmente zuerst in ein Set um, überspringe deaktivierte oder zur Umgebung nicht passende Flags und sammle passende Keys in einem Set, bevor du sie sortiert zurückgibst.",
         "code": "def resolve_flags(user, environment, flags):\n    if not user or not environment or not flags:\n        return []\n\n    user_segments = set(user.get(\"segments\", []))\n    active_keys = set()\n\n    for flag in flags:\n        if not flag.get(\"enabled\"):\n            continue\n\n        if environment not in flag.get(\"environments\", []):\n            continue\n\n        required_segments = flag.get(\"segments\", [])\n        if required_segments and user_segments.isdisjoint(required_segments):\n            continue\n\n        active_keys.add(flag[\"key\"])\n\n    return sorted(active_keys)"
       }
     },
     {
       "id": "backend-rate-limiter",
-      "name": "Sliding Window Rate Limiter",
+      "name": "Sliding-Window-Rate-Limiter",
       "role": "backend",
       "language": "python",
       "difficulty": "medium",
       "estimatedMinutes": 35,
-      "description": "Implement a simple in-memory sliding window rate limiter.",
-      "statement": "Implement `allow_request(history, user_id, timestamp, limit, window_seconds)`.\n\n`history` is a dictionary where each key is a user id and the value is a list of previous request timestamps in ascending order.\n\nThe function should:\n- remove timestamps outside the sliding window,\n- allow the current request only if the remaining amount is below `limit`,\n- append the current timestamp if the request is allowed,\n- return a tuple `(allowed, updated_history)`.\n\nDo not mutate the original history object.",
+      "description": "Implementiere einen einfachen In-Memory-Rate-Limiter mit Sliding Window.",
+      "statement": "Implementiere `allow_request(history, user_id, timestamp, limit, window_seconds)`.\n\n`history` ist ein Dictionary, bei dem jeder Key eine Nutzer-ID ist und der Wert eine Liste bisheriger Request-Zeitstempel in aufsteigender Reihenfolge.\n\nDie Funktion soll:\n- Zeitstempel außerhalb des Sliding Windows entfernen,\n- den aktuellen Request nur erlauben, wenn die verbleibende Anzahl unter `limit` liegt,\n- den aktuellen Zeitstempel anhängen, wenn der Request erlaubt ist,\n- ein Tupel `(allowed, updated_history)` zurückgeben.\n\nVerändere das ursprüngliche History-Objekt nicht.",
       "requirements": [
-        "Use a sliding window based on the given timestamp.",
-        "Keep only timestamps where `timestamp - entry < window_seconds`.",
-        "Append the current timestamp only when allowed.",
-        "Return a copied structure instead of mutating the original dictionary.",
-        "Handle unknown users correctly."
+        "Verwende ein Sliding Window basierend auf dem übergebenen Zeitstempel.",
+        "Behalte nur Zeitstempel, für die `timestamp - entry < window_seconds` gilt.",
+        "Hänge den aktuellen Zeitstempel nur an, wenn der Request erlaubt ist.",
+        "Gib eine kopierte Struktur zurück, statt das ursprüngliche Dictionary zu verändern.",
+        "Behandle unbekannte Nutzer korrekt."
       ],
       "evaluationFocus": [
-        "correctness",
-        "immutable updates",
-        "edge cases",
-        "backend thinking"
+        "Korrektheit",
+        "immutable Updates",
+        "Randfälle",
+        "Backend-Denken"
       ],
       "starterCode": "def allow_request(history, user_id, timestamp, limit, window_seconds):\n    # your code here\n    pass\n\nhistory = {\n    \"u1\": [10, 15, 18]\n}\n\nprint(allow_request(history, \"u1\", 20, 3, 10))",
       "examples": [
-        "With history { 'u1': [10, 15, 18] }, timestamp 20, limit 3, window 10, the request should be denied because 15, 18 remain in the window and appending 20 would exceed the limit.",
-        "With the same history and limit 4, the request should be allowed."
+        "Mit `history { 'u1': [10, 15, 18] }`, `timestamp` 20, `limit` 3 und `window` 10 soll der Request abgelehnt werden, weil 15 und 18 im Fenster bleiben und ein Anhängen von 20 das Limit überschreiten würde.",
+        "Mit derselben History und `limit` 4 soll der Request erlaubt werden."
       ],
       "solution": {
-        "approach": "Copy the dictionary, keep only timestamps still inside the window, decide on allowance from the filtered list length, and append the new timestamp only when the request passes.",
+        "approach": "Kopiere das Dictionary, behalte nur Zeitstempel innerhalb des Fensters, entscheide anhand der gefilterten Liste über die Erlaubnis und hänge den neuen Zeitstempel nur bei erfolgreichem Request an.",
         "code": "def allow_request(history, user_id, timestamp, limit, window_seconds):\n    copied_history = {\n        key: list(values)\n        for key, values in history.items()\n    }\n\n    recent_requests = [\n        entry\n        for entry in copied_history.get(user_id, [])\n        if timestamp - entry < window_seconds\n    ]\n\n    allowed = len(recent_requests) < limit\n    if allowed:\n        recent_requests.append(timestamp)\n\n    copied_history[user_id] = recent_requests\n    return allowed, copied_history"
       }
     },
     {
       "id": "backend-retry-scheduler",
-      "name": "Retryable Job Selector",
+      "name": "Retry-fähige Jobs auswählen",
       "role": "backend",
       "language": "java",
       "difficulty": "hard",
       "estimatedMinutes": 40,
-      "description": "Select retryable background jobs based on status, retry count, and next retry timestamp.",
-      "statement": "Implement `selectRetryableJobs(List<Job> jobs, int maxRetries, long now)`.\n\nA `Job` has the fields:\n- `String id`\n- `String status`\n- `int retryCount`\n- `long nextRetryAt`\n\nReturn the ids of all jobs that are eligible for retry. A job is eligible when:\n- `status` equals `failed`,\n- `retryCount` is smaller than `maxRetries`, and\n- `nextRetryAt` is less than or equal to `now`.\n\nReturn the ids sorted by `nextRetryAt` ascending and then by `id` ascending.",
+      "description": "Wähle retry-fähige Hintergrundjobs anhand von Status, Retry-Anzahl und nächstem Retry-Zeitpunkt aus.",
+      "statement": "Implementiere `selectRetryableJobs(List<Job> jobs, int maxRetries, long now)`.\n\nEin `Job` hat die Felder:\n- `String id`\n- `String status`\n- `int retryCount`\n- `long nextRetryAt`\n\nGib die IDs aller Jobs zurück, die für einen Retry geeignet sind. Ein Job ist geeignet, wenn:\n- `status` gleich `failed` ist,\n- `retryCount` kleiner als `maxRetries` ist und\n- `nextRetryAt` kleiner oder gleich `now` ist.\n\nGib die IDs sortiert nach `nextRetryAt` aufsteigend und danach nach `id` aufsteigend zurück.",
       "requirements": [
-        "Ignore jobs with other statuses.",
-        "Ignore jobs that already reached max retries.",
-        "Ignore jobs scheduled for the future.",
-        "Sort first by nextRetryAt ascending, then id ascending.",
-        "Return a new list of job ids."
+        "Ignoriere Jobs mit anderen Statuswerten.",
+        "Ignoriere Jobs, die das maximale Retry-Limit bereits erreicht haben.",
+        "Ignoriere Jobs, die erst in der Zukunft geplant sind.",
+        "Sortiere zuerst nach `nextRetryAt` aufsteigend und danach nach `id` aufsteigend.",
+        "Gib eine neue Liste mit Job-IDs zurück."
       ],
       "evaluationFocus": [
-        "backend filtering logic",
-        "sorting",
-        "clean Java collections usage",
-        "readability"
+        "Backend-Filterlogik",
+        "Sortierung",
+        "saubere Nutzung von Java-Collections",
+        "Lesbarkeit"
       ],
       "starterCode": "import java.util.Comparator;\nimport java.util.List;\nimport java.util.stream.Collectors;\n\nclass Job {\n    String id;\n    String status;\n    int retryCount;\n    long nextRetryAt;\n\n    Job(String id, String status, int retryCount, long nextRetryAt) {\n        this.id = id;\n        this.status = status;\n        this.retryCount = retryCount;\n        this.nextRetryAt = nextRetryAt;\n    }\n}\n\npublic class Main {\n    static List<String> selectRetryableJobs(List<Job> jobs, int maxRetries, long now) {\n        // your code here\n        return List.of();\n    }\n}",
       "examples": [
-        "A failed job with retryCount 1, maxRetries 3, and nextRetryAt <= now should be included.",
-        "A failed job with retryCount 3 and maxRetries 3 should be excluded."
+        "Ein fehlgeschlagener Job mit `retryCount` 1, `maxRetries` 3 und `nextRetryAt <= now` soll enthalten sein.",
+        "Ein fehlgeschlagener Job mit `retryCount` 3 und `maxRetries` 3 soll ausgeschlossen werden."
       ],
       "solution": {
-        "approach": "Filter the eligible failed jobs first, then sort the remaining jobs with a comparator that uses `nextRetryAt` and `id`, and finally map them to their ids.",
+        "approach": "Filtere zuerst alle geeigneten fehlgeschlagenen Jobs, sortiere die verbleibenden Jobs anschließend mit einem Comparator über `nextRetryAt` und `id` und mappe sie danach auf ihre IDs.",
         "code": "import java.util.Comparator;\nimport java.util.List;\nimport java.util.stream.Collectors;\n\nclass Job {\n    String id;\n    String status;\n    int retryCount;\n    long nextRetryAt;\n\n    Job(String id, String status, int retryCount, long nextRetryAt) {\n        this.id = id;\n        this.status = status;\n        this.retryCount = retryCount;\n        this.nextRetryAt = nextRetryAt;\n    }\n}\n\npublic class Main {\n    static List<String> selectRetryableJobs(List<Job> jobs, int maxRetries, long now) {\n        return jobs.stream()\n            .filter(job -> \"failed\".equals(job.status))\n            .filter(job -> job.retryCount < maxRetries)\n            .filter(job -> job.nextRetryAt <= now)\n            .sorted(\n                Comparator.comparingLong((Job job) -> job.nextRetryAt)\n                    .thenComparing(job -> job.id)\n            )\n            .map(job -> job.id)\n            .collect(Collectors.toList());\n    }\n}"
       }
     }
