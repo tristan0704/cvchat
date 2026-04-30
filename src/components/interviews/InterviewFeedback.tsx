@@ -320,7 +320,7 @@ function AnalysisStateCard(args: {
                     description="Das komplette Interview-Transkript wird gerade mit dem neuen Bewertungs-Prompt analysiert."
                     badge={
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                            GPT laeuft
+                            GPT läuft
                         </span>
                     }
                 />
@@ -566,9 +566,9 @@ export default function InterviewFeedback({
 
         const navigationLockMessage =
             transcriptStatus === "recording" || transcriptStatus === "transcribing"
-                ? "Der Step-Wechsel bleibt gesperrt, waehrend das Transkript verarbeitet wird."
+                ? "Der Step-Wechsel bleibt gesperrt, während das Transkript verarbeitet wird."
                 : analysis.status === "loading"
-                  ? "Der Step-Wechsel bleibt gesperrt, waehrend das Interview-Feedback gespeichert und geladen wird."
+                  ? "Der Step-Wechsel bleibt gesperrt, während das Interview-Feedback gespeichert und geladen wird."
                   : null;
 
         onNavigationStateChange(navigationLockMessage);
@@ -674,7 +674,7 @@ export default function InterviewFeedback({
                                     src={controller.interviewRecapUrl}
                                     className="w-full accent-indigo-500"
                                 >
-                                    Dein Browser unterstuetzt das Audio-Element
+                                    Dein Browser unterstützt das Audio-Element
                                     nicht.
                                 </audio>
                                 <p className="text-sm text-gray-400">
@@ -914,7 +914,7 @@ export default function InterviewFeedback({
                     </div>
                 ) : (
                     <p className="mt-4 text-sm text-gray-400">
-                        Fuer dieses Interview sind noch keine Face-Metriken
+                        Für dieses Interview sind noch keine Face-Metriken
                         verfügbar. Aktiviere im Live-Call die Kamera, damit die
                         Face-Auswertung Daten sammeln kann.
                     </p>

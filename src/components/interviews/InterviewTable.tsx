@@ -220,7 +220,7 @@ export default function InterviewTable() {
                                             href={`/interviews/${item.id}`}
                                             className="rounded-md bg-indigo-500/10 px-3 py-1 text-xs text-indigo-400 hover:bg-indigo-500/20"
                                         >
-                                            Oeffnen
+                                            Öffnen
                                         </Link>
 
                                         <button

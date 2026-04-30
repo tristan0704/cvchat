@@ -61,7 +61,7 @@ function resolvePhaseMeta(
         case "opening":
             return { label: "Setup", tone: "default" as const };
         case "interviewing":
-            return { label: "Im Gespraech", tone: "positive" as const };
+            return { label: "Im Gespräch", tone: "positive" as const };
         case "closing":
             return { label: "Letzte Antwort", tone: "default" as const };
         case "stopping":
@@ -76,8 +76,8 @@ function resolveAssistantStatus(
     playbackActive: boolean
 ) {
     if (playbackActive) return "AI spricht";
-    if (callLifecyclePhase === "interviewing") return "AI hoert zu";
-    if (callLifecyclePhase === "opening") return "Verbindung laeuft";
+    if (callLifecyclePhase === "interviewing") return "AI hört zu";
+    if (callLifecyclePhase === "opening") return "Verbindung läuft";
     if (callLifecyclePhase === "closing" || callLifecyclePhase === "stopping") {
         return "Call endet";
     }
@@ -95,7 +95,7 @@ function resolveCallCopy(args: {
     if (error) {
         return {
             title: "Call konnte nicht sauber gestartet werden",
-            description: "Pruefe Mikrofonfreigabe und Browser-Support, dann starte erneut.",
+            description: "Prüfe Mikrofonfreigabe und Browser-Support, dann starte erneut.",
         };
     }
 
@@ -108,8 +108,8 @@ function resolveCallCopy(args: {
 
     if (callLifecyclePhase === "interviewing") {
         return {
-            title: "Interview laeuft",
-            description: "Fokussiere dich auf das Gespraech. Alles fuer Feedback kommt im naechsten Schritt.",
+            title: "Interview läuft",
+            description: "Fokussiere dich auf das Gespräch. Das Feedback kommt im nächsten Schritt.",
         };
     }
 
@@ -121,7 +121,7 @@ function resolveCallCopy(args: {
     }
 
     return {
-        title: "Bereit fuer den Live-Call",
+        title: "Bereit für den Live-Call",
         description: "Starte das Interview, sobald Mikrofon und Kamera bereit sind.",
     };
 }
@@ -281,7 +281,7 @@ function VoiceInterviewContent({
 
                         {microphoneSupported && !recorderSupported ? (
                             <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                                Dieser Browser unterstuetzt die benoetigte
+                                Dieser Browser unterstützt die benötigte
                                 Aufnahme-Konfiguration nicht.
                             </div>
                         ) : null}

@@ -278,7 +278,7 @@ function FaceAnalysisSummary(args: {
                             Gesicht: {(report.globalMetrics.faceDetectedPct * 100).toFixed(1)}%
                         </span>
                         <span className="rounded-full border bg-white px-3 py-1.5">
-                            Sprechaktivitaet: {(report.globalMetrics.speakingActivityPct * 100).toFixed(1)}%
+                            Sprechaktivität: {(report.globalMetrics.speakingActivityPct * 100).toFixed(1)}%
                         </span>
                     </div>
 
