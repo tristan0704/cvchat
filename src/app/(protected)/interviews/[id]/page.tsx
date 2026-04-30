@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import CodingChallengeEditor from "@/components/coding-challenge/coding-challenge-editor";
@@ -614,10 +614,27 @@ function InterviewDetailPageContent() {
     const [feedbackNavigationLock, setFeedbackNavigationLock] = useState<string | null>(
         null
     );
+    const refreshInFlightRef = useRef(false);
 
     const refreshInterview = useCallback(
-        async (options?: { syncStep?: boolean; showLoading?: boolean }) => {
-            const { syncStep = false, showLoading = false } = options ?? {};
+        async (options?: {
+            syncStep?: boolean;
+            showLoading?: boolean;
+            force?: boolean;
+        }) => {
+            const {
+                syncStep = false,
+                showLoading = false,
+                force = false,
+            } = options ?? {};
+
+            // Verhindert überlappende Detail-Requests, wenn Polling und UI
+            // fast gleichzeitig dieselben Daten nachladen wollen.
+            if (refreshInFlightRef.current && !force) {
+                return;
+            }
+
+            refreshInFlightRef.current = true;
 
             if (showLoading) {
                 setLoading(true);
@@ -639,6 +656,8 @@ function InterviewDetailPageContent() {
                 );
                 throw interviewError;
             } finally {
+                refreshInFlightRef.current = false;
+
                 if (showLoading) {
                     setLoading(false);
                 }
@@ -673,26 +692,42 @@ function InterviewDetailPageContent() {
 
     useEffect(() => {
         let cancelled = false;
+        let timeoutId: number | null = null;
 
-        const intervalId = window.setInterval(() => {
-            void (async () => {
+        const shouldPoll =
+            interview?.transcript?.transcriptStatus === "recording" ||
+            interview?.transcript?.transcriptStatus === "transcribing" ||
+            (interview?.currentStep ?? 1) < 6;
+
+        async function scheduleRefresh() {
+            if (!shouldPoll || cancelled) {
+                return;
+            }
+
+            timeoutId = window.setTimeout(async () => {
                 try {
-                    const refreshedInterview = await fetchInterviewDetail(interviewId);
-
-                    if (!cancelled) {
-                        setInterview(refreshedInterview);
-                    }
+                    // Bedingtes Polling hält den Step-Status aktuell,
+                    // ohne dauerhaft Last zu erzeugen.
+                    await refreshInterview();
                 } catch {
-                    // Silent refresh keeps step gating aligned with persisted data.
+                    // Silent background refresh keeps step gating aligned with persisted data.
                 }
-            })();
-        }, 4_000);
+
+                if (!cancelled) {
+                    await scheduleRefresh();
+                }
+            }, 6_000);
+        }
+
+        void scheduleRefresh();
 
         return () => {
             cancelled = true;
-            window.clearInterval(intervalId);
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
         };
-    }, [interviewId]);
+    }, [interview?.currentStep, interview?.transcript?.transcriptStatus, refreshInterview]);
 
     const config = useMemo(
         () =>

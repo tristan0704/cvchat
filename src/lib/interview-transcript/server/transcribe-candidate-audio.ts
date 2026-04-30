@@ -11,7 +11,20 @@ import {
 const GEMINI_API_VERSION = "v1alpha";
 const PRIMARY_TRANSCRIPTION_MODEL =
   process.env.GEMINI_TRANSCRIPTION_MODEL || "models/gemini-2.5-flash";
-const TRANSCRIPTION_MODEL_FALLBACKS = ["models/gemini-2.5-flash"];
+const TRANSCRIPTION_MODEL_FALLBACKS = [
+  process.env.GEMINI_TRANSCRIPTION_MODEL_FALLBACK || "models/gemini-2.0-flash",
+];
+const MAX_TRANSCRIPTION_ATTEMPTS_PER_MODEL = 2;
+const TRANSIENT_TRANSCRIPTION_ERROR_MARKERS = [
+  "503",
+  "unavailable",
+  "high demand",
+  "try again later",
+  "overloaded",
+  "deadline exceeded",
+  "timeout",
+  "internal",
+];
 
 function normalizeModelName(model: string) {
   const normalized = model.trim();
@@ -38,6 +51,18 @@ function isModelLoadError(message: string) {
       normalizedMessage.includes("unavailable") ||
       normalizedMessage.includes("failed_precondition"))
   );
+}
+
+function isTransientTranscriptError(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  return TRANSIENT_TRANSCRIPTION_ERROR_MARKERS.some((marker) =>
+    normalizedMessage.includes(marker)
+  );
+}
+
+async function waitForRetry(delayMs: number) {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 function logTranscriptRouteError(stage: string, details: Record<string, unknown>) {
@@ -145,92 +170,118 @@ export async function transcribeCandidateAudio({
     let lastError = "Gemini transcription failed";
 
     for (const model of modelsToTry) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: [
-                    "Du transkribierst nur die Sprache des Kandidaten aus einem technischen Interview auf Deutsch.",
-                    `Die Zielrolle ist: ${role || "Backend Developer"}.`,
-                    "Liefere nur das bereinigte Transcript als fortlaufenden deutschen Text mit normaler Satzzeichensetzung.",
-                    "Keine Sprecherlabels. Keine Analyse. Keine Zusammenfassung. Kein Markdown.",
-                    "Wenn einzelne Woerter unklar sind, rekonstruiere konservativ und erfinde keine fachlichen Details hinzu.",
-                  ].join("\n"),
-                },
-                createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
-              ],
-            },
-          ],
-        });
-
-        const transcriptText = response.text?.trim();
-        if (!transcriptText) {
-          lastError = `Gemini returned no transcript text for model ${model}`;
-          logTranscriptRouteError("transcribe_empty", {
-            role,
+      for (
+        let attempt = 1;
+        attempt <= MAX_TRANSCRIPTION_ATTEMPTS_PER_MODEL;
+        attempt += 1
+      ) {
+        try {
+          const response = await ai.models.generateContent({
             model,
-            interviewerQuestionCount: interviewerQuestions.length,
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: [
+                      "Du transkribierst nur die Sprache des Kandidaten aus einem technischen Interview auf Deutsch.",
+                      `Die Zielrolle ist: ${role || "Backend Developer"}.`,
+                      "Liefere nur das bereinigte Transcript als fortlaufenden deutschen Text mit normaler Satzzeichensetzung.",
+                      "Keine Sprecherlabels. Keine Analyse. Keine Zusammenfassung. Kein Markdown.",
+                      "Wenn einzelne Woerter unklar sind, rekonstruiere konservativ und erfinde keine fachlichen Details hinzu.",
+                    ].join("\n"),
+                  },
+                  createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
+                ],
+              },
+            ],
           });
-          continue;
-        }
 
-        let qaPairs: TranscriptQaPair[] = [];
-        let qaMappingModel = "";
-        let qaMappingError = "";
-
-        if (interviewerQuestions.length) {
-          try {
-            const qaMappingResult = await mapPostCallTranscriptToQaPairs({
-              ai,
-              role,
-              interviewerQuestions,
-              candidateTranscript: transcriptText,
-            });
-            qaPairs = qaMappingResult.qaPairs;
-            qaMappingModel = qaMappingResult.model;
-          } catch (error) {
-            qaMappingError =
-              error instanceof Error
-                ? error.message
-                : "Gemini QA mapping failed";
-
-            logTranscriptRouteError("qa_mapping", {
+          const transcriptText = response.text?.trim();
+          if (!transcriptText) {
+            lastError = `Gemini returned no transcript text for model ${model}`;
+            logTranscriptRouteError("transcribe_empty", {
               role,
               model,
+              attempt,
               interviewerQuestionCount: interviewerQuestions.length,
-              message: qaMappingError,
             });
+            continue;
           }
+
+          let qaPairs: TranscriptQaPair[] = [];
+          let qaMappingModel = "";
+          let qaMappingError = "";
+
+          if (interviewerQuestions.length) {
+            try {
+              const qaMappingResult = await mapPostCallTranscriptToQaPairs({
+                ai,
+                role,
+                interviewerQuestions,
+                candidateTranscript: transcriptText,
+              });
+              qaPairs = qaMappingResult.qaPairs;
+              qaMappingModel = qaMappingResult.model;
+            } catch (error) {
+              qaMappingError =
+                error instanceof Error
+                  ? error.message
+                  : "Gemini QA mapping failed";
+
+              logTranscriptRouteError("qa_mapping", {
+                role,
+                model,
+                attempt,
+                interviewerQuestionCount: interviewerQuestions.length,
+                message: qaMappingError,
+              });
+            }
+          }
+
+          return {
+            transcriptText,
+            qaPairs,
+            qaMappingModel,
+            qaMappingError,
+            model,
+          };
+        } catch (error) {
+          lastError =
+            error instanceof Error
+              ? error.message
+              : `Gemini transcription failed for model ${model}`;
+          const isTransientError = isTransientTranscriptError(lastError);
+
+          logTranscriptRouteError("transcribe", {
+            role,
+            model,
+            attempt,
+            errorType: isModelLoadError(lastError)
+              ? "model_load"
+              : isTransientError
+                ? "provider_transient"
+                : "provider_runtime",
+            interviewerQuestionCount: interviewerQuestions.length,
+            audioType: audio.type || "audio/webm",
+            audioSize: audio.size,
+            message: lastError,
+          });
+
+          // Bei kurzen Lastspitzen lohnt sich ein zweiter Versuch,
+          // bevor wir auf das nächste Modell wechseln.
+          if (
+            attempt < MAX_TRANSCRIPTION_ATTEMPTS_PER_MODEL &&
+            isTransientError
+          ) {
+            await waitForRetry(600 * attempt);
+            continue;
+          }
+
+          // Nicht-transiente Fehler oder ausgeschöpfte Retries wechseln
+          // kontrolliert zum nächsten Modell in der Fallback-Liste.
+          break;
         }
-
-        return {
-          transcriptText,
-          qaPairs,
-          qaMappingModel,
-          qaMappingError,
-          model,
-        };
-      } catch (error) {
-        lastError =
-          error instanceof Error
-            ? error.message
-            : `Gemini transcription failed for model ${model}`;
-
-        logTranscriptRouteError("transcribe", {
-          role,
-          model,
-          errorType: isModelLoadError(lastError)
-            ? "model_load"
-            : "provider_runtime",
-          interviewerQuestionCount: interviewerQuestions.length,
-          audioType: audio.type || "audio/webm",
-          audioSize: audio.size,
-          message: lastError,
-        });
       }
     }
 

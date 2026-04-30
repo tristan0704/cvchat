@@ -1,5 +1,7 @@
 import voiceHostPhraseManifest from "@/config/voice-host-phrases.json"
 
+//Funktionen zum Laden und Verwalten von Host-Phrasen
+
 type GreetingPhraseConfig = {
     id: string
     roleLabel: string
