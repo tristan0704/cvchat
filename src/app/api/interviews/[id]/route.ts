@@ -3,6 +3,7 @@ import {
     deleteInterviewForUser,
     getInterviewDetailLightForUser,
     getInterviewDetailForUser,
+    getInterviewShellForUser,
     updateInterviewProgressForUser,
 } from "@/db-backend/interviews/interview-service";
 
@@ -25,7 +26,9 @@ export async function GET(request: Request, context: RouteContext) {
     const url = new URL(request.url);
     const view = url.searchParams.get("view");
     const interview =
-        view === "light"
+        view === "shell"
+            ? await getInterviewShellForUser(currentUser.id, id)
+            : view === "light"
             ? await getInterviewDetailLightForUser(currentUser.id, id)
             : await getInterviewDetailForUser(currentUser.id, id);
 

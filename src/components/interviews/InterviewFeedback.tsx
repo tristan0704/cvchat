@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { FaceAnalysisParameterReport, FaceAnalysisReport } from "@/lib/face-analysis";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback-fetch/fingerprint";
@@ -16,6 +16,11 @@ import {
     formatMetricSeconds,
     formatMetricWordsPerMinute,
 } from "@/lib/voice-interview/core/formatters";
+
+// Dateiübersicht:
+// Dieser Step lädt Transcript, Timing, Interview-Feedback und Face-Analyse über
+// getrennte Domain-Endpunkte. Ein lokaler In-flight-Guard verhindert doppelte
+// Hydration, weil diese Datenblöcke größer sind als die Interview-Shell.
 
 const PERCENT_FORMATTER = new Intl.NumberFormat("de-DE", {
     maximumFractionDigits: 1,
@@ -415,6 +420,13 @@ type PersistedInterviewFeedbackState = {
     faceAnalysis: FaceAnalysisReport | null;
 };
 
+type PersistedInterviewFeedbackPayload = {
+    transcript: PersistedInterviewFeedbackState["transcript"];
+    timingMetrics: InterviewTimingMetrics | null;
+    feedback: InterviewFeedbackEvaluation | null;
+    faceAnalysis: FaceAnalysisReport | null;
+};
+
 export default function InterviewFeedback({
     onEvaluationReady,
     onNavigationStateChange,
@@ -431,42 +443,75 @@ export default function InterviewFeedback({
     const [persistedState, setPersistedState] =
         useState<PersistedInterviewFeedbackState | null>(null);
     const [loadError, setLoadError] = useState("");
+    const hydratePromiseRef = useRef<Promise<PersistedInterviewFeedbackPayload> | null>(
+        null
+    );
+    const timingPersistKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
 
         async function hydratePersistedInterview() {
             try {
-                const response = await fetch(`/api/interviews/${interviewId}`, {
-                    method: "GET",
-                    cache: "no-store",
-                });
-                const data = (await response.json().catch(() => null)) as
-                    | {
-                          interview?: {
-                              transcript?: PersistedInterviewFeedbackState["transcript"];
-                              timingMetrics?: InterviewTimingMetrics | null;
-                              feedback?: InterviewFeedbackEvaluation | null;
-                              faceAnalysis?: FaceAnalysisReport | null;
-                          };
-                          error?: string;
-                      }
-                    | null;
+                const requestPromise =
+                    hydratePromiseRef.current ??
+                    (async () => {
+                        const [transcriptResponse, feedbackResponse] =
+                            await Promise.all([
+                                fetch(`/api/interviews/${interviewId}/transcript`, {
+                                    method: "GET",
+                                    cache: "no-store",
+                                }),
+                                fetch(`/api/interviews/${interviewId}/feedback`, {
+                                    method: "GET",
+                                    cache: "no-store",
+                                }),
+                            ]);
+                        const transcriptData = (await transcriptResponse
+                            .json()
+                            .catch(() => null)) as
+                            | {
+                                  transcript?: PersistedInterviewFeedbackState["transcript"];
+                                  timingMetrics?: InterviewTimingMetrics | null;
+                                  error?: string;
+                              }
+                            | null;
+                        const feedbackData = (await feedbackResponse
+                            .json()
+                            .catch(() => null)) as
+                            | {
+                                  feedback?: InterviewFeedbackEvaluation | null;
+                                  faceAnalysis?: FaceAnalysisReport | null;
+                                  error?: string;
+                              }
+                            | null;
 
-                if (!response.ok || !data?.interview) {
-                    throw new Error(
-                        data?.error ||
-                            "Persistierte Interviewdaten konnten nicht geladen werden."
-                    );
-                }
+                        if (!transcriptResponse.ok || !transcriptData) {
+                            throw new Error(
+                                transcriptData?.error ||
+                                    "Persistierte Interviewdaten konnten nicht geladen werden."
+                            );
+                        }
+
+                        if (!feedbackResponse.ok || !feedbackData) {
+                            throw new Error(
+                                feedbackData?.error ||
+                                    "Persistierte Feedbackdaten konnten nicht geladen werden."
+                            );
+                        }
+
+                        return {
+                            transcript: transcriptData.transcript ?? null,
+                            timingMetrics: transcriptData.timingMetrics ?? null,
+                            feedback: feedbackData.feedback ?? null,
+                            faceAnalysis: feedbackData.faceAnalysis ?? null,
+                        };
+                    })();
+                hydratePromiseRef.current = requestPromise;
+                const payload = await requestPromise;
 
                 if (!cancelled) {
-                    setPersistedState({
-                        transcript: data.interview.transcript ?? null,
-                        timingMetrics: data.interview.timingMetrics ?? null,
-                        feedback: data.interview.feedback ?? null,
-                        faceAnalysis: data.interview.faceAnalysis ?? null,
-                    });
+                    setPersistedState(payload);
                     setLoadError("");
                 }
             } catch (error) {
@@ -474,9 +519,11 @@ export default function InterviewFeedback({
                     setLoadError(
                         error instanceof Error
                             ? error.message
-                            : "Persistierte Interviewdaten konnten nicht geladen werden."
+                        : "Persistierte Interviewdaten konnten nicht geladen werden."
                     );
                 }
+            } finally {
+                hydratePromiseRef.current = null;
             }
         }
 
@@ -491,6 +538,13 @@ export default function InterviewFeedback({
         if (!controller?.hasTimingMetrics) {
             return;
         }
+
+        const timingPersistKey = JSON.stringify(controller.interviewTimingMetrics);
+        if (timingPersistKeyRef.current === timingPersistKey) {
+            return;
+        }
+
+        timingPersistKeyRef.current = timingPersistKey;
 
         void fetch(`/api/interviews/${interviewId}/timing`, {
             method: "PUT",
@@ -634,9 +688,9 @@ export default function InterviewFeedback({
 
                     <div className="grid gap-4 lg:grid-cols-3">
                         <ListCard
-                            title="Staerken"
+                            title="Stärken"
                             items={evaluation.strengths}
-                            emptyLabel="Noch keine Staerken erkannt."
+                            emptyLabel="Noch keine Stärken erkannt."
                         />
                         <ListCard
                             title="Risiken"
@@ -711,7 +765,7 @@ export default function InterviewFeedback({
                     <SectionHeading
                         eyebrow="Transkript"
                         title="Interview-Transkript"
-                        description="Dieselbe strukturierte Export-Basis wird fuer die GPT-Auswertung verwendet."
+                        description="Dieselbe strukturierte Export-Basis wird für die GPT-Auswertung verwendet."
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
                                 {transcriptStatus}
@@ -793,7 +847,7 @@ export default function InterviewFeedback({
                                 )}
                             />
                             <MetricCard
-                                label="Kuerzeste Antwort"
+                                label="Kürzeste Antwort"
                                 value={formatMetricSeconds(
                                     timingMetrics.shortestAnswerDurationMs
                                 )}
@@ -886,9 +940,9 @@ export default function InterviewFeedback({
 
                         <div className="grid gap-4 lg:grid-cols-3">
                             <ListCard
-                                title="Staerken"
+                                title="Stärken"
                                 items={faceAnalysisReport.summary.strengths}
-                                emptyLabel="Keine besonderen Staerken erkannt."
+                                emptyLabel="Keine besonderen Stärken erkannt."
                             />
                             <ListCard
                                 title="Risiken"

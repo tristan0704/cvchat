@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { provisionCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { createClient } from "@/db-backend/auth/server-client";
 
 function redirectWithError(message: string) {
@@ -35,6 +36,7 @@ export async function signup(formData: FormData) {
     revalidatePath("/", "layout");
 
     if (data.session) {
+        await provisionCurrentAppUser();
         redirect("/auth/register/step2");
     }
 

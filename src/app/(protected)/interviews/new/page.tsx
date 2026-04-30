@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type InterviewTemplateSummary = {
@@ -19,6 +19,11 @@ type InterviewTemplateCatalog = {
     companySizes: string[];
     templates: InterviewTemplateSummary[];
 };
+
+// Dateiübersicht:
+// Die neue Interview-Seite lädt den Template-Katalog clientseitig. Der lokale
+// In-flight-Guard verhindert doppelte Initial-GETs im Entwicklungsmodus; ein
+// späterer Server-Wrapper kann denselben Katalog als Initialdaten übergeben.
 
 function StepButton({
     children,
@@ -53,6 +58,9 @@ export default function NewInterviewPage() {
     const [loadingCatalog, setLoadingCatalog] = useState(true);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState("");
+    const catalogLoadPromiseRef = useRef<Promise<InterviewTemplateCatalog> | null>(
+        null
+    );
     const router = useRouter();
 
     useEffect(() => {
@@ -63,23 +71,31 @@ export default function NewInterviewPage() {
             setError("");
 
             try {
-                const response = await fetch("/api/interviews/config", {
-                    method: "GET",
-                    cache: "no-store",
-                });
-                const data = (await response.json().catch(() => null)) as
-                    | { catalog?: InterviewTemplateCatalog; error?: string }
-                    | null;
+                const requestPromise =
+                    catalogLoadPromiseRef.current ??
+                    (async () => {
+                        const response = await fetch("/api/interviews/config", {
+                            method: "GET",
+                            cache: "no-store",
+                        });
+                        const data = (await response.json().catch(() => null)) as
+                            | { catalog?: InterviewTemplateCatalog; error?: string }
+                            | null;
 
-                if (!response.ok || !data?.catalog) {
-                    throw new Error(
-                        data?.error ||
-                            "Interview-Konfiguration konnte nicht geladen werden."
-                    );
-                }
+                        if (!response.ok || !data?.catalog) {
+                            throw new Error(
+                                data?.error ||
+                                    "Interview-Konfiguration konnte nicht geladen werden."
+                            );
+                        }
+
+                        return data.catalog;
+                    })();
+                catalogLoadPromiseRef.current = requestPromise;
+                const nextCatalog = await requestPromise;
 
                 if (!cancelled) {
-                    setCatalog(data.catalog);
+                    setCatalog(nextCatalog);
                 }
             } catch (loadError) {
                 if (!cancelled) {
@@ -93,6 +109,7 @@ export default function NewInterviewPage() {
                 if (!cancelled) {
                     setLoadingCatalog(false);
                 }
+                catalogLoadPromiseRef.current = null;
             }
         }
 
@@ -132,7 +149,7 @@ export default function NewInterviewPage() {
 
     async function handleCreateInterview() {
         if (!selectedTemplate) {
-            setError("Bitte waehle eine vollstaendige Interview-Konfiguration.");
+            setError("Bitte wähle eine vollständige Interview-Konfiguration.");
             return;
         }
 
@@ -203,7 +220,7 @@ export default function NewInterviewPage() {
             <main className="mx-auto max-w-7xl px-4 py-10">
                 <h1 className="text-3xl font-bold">Interview starten</h1>
                 <p className="mt-4 text-gray-400">
-                    Waehle eine DB-gestuetzte Interview-Konfiguration.
+                    Wähle eine DB-gestützte Interview-Konfiguration.
                 </p>
 
                 <div className="mt-8 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">

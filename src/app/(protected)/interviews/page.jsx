@@ -1,8 +1,22 @@
 import InterviewTable from "@/components/interviews/InterviewTable";
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function InterviewsPage() {
+import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { listInterviewsForUser } from "@/db-backend/interviews/interview-service";
+
+export default async function InterviewsPage() {
+  const currentUser = await getCurrentAppUser();
+
+  if (!currentUser) {
+    redirect("/auth/login");
+  }
+
+  // Die Liste wird als Initialdaten gerendert, damit der Browser keinen
+  // zusätzlichen GET direkt nach dem Seitenaufbau auslösen muss.
+  const interviews = await listInterviewsForUser(currentUser.id);
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <main className="mx-auto max-w-7xl px-4 py-10">
@@ -25,7 +39,7 @@ export default function InterviewsPage() {
 
         {/* TABLE */}
         <div className="mt-8">
-          <InterviewTable />
+          <InterviewTable initialInterviews={interviews} />
         </div>
       </main>
     </div>

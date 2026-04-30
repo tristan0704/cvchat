@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
     DIFFICULTY_LABELS,
@@ -11,6 +11,11 @@ import type {
     CodingChallengeEvaluation,
 } from "@/lib/coding-challenge/types";
 import { useInterviewSession } from "@/lib/interview-session/context";
+
+// Dateiübersicht:
+// Diese Auswertungsansicht lädt nur die Coding-Domäne. Ein In-flight-Guard
+// verhindert doppelte Detail-GETs beim Mounten, damit nicht mehrere identische
+// Reads mit voller Task- und Evaluation-Payload entstehen.
 
 function getScoreTone(score: number) {
     if (score >= 75) {
@@ -99,34 +104,45 @@ export default function CodingChallengeFeedback() {
         null
     );
     const [error, setError] = useState("");
+    const hydratePromiseRef = useRef<Promise<CodingChallengeDraft> | null>(null);
 
     useEffect(() => {
         let cancelled = false;
 
         async function hydrateFeedback() {
             try {
-                const response = await fetch(`/api/interviews/${interviewId}`, {
-                    method: "GET",
-                    cache: "no-store",
-                });
-                const data = (await response.json().catch(() => null)) as
-                    | {
-                          interview?: {
-                              codingChallenge?: CodingChallengeDraft | null;
-                          };
-                          error?: string;
-                      }
-                    | null;
+                const requestPromise =
+                    hydratePromiseRef.current ??
+                    (async () => {
+                        const response = await fetch(
+                            `/api/interviews/${interviewId}/coding`,
+                            {
+                                method: "GET",
+                                cache: "no-store",
+                            }
+                        );
+                        const data = (await response.json().catch(() => null)) as
+                            | {
+                                  codingChallenge?: CodingChallengeDraft | null;
+                                  error?: string;
+                              }
+                            | null;
 
-                if (!response.ok || !data?.interview?.codingChallenge) {
-                    throw new Error(
-                        data?.error || "Coding challenge konnte nicht geladen werden."
-                    );
-                }
+                        if (!response.ok || !data?.codingChallenge) {
+                            throw new Error(
+                                data?.error ||
+                                    "Coding challenge konnte nicht geladen werden."
+                            );
+                        }
+
+                        return data.codingChallenge;
+                    })();
+                hydratePromiseRef.current = requestPromise;
+                const codingChallenge = await requestPromise;
 
                 if (!cancelled) {
-                    setDraft(data.interview.codingChallenge);
-                    setEvaluation(data.interview.codingChallenge.evaluation ?? null);
+                    setDraft(codingChallenge);
+                    setEvaluation(codingChallenge.evaluation ?? null);
                     setError("");
                 }
             } catch (loadError) {
@@ -134,9 +150,11 @@ export default function CodingChallengeFeedback() {
                     setError(
                         loadError instanceof Error
                             ? loadError.message
-                            : "Coding challenge konnte nicht geladen werden."
+                        : "Coding challenge konnte nicht geladen werden."
                     );
                 }
+            } finally {
+                hydratePromiseRef.current = null;
             }
         }
 
@@ -230,7 +248,7 @@ export default function CodingChallengeFeedback() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
-                <ListCard title="Staerken" items={evaluation.strengths} />
+                <ListCard title="Stärken" items={evaluation.strengths} />
                 <ListCard title="Risiken" items={evaluation.issues} />
                 <ListCard title="Verbesserungen" items={evaluation.improvements} />
             </div>

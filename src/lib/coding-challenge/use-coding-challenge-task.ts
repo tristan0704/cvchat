@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { CodingChallengeDraft } from "@/lib/coding-challenge/types";
+
+// Dateiübersicht:
+// Der Hook weist genau eine Coding-Challenge pro Interview/Rolle zu und speichert
+// Drafts verzögert. Die initiale Assignment-Anfrage wird dedupliziert, weil sie
+// sonst bei Remounts mehrere gleichwertige GETs auslösen kann.
 
 type UseCodingChallengeTaskArgs = {
     interviewId: string;
@@ -73,19 +78,32 @@ export function useCodingChallengeTask({
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState("");
+    const loadPromiseRef = useRef<{
+        key: string;
+        promise: Promise<CodingChallengeDraft>;
+    } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
+        const loadKey = `${interviewId}:${roleLabel}`;
 
         async function loadTask() {
             setError("");
             setIsLoading(true);
 
             try {
-                const nextDraft = await fetchCodingChallengeDraft(
-                    interviewId,
-                    roleLabel
-                );
+                const request =
+                    loadPromiseRef.current?.key === loadKey
+                        ? loadPromiseRef.current
+                        : {
+                              key: loadKey,
+                              promise: fetchCodingChallengeDraft(
+                                  interviewId,
+                                  roleLabel
+                              ),
+                          };
+                loadPromiseRef.current = request;
+                const nextDraft = await request.promise;
                 if (!cancelled) {
                     setDraft(nextDraft);
                 }
@@ -96,6 +114,9 @@ export function useCodingChallengeTask({
             } finally {
                 if (!cancelled) {
                     setIsLoading(false);
+                }
+                if (loadPromiseRef.current?.key === loadKey) {
+                    loadPromiseRef.current = null;
                 }
             }
         }

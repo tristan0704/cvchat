@@ -1,8 +1,45 @@
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { getOrCreateCvFeedbackAnalysisForInterview } from "@/db-backend/cv/cv-service";
+import {
+    getCvFeedbackAnalysisForInterview,
+    getOrCreateCvFeedbackAnalysisForInterview,
+} from "@/db-backend/cv/cv-service";
 import { CvFeedbackError } from "@/lib/cv/server/analyze-cv-feedback";
 
 export const runtime = "nodejs";
+
+export async function GET(req: Request) {
+    const currentUser = await getCurrentAppUser();
+
+    if (!currentUser) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+        const url = new URL(req.url);
+        const interviewId = url.searchParams.get("interviewId")?.trim() ?? "";
+
+        if (!interviewId) {
+            return Response.json(
+                { error: "Interview id is required" },
+                { status: 400 }
+            );
+        }
+
+        const data = await getCvFeedbackAnalysisForInterview({
+            userId: currentUser.id,
+            interviewId,
+        });
+
+        return Response.json(data);
+    } catch (error) {
+        if (error instanceof CvFeedbackError) {
+            return Response.json({ error: error.message }, { status: error.status });
+        }
+
+        console.error("[api/interview/cv-feedback]", error);
+        return Response.json({ error: "Internal server error" }, { status: 500 });
+    }
+}
 
 export async function POST(req: Request) {
     const currentUser = await getCurrentAppUser();

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { provisionCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { createClient } from "@/db-backend/auth/server-client";
 
 function redirectWithError(message: string) {
@@ -26,6 +27,8 @@ export async function login(formData: FormData) {
     if (error) {
         redirectWithError(error.message);
     }
+
+    await provisionCurrentAppUser();
 
     revalidatePath("/", "layout");
     redirect("/home");

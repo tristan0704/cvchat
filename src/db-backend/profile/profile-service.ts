@@ -1,8 +1,14 @@
 import "server-only";
 
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 
 import { db } from "@/db-backend/prisma/client";
+
+// Dateiübersicht:
+// Profildaten werden auf vielen geschützten Seiten für Navbar, Einstellungen
+// und Profilansichten benötigt. Der Snapshot ist request-scoped gecacht, damit
+// Layout und Page im selben Server-Render nicht dieselben Tabellen doppelt lesen.
 
 export type ActiveCvSummary = {
     id: string;
@@ -44,7 +50,10 @@ function mapActiveCvSummary(
     } satisfies ActiveCvSummary;
 }
 
-export async function getProfileSnapshot(userId: string): Promise<ProfileSnapshot> {
+export const getProfileSnapshot = cache(
+    async function getProfileSnapshotForUser(
+        userId: string
+    ): Promise<ProfileSnapshot> {
     const [profile, settings, cvVersions] = await db.$transaction([
         db.profile.findUnique({
             where: {
@@ -90,7 +99,7 @@ export async function getProfileSnapshot(userId: string): Promise<ProfileSnapsho
         emailNotifications: settings?.emailNotifications ?? true,
         activeCv: mapActiveCvSummary(cvVersions[0] ?? null),
     };
-}
+});
 
 export async function updateProfileUsernameForUser(
     userId: string,

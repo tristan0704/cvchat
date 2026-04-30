@@ -342,3 +342,46 @@ export async function getOrCreateCvFeedbackAnalysisForInterview(args: {
         result,
     };
 }
+
+export async function getCvFeedbackAnalysisForInterview(args: {
+    userId: string;
+    interviewId: string;
+}) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: args.interviewId,
+            userId: args.userId,
+        },
+        include: {
+            cvFeedbackAnalysis: true,
+            cvVersion: true,
+        },
+    });
+
+    if (!interview) {
+        throw new CvFeedbackError("Interview not found", 404);
+    }
+
+    const cvVersion =
+        interview.cvVersion ??
+        (await db.cvVersion.findFirst({
+            where: {
+                userId: args.userId,
+                isActive: true,
+            },
+            orderBy: {
+                uploadedAt: "desc",
+            },
+        }));
+
+    if (!cvVersion) {
+        throw new CvFeedbackError("Kein Lebenslauf im Profil gespeichert.", 404);
+    }
+
+    return {
+        cv: buildCvVersionSummary(cvVersion),
+        result: interview.cvFeedbackAnalysis
+            ? mapCvFeedbackAnalysisToResult(interview.cvFeedbackAnalysis)
+            : null,
+    };
+}

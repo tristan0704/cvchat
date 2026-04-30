@@ -1,12 +1,24 @@
 import { redirect } from "next/navigation";
 
 import Navbar from "../../components/navigation/Navbar";
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import {
+  getCurrentAppUserState,
+  provisionCurrentAppUser,
+} from "@/db-backend/auth/current-app-user";
 import { createAvatarUrlForPath } from "@/db-backend/profile/avatar-service";
 import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
 
 export default async function HomeLayout({ children }) {
-  const currentUser = await getCurrentAppUser();
+  const userState = await getCurrentAppUserState();
+
+  if (userState.status === "unauthenticated") {
+    redirect("/auth/login");
+  }
+
+  const currentUser =
+    userState.status === "ready"
+      ? userState.user
+      : await provisionCurrentAppUser();
 
   if (!currentUser) {
     redirect("/auth/login");

@@ -10,6 +10,12 @@ import InterviewFeedback from "@/components/interviews/InterviewFeedback";
 import InterviewVoiceStep from "@/components/interviews/InterviewVoiceStep";
 import { InterviewSessionProvider, useOptionalInterviewSession } from "@/lib/interview-session/context";
 
+// Dateiübersicht:
+// Die Detailseite lädt einmal die vollständige Interview-Shell für Navigation,
+// Konfiguration und geplante Fragen. Laufende Aktualisierungen verwenden danach
+// nur noch den kleinen Status-Endpunkt, damit Polling keine schweren Datenblöcke
+// oder Frage-Texte nachlädt.
+
 type InterviewDetail = {
     id: string;
     title: string;
@@ -17,6 +23,9 @@ type InterviewDetail = {
     experience: string;
     companySize: string;
     currentStep: number;
+    status: string;
+    startedAt: string | null;
+    completedAt: string | null;
     cv: {
         id: string;
         fileName: string;
@@ -32,7 +41,12 @@ type InterviewDetail = {
     }>;
     transcript: {
         transcriptStatus: "idle" | "recording" | "transcribing" | "ready" | "error";
+        transcriptError: string;
     } | null;
+    hasCvFeedback: boolean;
+    hasInterviewFeedback: boolean;
+    hasOverallFeedback: boolean;
+    hasCodingEvaluation: boolean;
     cvFeedback: {
         quality: {
             overallScore: number;
@@ -67,8 +81,22 @@ type InterviewDetail = {
     } | null;
 };
 
+type InterviewStatusSnapshot = {
+    id: string;
+    currentStep: number;
+    status: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    transcriptStatus: "idle" | "recording" | "transcribing" | "ready" | "error" | null;
+    transcriptError: string;
+    hasCvFeedback: boolean;
+    hasInterviewFeedback: boolean;
+    hasOverallFeedback: boolean;
+    hasCodingEvaluation: boolean;
+};
+
 async function fetchInterviewDetail(interviewId: string) {
-    const response = await fetch(`/api/interviews/${interviewId}?view=light`, {
+    const response = await fetch(`/api/interviews/${interviewId}/shell`, {
         method: "GET",
         cache: "no-store",
     });
@@ -83,6 +111,45 @@ async function fetchInterviewDetail(interviewId: string) {
     return data.interview;
 }
 
+async function fetchInterviewStatus(interviewId: string) {
+    const response = await fetch(`/api/interviews/${interviewId}/status`, {
+        method: "GET",
+        cache: "no-store",
+    });
+    const data = (await response.json().catch(() => null)) as
+        | { status?: InterviewStatusSnapshot; error?: string }
+        | null;
+
+    if (!response.ok || !data?.status) {
+        throw new Error(data?.error || "Interview-Status konnte nicht geladen werden.");
+    }
+
+    return data.status;
+}
+
+function mergeInterviewStatus(
+    interview: InterviewDetail,
+    status: InterviewStatusSnapshot
+) {
+    return {
+        ...interview,
+        currentStep: status.currentStep,
+        status: status.status,
+        startedAt: status.startedAt,
+        completedAt: status.completedAt,
+        transcript: status.transcriptStatus
+            ? {
+                  transcriptStatus: status.transcriptStatus,
+                  transcriptError: status.transcriptError,
+              }
+            : null,
+        hasCvFeedback: status.hasCvFeedback,
+        hasInterviewFeedback: status.hasInterviewFeedback,
+        hasOverallFeedback: status.hasOverallFeedback,
+        hasCodingEvaluation: status.hasCodingEvaluation,
+    } satisfies InterviewDetail;
+}
+
 function getMaxAccessibleStep(args: {
     interview: InterviewDetail;
     hasTranscriptProgress: boolean;
@@ -90,7 +157,7 @@ function getMaxAccessibleStep(args: {
 }) {
     const { interview, hasTranscriptProgress, hasInterviewFeedback } = args;
 
-    if (interview.codingChallenge?.evaluation) {
+    if (interview.hasCodingEvaluation || interview.codingChallenge?.evaluation) {
         return 6;
     }
 
@@ -102,7 +169,7 @@ function getMaxAccessibleStep(args: {
         return 3;
     }
 
-    if (interview.cvFeedback) {
+    if (interview.hasCvFeedback || interview.cvFeedback) {
         return 2;
     }
 
@@ -125,7 +192,7 @@ function resolveVoiceNavigationLock(args: {
         | "error";
 }) {
     if (args.callLifecyclePhase === "opening") {
-        return "Der Step-Wechsel bleibt gesperrt, waehrend die Voice-Session aufgebaut wird.";
+        return "Der Step-Wechsel bleibt gesperrt, während die Voice-Session aufgebaut wird.";
     }
 
     if (
@@ -133,7 +200,7 @@ function resolveVoiceNavigationLock(args: {
         args.callLifecyclePhase === "closing" ||
         args.callLifecyclePhase === "stopping"
     ) {
-        return "Der Step-Wechsel bleibt gesperrt, solange der Call noch laeuft oder beendet wird.";
+        return "Der Step-Wechsel bleibt gesperrt, solange der Call noch läuft oder beendet wird.";
     }
 
     if (
@@ -142,7 +209,7 @@ function resolveVoiceNavigationLock(args: {
         args.persistedTranscriptStatus === "recording" ||
         args.persistedTranscriptStatus === "transcribing"
     ) {
-        return "Der Step-Wechsel bleibt gesperrt, waehrend das Transkript verarbeitet wird.";
+        return "Der Step-Wechsel bleibt gesperrt, während das Transkript verarbeitet wird.";
     }
 
     return null;
@@ -157,7 +224,7 @@ function getNextStepRequirement(args: {
     const { step, interview, hasTranscriptProgress, hasInterviewFeedback } = args;
 
     if (step === 1) {
-        return interview.cvFeedback
+        return interview.hasCvFeedback || interview.cvFeedback
             ? null
             : "Schritt 1 braucht zuerst ein gespeichertes CV-Feedback.";
     }
@@ -175,7 +242,7 @@ function getNextStepRequirement(args: {
     }
 
     if (step === 4) {
-        return interview.codingChallenge?.evaluation
+        return interview.hasCodingEvaluation || interview.codingChallenge?.evaluation
             ? null
             : "Schritt 4 braucht zuerst eine abgegebene und bewertete Coding-Challenge.";
     }
@@ -211,7 +278,7 @@ function InterviewDetailStepContent({
     const localTranscriptStatus =
         session?.voiceInterview.postCallTranscriptStatus ?? "idle";
     const hasTranscriptProgress = persistedTranscriptStatus !== "idle";
-    const hasInterviewFeedback = Boolean(interview.feedback);
+    const hasInterviewFeedback = interview.hasInterviewFeedback;
     const maxAccessibleStep = getMaxAccessibleStep({
         interview,
         hasTranscriptProgress,
@@ -430,13 +497,110 @@ function OverallFeedbackBlock({
 }) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [generationError, setGenerationError] = useState("");
+    const overallHydratePromiseRef = useRef<Promise<{
+        overallFeedback: InterviewDetail["overallFeedback"];
+        cvFeedback: InterviewDetail["cvFeedback"];
+        interviewFeedback: Pick<
+            NonNullable<InterviewDetail["feedback"]>,
+            "overallScore" | "summary"
+        > | null;
+        codingChallenge: InterviewDetail["codingChallenge"];
+    }> | null>(null);
+    const overallGeneratePromiseRef = useRef<Promise<
+        InterviewDetail["overallFeedback"]
+    > | null>(null);
+    const [detail, setDetail] = useState<{
+        overallFeedback: InterviewDetail["overallFeedback"];
+        cvFeedback: InterviewDetail["cvFeedback"];
+        interviewFeedback: Pick<
+            NonNullable<InterviewDetail["feedback"]>,
+            "overallScore" | "summary"
+        > | null;
+        codingChallenge: InterviewDetail["codingChallenge"];
+    } | null>(null);
+    const effectiveOverallFeedback =
+        detail?.overallFeedback ?? interview.overallFeedback;
+    const effectiveCvFeedback = detail?.cvFeedback ?? interview.cvFeedback;
+    const effectiveInterviewFeedback =
+        detail?.interviewFeedback ?? interview.feedback;
+    const effectiveCodingChallenge =
+        detail?.codingChallenge ?? interview.codingChallenge;
     const canGenerateOverallFeedback =
-        Boolean(interview.cvFeedback) &&
-        Boolean(interview.feedback) &&
-        Boolean(interview.codingChallenge?.evaluation);
+        Boolean(effectiveCvFeedback) &&
+        Boolean(effectiveInterviewFeedback) &&
+        Boolean(effectiveCodingChallenge?.evaluation);
 
     useEffect(() => {
-        if (!canGenerateOverallFeedback || interview.overallFeedback || isGenerating) {
+        let cancelled = false;
+
+        async function hydrateOverallDetail() {
+            try {
+                const requestPromise =
+                    overallHydratePromiseRef.current ??
+                    (async () => {
+                        const response = await fetch(
+                            `/api/interviews/${interview.id}/overall`,
+                            {
+                                method: "GET",
+                                cache: "no-store",
+                            }
+                        );
+                        const data = (await response.json().catch(() => null)) as
+                            | {
+                                  overallFeedback?: InterviewDetail["overallFeedback"];
+                                  cvFeedback?: InterviewDetail["cvFeedback"];
+                                  interviewFeedback?: Pick<
+                                      NonNullable<InterviewDetail["feedback"]>,
+                                      "overallScore" | "summary"
+                                  > | null;
+                                  codingChallenge?: InterviewDetail["codingChallenge"];
+                                  error?: string;
+                              }
+                            | null;
+
+                        if (!response.ok || !data) {
+                            throw new Error(
+                                data?.error ||
+                                    "Gesamtfeedback-Daten konnten nicht geladen werden."
+                            );
+                        }
+
+                        return {
+                            overallFeedback: data.overallFeedback ?? null,
+                            cvFeedback: data.cvFeedback ?? null,
+                            interviewFeedback: data.interviewFeedback ?? null,
+                            codingChallenge: data.codingChallenge ?? null,
+                        };
+                    })();
+                overallHydratePromiseRef.current = requestPromise;
+                const payload = await requestPromise;
+
+                if (!cancelled) {
+                    setDetail(payload);
+                    setGenerationError("");
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setGenerationError(
+                        error instanceof Error
+                            ? error.message
+                        : "Gesamtfeedback-Daten konnten nicht geladen werden."
+                    );
+                }
+            } finally {
+                overallHydratePromiseRef.current = null;
+            }
+        }
+
+        void hydrateOverallDetail();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [interview.id]);
+
+    useEffect(() => {
+        if (!canGenerateOverallFeedback || effectiveOverallFeedback || isGenerating) {
             return;
         }
 
@@ -447,31 +611,52 @@ function OverallFeedbackBlock({
             setGenerationError("");
 
             try {
-                const response = await fetch("/api/interview/overall-feedback", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        interviewId: interview.id,
-                    }),
-                });
-                const data = (await response.json().catch(() => null)) as
-                    | {
-                          overallFeedback?: InterviewDetail["overallFeedback"];
-                          error?: string;
-                      }
-                    | null;
+                const requestPromise =
+                    overallGeneratePromiseRef.current ??
+                    (async () => {
+                        const response = await fetch(
+                            "/api/interview/overall-feedback",
+                            {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                    interviewId: interview.id,
+                                }),
+                            }
+                        );
+                        const data = (await response.json().catch(() => null)) as
+                            | {
+                                  overallFeedback?: InterviewDetail["overallFeedback"];
+                                  error?: string;
+                              }
+                            | null;
 
-                if (!response.ok || !data?.overallFeedback) {
-                    throw new Error(
-                        data?.error ||
-                            "Gesamtfeedback konnte nicht erstellt werden."
-                    );
-                }
+                        if (!response.ok || !data?.overallFeedback) {
+                            throw new Error(
+                                data?.error ||
+                                    "Gesamtfeedback konnte nicht erstellt werden."
+                            );
+                        }
+
+                        return data.overallFeedback;
+                    })();
+                overallGeneratePromiseRef.current = requestPromise;
+                const overallFeedback = await requestPromise;
 
                 if (!cancelled) {
-                    onOverallFeedbackChange(data.overallFeedback);
+                    setDetail((currentDetail) => ({
+                        overallFeedback,
+                        cvFeedback: currentDetail?.cvFeedback ?? effectiveCvFeedback,
+                        interviewFeedback:
+                            currentDetail?.interviewFeedback ??
+                            effectiveInterviewFeedback,
+                        codingChallenge:
+                            currentDetail?.codingChallenge ??
+                            effectiveCodingChallenge,
+                    }));
+                    onOverallFeedbackChange(overallFeedback);
                 }
             } catch (error) {
                 if (!cancelled) {
@@ -485,6 +670,7 @@ function OverallFeedbackBlock({
                 if (!cancelled) {
                     setIsGenerating(false);
                 }
+                overallGeneratePromiseRef.current = null;
             }
         }
 
@@ -495,8 +681,11 @@ function OverallFeedbackBlock({
         };
     }, [
         canGenerateOverallFeedback,
+        effectiveCodingChallenge,
+        effectiveCvFeedback,
+        effectiveInterviewFeedback,
+        effectiveOverallFeedback,
         interview.id,
-        interview.overallFeedback,
         isGenerating,
         onOverallFeedbackChange,
     ]);
@@ -505,31 +694,31 @@ function OverallFeedbackBlock({
         {
             label: "CV",
             score:
-                interview.overallFeedback?.cvScore ??
-                interview.cvFeedback?.quality.overallScore ??
+                effectiveOverallFeedback?.cvScore ??
+                effectiveCvFeedback?.quality.overallScore ??
                 null,
             summary:
-                interview.cvFeedback?.roleAnalysis.summary ||
+                effectiveCvFeedback?.roleAnalysis.summary ||
                 "Noch kein CV-Feedback gespeichert.",
         },
         {
             label: "Interview",
             score:
-                interview.overallFeedback?.interviewScore ??
-                interview.feedback?.overallScore ??
+                effectiveOverallFeedback?.interviewScore ??
+                effectiveInterviewFeedback?.overallScore ??
                 null,
             summary:
-                interview.feedback?.summary ||
+                effectiveInterviewFeedback?.summary ||
                 "Noch kein Interview-Feedback gespeichert.",
         },
         {
             label: "Code",
             score:
-                interview.overallFeedback?.codingChallengeScore ??
-                interview.codingChallenge?.evaluation?.overallScore ??
+                effectiveOverallFeedback?.codingChallengeScore ??
+                effectiveCodingChallenge?.evaluation?.overallScore ??
                 null,
             summary:
-                interview.codingChallenge?.evaluation?.summary ||
+                effectiveCodingChallenge?.evaluation?.summary ||
                 "Noch kein Coding-Feedback gespeichert.",
         },
     ];
@@ -556,13 +745,13 @@ function OverallFeedbackBlock({
                 <div className="mt-4 rounded-lg bg-red-500/10 p-4 text-sm text-red-200">
                     {generationError}
                 </div>
-            ) : interview.overallFeedback ? (
+            ) : effectiveOverallFeedback ? (
                 <div className="mt-4 space-y-4">
                     <div className="rounded-lg bg-gray-900 p-4 text-sm text-gray-300">
                         <div className="flex items-center justify-between gap-4">
-                            <p>{interview.overallFeedback.summary}</p>
+                            <p>{effectiveOverallFeedback.summary}</p>
                             <span className="rounded-md bg-indigo-500/20 px-2 py-1 text-xs text-indigo-200">
-                                {interview.overallFeedback.overallScore}%
+                                {effectiveOverallFeedback.overallScore}%
                             </span>
                         </div>
                     </div>
@@ -572,7 +761,7 @@ function OverallFeedbackBlock({
                             Positiv
                         </p>
                         <ul className="space-y-1 text-sm text-green-200">
-                            {interview.overallFeedback.strengths.map((item) => (
+                            {effectiveOverallFeedback.strengths.map((item) => (
                                 <li key={item}>{item}</li>
                             ))}
                         </ul>
@@ -584,8 +773,8 @@ function OverallFeedbackBlock({
                         </p>
                         <ul className="space-y-1 text-sm text-red-200">
                             {[
-                                ...interview.overallFeedback.issues,
-                                ...interview.overallFeedback.improvements,
+                                ...effectiveOverallFeedback.issues,
+                                ...effectiveOverallFeedback.improvements,
                             ].map((item) => (
                                 <li key={item}>{item}</li>
                             ))}
@@ -615,6 +804,7 @@ function InterviewDetailPageContent() {
         null
     );
     const refreshInFlightRef = useRef(false);
+    const statusRefreshInFlightRef = useRef(false);
 
     const refreshInterview = useCallback(
         async (options?: {
@@ -666,6 +856,44 @@ function InterviewDetailPageContent() {
         [interviewId]
     );
 
+    const refreshInterviewStatus = useCallback(
+        async (options?: {
+            syncStep?: boolean;
+            force?: boolean;
+        }) => {
+            const { syncStep = false, force = false } = options ?? {};
+
+            if (statusRefreshInFlightRef.current && !force) {
+                return;
+            }
+
+            statusRefreshInFlightRef.current = true;
+
+            try {
+                const nextStatus = await fetchInterviewStatus(interviewId);
+                setInterview((currentInterview) =>
+                    currentInterview
+                        ? mergeInterviewStatus(currentInterview, nextStatus)
+                        : currentInterview
+                );
+
+                if (syncStep) {
+                    setStep(nextStatus.currentStep || 1);
+                }
+            } catch (statusError) {
+                setError(
+                    statusError instanceof Error
+                        ? statusError.message
+                        : "Interview-Status konnte nicht geladen werden."
+                );
+                throw statusError;
+            } finally {
+                statusRefreshInFlightRef.current = false;
+            }
+        },
+        [interviewId]
+    );
+
     useEffect(() => {
         let cancelled = false;
 
@@ -697,18 +925,21 @@ function InterviewDetailPageContent() {
         const shouldPoll =
             interview?.transcript?.transcriptStatus === "recording" ||
             interview?.transcript?.transcriptStatus === "transcribing" ||
-            (interview?.currentStep ?? 1) < 6;
+            ((interview?.currentStep ?? 1) < 6 && !interview?.hasOverallFeedback);
 
         async function scheduleRefresh() {
             if (!shouldPoll || cancelled) {
                 return;
             }
 
+            const delayMs = document.visibilityState === "hidden" ? 30_000 : 6_000;
+
             timeoutId = window.setTimeout(async () => {
                 try {
-                    // Bedingtes Polling lädt nur den leichten Snapshot
-                    // und hält so Navigation und Status günstig aktuell.
-                    await refreshInterview();
+                    // Bedingtes Polling lädt nur den Status-Snapshot, damit
+                    // Navigation aktuell bleibt, ohne Shell- oder Detaildaten
+                    // mitzuziehen.
+                    await refreshInterviewStatus();
                 } catch {
                     // Silent background refresh keeps step gating aligned with persisted data.
                 }
@@ -716,7 +947,7 @@ function InterviewDetailPageContent() {
                 if (!cancelled) {
                     await scheduleRefresh();
                 }
-            }, 6_000);
+            }, delayMs);
         }
 
         void scheduleRefresh();
@@ -727,7 +958,12 @@ function InterviewDetailPageContent() {
                 window.clearTimeout(timeoutId);
             }
         };
-    }, [interview?.currentStep, interview?.transcript?.transcriptStatus, refreshInterview]);
+    }, [
+        interview?.currentStep,
+        interview?.hasOverallFeedback,
+        interview?.transcript?.transcriptStatus,
+        refreshInterviewStatus,
+    ]);
 
     const config = useMemo(
         () =>
@@ -764,9 +1000,13 @@ function InterviewDetailPageContent() {
                 throw new Error("Interview-Schritt konnte nicht gespeichert werden.");
             }
 
-            const refreshedInterview = await fetchInterviewDetail(interviewId);
-            setInterview(refreshedInterview);
-            setStep(refreshedInterview.currentStep || boundedStep);
+            const refreshedStatus = await fetchInterviewStatus(interviewId);
+            setInterview((currentInterview) =>
+                currentInterview
+                    ? mergeInterviewStatus(currentInterview, refreshedStatus)
+                    : currentInterview
+            );
+            setStep(refreshedStatus.currentStep || boundedStep);
         } catch (persistError) {
             setError(
                 persistError instanceof Error
@@ -807,7 +1047,7 @@ function InterviewDetailPageContent() {
                 router={router}
                 persistStep={persistStep}
                 setInterview={setInterview}
-                onRefreshInterview={() => refreshInterview()}
+                onRefreshInterview={() => refreshInterviewStatus()}
                 onFeedbackNavigationLockChange={setFeedbackNavigationLock}
                 isPersistingStep={isPersistingStep}
                 feedbackNavigationLock={feedbackNavigationLock}

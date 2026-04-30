@@ -1,6 +1,7 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { provisionCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { createClient } from "@/db-backend/auth/server-client";
 
 export async function GET(request: NextRequest) {
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
         });
 
         if (!error) {
+            await provisionCurrentAppUser();
             return NextResponse.redirect(redirectTo);
         }
     }

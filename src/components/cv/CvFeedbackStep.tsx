@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import CvAnalysisDashboard from "@/components/cv/CvAnalysisDashboard";
 import CvRoleMatchCard from "@/components/cv/CvRoleMatchCard";
 import CvScoreBreakdownCard from "@/components/cv/CvScoreBreakdownCard";
 import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
 import { useInterviewSession } from "@/lib/interview-session/context";
+
+// Dateiübersicht:
+// Der CV-Step trennt günstiges Laden vorhandener Analyse-Daten von expliziter
+// Generierung. Initiale GETs und teure POSTs werden lokal dedupliziert, damit
+// React-Remounts oder schnelle Klicks keine doppelte Analyse auslösen.
 
 type ActiveCvSummary = {
     id: string;
@@ -35,6 +40,48 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 async function requestCvFeedback(interviewId: string, force = false) {
+    const response = await fetch(
+        force
+            ? "/api/interview/cv-feedback"
+            : `/api/interview/cv-feedback?interviewId=${encodeURIComponent(
+                  interviewId
+              )}`,
+        {
+            method: force ? "POST" : "GET",
+            headers: force
+                ? {
+                      "Content-Type": "application/json",
+                  }
+                : undefined,
+            body: force
+                ? JSON.stringify({
+                      interviewId,
+                      force,
+                  })
+                : undefined,
+        }
+    );
+
+    const data = (await response.json().catch(() => null)) as
+        | {
+              cv?: ActiveCvSummary;
+              result?: CvFeedbackResult | null;
+              error?: string;
+          }
+        | null;
+
+    if (!response.ok || !data) {
+        throw new Error(data?.error || "CV-Analyse konnte nicht geladen werden.");
+    }
+
+    if (!data?.result && force) {
+        throw new Error(data?.error || "CV-Analyse konnte nicht erstellt werden.");
+    }
+
+    return data;
+}
+
+async function generateCvFeedback(interviewId: string) {
     const response = await fetch("/api/interview/cv-feedback", {
         method: "POST",
         headers: {
@@ -42,7 +89,7 @@ async function requestCvFeedback(interviewId: string, force = false) {
         },
         body: JSON.stringify({
             interviewId,
-            force,
+            force: true,
         }),
     });
 
@@ -70,6 +117,12 @@ export default function CvFeedbackStep() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [result, setResult] = useState<CvFeedbackResult | null>(null);
+    const hydratePromiseRef = useRef<Promise<
+        Awaited<ReturnType<typeof requestCvFeedback>>
+    > | null>(null);
+    const generatePromiseRef = useRef<Promise<
+        Awaited<ReturnType<typeof generateCvFeedback>>
+    > | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -80,7 +133,11 @@ export default function CvFeedbackStep() {
             setError("");
 
             try {
-                const data = await requestCvFeedback(session.interviewId);
+                const requestPromise =
+                    hydratePromiseRef.current ??
+                    requestCvFeedback(session.interviewId);
+                hydratePromiseRef.current = requestPromise;
+                const data = await requestPromise;
 
                 if (cancelled) {
                     return;
@@ -102,6 +159,7 @@ export default function CvFeedbackStep() {
                     setLoading(false);
                     setLoadingStoredCv(false);
                 }
+                hydratePromiseRef.current = null;
             }
         }
 
@@ -117,7 +175,11 @@ export default function CvFeedbackStep() {
         setError("");
 
         try {
-            const data = await requestCvFeedback(session.interviewId, true);
+            const requestPromise =
+                generatePromiseRef.current ??
+                generateCvFeedback(session.interviewId);
+            generatePromiseRef.current = requestPromise;
+            const data = await requestPromise;
             setStoredCv(data.cv ?? null);
             setResult(data.result ?? null);
         } catch (requestError) {
@@ -129,6 +191,7 @@ export default function CvFeedbackStep() {
             );
         } finally {
             setLoading(false);
+            generatePromiseRef.current = null;
         }
     }
 

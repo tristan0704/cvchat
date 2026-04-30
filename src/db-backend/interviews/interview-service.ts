@@ -22,6 +22,12 @@ import type { FaceAnalysisReport } from "@/lib/face-analysis";
 import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback-fetch/types";
 import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 
+// Dateiübersicht:
+// Diese Service-Datei bündelt Interview-Reads und -Writes. Für Performance ist
+// wichtig, dass Initialdaten, Polling-Status und schwere Detaildaten getrennt
+// bleiben. Neue UI-Features sollen deshalb eigene Domain-Reader bekommen und
+// nicht automatisch in Shell- oder Status-Queries wandern.
+
 export type InterviewListItem = {
     id: string;
     title: string;
@@ -128,6 +134,55 @@ export type InterviewDetailLight = {
             summary: string;
         } | null;
     } | null;
+};
+
+export type InterviewShell = Omit<
+    InterviewDetailLight,
+    "cvFeedbackAnalysisId" | "cvFeedback" | "feedback" | "overallFeedback"
+> & {
+    cvFeedback: {
+        quality: {
+            overallScore: number;
+        };
+        roleAnalysis: {
+            summary: string;
+        };
+    } | null;
+    hasCvFeedback: boolean;
+    hasInterviewFeedback: boolean;
+    hasOverallFeedback: boolean;
+    hasCodingEvaluation: boolean;
+};
+
+export type InterviewTranscriptDetail = {
+    transcript: InterviewDetail["transcript"];
+    timingMetrics: InterviewTimingMetrics | null;
+};
+
+export type InterviewFeedbackDetail = {
+    feedback: InterviewFeedbackEvaluation | null;
+    faceAnalysis: FaceAnalysisReport | null;
+};
+
+export type InterviewOverallFeedbackDetail = {
+    overallFeedback: InterviewOverallFeedback | null;
+    cvFeedback: InterviewShell["cvFeedback"];
+    interviewFeedback: Pick<InterviewFeedbackEvaluation, "overallScore" | "summary"> | null;
+    codingChallenge: InterviewShell["codingChallenge"];
+};
+
+export type InterviewStatusSnapshot = {
+    id: string;
+    currentStep: number;
+    status: InterviewStatus;
+    startedAt: string | null;
+    completedAt: string | null;
+    transcriptStatus: InterviewTranscriptStatus | null;
+    transcriptError: string;
+    hasCvFeedback: boolean;
+    hasInterviewFeedback: boolean;
+    hasOverallFeedback: boolean;
+    hasCodingEvaluation: boolean;
 };
 
 function buildInterviewTitle(config: {
@@ -579,6 +634,26 @@ function mapInterviewCore(interview: {
     };
 }
 
+function mapCvFeedbackSummary(
+    analysis: {
+        overallScore: number;
+        roleSummary: string;
+    } | null
+) {
+    if (!analysis) {
+        return null;
+    }
+
+    return {
+        quality: {
+            overallScore: analysis.overallScore,
+        },
+        roleAnalysis: {
+            summary: analysis.roleSummary,
+        },
+    } satisfies InterviewShell["cvFeedback"];
+}
+
 export async function getInterviewDetailLightForUser(
     userId: string,
     interviewId: string
@@ -673,6 +748,205 @@ export async function getInterviewDetailLightForUser(
               }
             : null,
     } satisfies InterviewDetailLight;
+}
+
+export async function getInterviewShellForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        select: {
+            id: true,
+            title: true,
+            role: true,
+            experience: true,
+            companySize: true,
+            currentStep: true,
+            status: true,
+            createdAt: true,
+            startedAt: true,
+            completedAt: true,
+            cvVersion: {
+                select: {
+                    id: true,
+                    fileName: true,
+                    fileSizeBytes: true,
+                    uploadedAt: true,
+                },
+            },
+            plannedQuestions: {
+                orderBy: {
+                    sequence: "asc",
+                },
+                select: {
+                    id: true,
+                    sequence: true,
+                    questionKey: true,
+                    text: true,
+                    priority: true,
+                },
+            },
+            cvFeedbackAnalysis: {
+                select: {
+                    overallScore: true,
+                    roleSummary: true,
+                },
+            },
+            // Shell-Polling darf nur Status- und Gating-Daten laden.
+            transcript: {
+                select: {
+                    transcriptStatus: true,
+                    transcriptError: true,
+                },
+            },
+            feedback: {
+                select: {
+                    id: true,
+                },
+            },
+            overallFeedback: {
+                select: {
+                    id: true,
+                },
+            },
+            codingChallengeAttempts: {
+                orderBy: [{ attemptNumber: "desc" }, { createdAt: "desc" }],
+                take: 1,
+                select: {
+                    evaluation: {
+                        select: {
+                            overallScore: true,
+                            summary: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    return {
+        ...mapInterviewCore(interview),
+        cv: interview.cvVersion
+            ? {
+                  id: interview.cvVersion.id,
+                  fileName: interview.cvVersion.fileName ?? "Lebenslauf.pdf",
+                  fileSizeBytes: interview.cvVersion.fileSizeBytes,
+                  uploadedAt: interview.cvVersion.uploadedAt.toISOString(),
+              }
+            : null,
+        plannedQuestions: interview.plannedQuestions.map((question) => ({
+            id: question.id,
+            sequence: question.sequence,
+            questionKey: question.questionKey,
+            text: question.text,
+            priority: question.priority,
+        })),
+        cvFeedback: mapCvFeedbackSummary(interview.cvFeedbackAnalysis),
+        hasCvFeedback: Boolean(interview.cvFeedbackAnalysis),
+        transcript: interview.transcript
+            ? {
+                  transcriptStatus: interview.transcript.transcriptStatus,
+                  transcriptError: interview.transcript.transcriptError ?? "",
+              }
+            : null,
+        hasInterviewFeedback: Boolean(interview.feedback),
+        hasOverallFeedback: Boolean(interview.overallFeedback),
+        hasCodingEvaluation: Boolean(
+            interview.codingChallengeAttempts[0]?.evaluation
+        ),
+        codingChallenge: interview.codingChallengeAttempts[0]
+            ? {
+                  evaluation: interview.codingChallengeAttempts[0].evaluation
+                      ? {
+                            overallScore:
+                                interview.codingChallengeAttempts[0].evaluation
+                                    .overallScore,
+                            summary:
+                                interview.codingChallengeAttempts[0].evaluation
+                                    .summary,
+                        }
+                      : null,
+              }
+            : null,
+    } satisfies InterviewShell;
+}
+
+export async function getInterviewStatusForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        select: {
+            id: true,
+            currentStep: true,
+            status: true,
+            startedAt: true,
+            completedAt: true,
+            cvFeedbackAnalysisId: true,
+            // Status-Polling darf keine schweren Relationen laden. Dieser
+            // Endpunkt hält Step-Gating aktuell und bleibt absichtlich unter
+            // einer kleinen Payload.
+            transcript: {
+                select: {
+                    transcriptStatus: true,
+                    transcriptError: true,
+                },
+            },
+            feedback: {
+                select: {
+                    id: true,
+                },
+            },
+            overallFeedback: {
+                select: {
+                    id: true,
+                },
+            },
+            codingChallengeAttempts: {
+                orderBy: [{ attemptNumber: "desc" }, { createdAt: "desc" }],
+                take: 1,
+                select: {
+                    evaluation: {
+                        select: {
+                            id: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    return {
+        id: interview.id,
+        currentStep: interview.currentStep,
+        status: interview.status,
+        startedAt: interview.startedAt?.toISOString() ?? null,
+        completedAt: interview.completedAt?.toISOString() ?? null,
+        transcriptStatus: interview.transcript?.transcriptStatus ?? null,
+        transcriptError: interview.transcript?.transcriptError ?? "",
+        hasCvFeedback: Boolean(interview.cvFeedbackAnalysisId),
+        hasInterviewFeedback: Boolean(interview.feedback),
+        hasOverallFeedback: Boolean(interview.overallFeedback),
+        hasCodingEvaluation: Boolean(
+            interview.codingChallengeAttempts[0]?.evaluation
+        ),
+    } satisfies InterviewStatusSnapshot;
 }
 
 export async function getInterviewDetailForUser(userId: string, interviewId: string) {
@@ -775,6 +1049,184 @@ export async function getInterviewDetailForUser(userId: string, interviewId: str
         faceAnalysis: mapFaceAnalysis(interview.faceAnalysis),
         codingChallenge: await getLatestCodingChallengeAttempt(userId, interview.id),
     } satisfies InterviewDetail;
+}
+
+export async function getInterviewTranscriptDetailForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        select: {
+            transcript: {
+                include: {
+                    entries: {
+                        orderBy: {
+                            sequence: "asc",
+                        },
+                    },
+                    qaPairs: {
+                        orderBy: {
+                            sequence: "asc",
+                        },
+                    },
+                },
+            },
+            timingMetrics: true,
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    return {
+        transcript: interview.transcript
+            ? {
+                  transcriptStatus: interview.transcript.transcriptStatus,
+                  transcriptError: interview.transcript.transcriptError ?? "",
+                  candidateTranscript:
+                      interview.transcript.candidateTranscript ?? "",
+                  transcriptExport: interview.transcript.transcriptExport ?? "",
+                  transcriptFingerprint:
+                      interview.transcript.transcriptFingerprint ?? "",
+                  interviewerQuestions: interview.transcript.interviewerQuestions,
+                  recapStatus: interview.transcript.recapStatus,
+                  recapError: interview.transcript.recapError ?? "",
+                  recapCaptureNote:
+                      interview.transcript.recapCaptureNote ?? "",
+                  entries: interview.transcript.entries.map((entry) => ({
+                      id: entry.id,
+                      sequence: entry.sequence,
+                      speaker: entry.speaker,
+                      text: entry.text,
+                  })),
+                  qaPairs: interview.transcript.qaPairs.map((pair) => ({
+                      id: pair.id,
+                      sequence: pair.sequence,
+                      question: pair.question,
+                      answer: pair.answer,
+                      source: pair.source,
+                  })),
+              }
+            : null,
+        timingMetrics: mapTimingMetrics(interview.timingMetrics),
+    } satisfies InterviewTranscriptDetail;
+}
+
+export async function getInterviewFeedbackDetailForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        select: {
+            feedback: true,
+            faceAnalysis: true,
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    return {
+        feedback: mapInterviewFeedback(interview.feedback),
+        faceAnalysis: mapFaceAnalysis(interview.faceAnalysis),
+    } satisfies InterviewFeedbackDetail;
+}
+
+export async function getInterviewCodingChallengeDetailForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    return getLatestCodingChallengeAttempt(userId, interview.id);
+}
+
+export async function getInterviewOverallFeedbackDetailForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        select: {
+            cvFeedbackAnalysis: {
+                select: {
+                    overallScore: true,
+                    roleSummary: true,
+                },
+            },
+            feedback: {
+                select: {
+                    overallScore: true,
+                    summary: true,
+                },
+            },
+            overallFeedback: true,
+            codingChallengeAttempts: {
+                orderBy: [{ attemptNumber: "desc" }, { createdAt: "desc" }],
+                take: 1,
+                select: {
+                    evaluation: {
+                        select: {
+                            overallScore: true,
+                            summary: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    const latestAttempt = interview.codingChallengeAttempts[0] ?? null;
+
+    return {
+        overallFeedback: mapInterviewOverallFeedback(interview.overallFeedback),
+        cvFeedback: mapCvFeedbackSummary(interview.cvFeedbackAnalysis),
+        interviewFeedback: interview.feedback
+            ? {
+                  overallScore: interview.feedback.overallScore,
+                  summary: interview.feedback.summary,
+              }
+            : null,
+        codingChallenge: latestAttempt
+            ? {
+                  evaluation: latestAttempt.evaluation
+                      ? {
+                            overallScore: latestAttempt.evaluation.overallScore,
+                            summary: latestAttempt.evaluation.summary,
+                        }
+                      : null,
+              }
+            : null,
+    } satisfies InterviewOverallFeedbackDetail;
 }
 
 export async function getOrCreateInterviewOverallFeedbackForUser(args: {

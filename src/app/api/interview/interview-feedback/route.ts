@@ -1,5 +1,8 @@
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { saveInterviewFeedbackForUser } from "@/db-backend/interviews/interview-service";
+import {
+    getInterviewFeedbackDetailForUser,
+    saveInterviewFeedbackForUser,
+} from "@/db-backend/interviews/interview-service";
 import { evaluateInterviewFeedback } from "@/app/api/interview/interview-feedback/evaluate-interview-feedback";
 import type {
     InterviewFeedbackRequest,
@@ -57,6 +60,20 @@ export async function POST(request: Request) {
                 { error: "Transcript fingerprint is required" },
                 { status: 400 }
             );
+        }
+
+        const existing = await getInterviewFeedbackDetailForUser(
+            currentUser.id,
+            interviewId
+        );
+
+        if (
+            existing?.feedback &&
+            existing.feedback.transcriptFingerprint === transcriptFingerprint
+        ) {
+            return Response.json({
+                evaluation: existing.feedback,
+            } satisfies InterviewFeedbackResponse);
         }
 
         const evaluation = await evaluateInterviewFeedback({

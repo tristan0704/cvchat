@@ -3,18 +3,30 @@ import {
     createInterviewForUser,
     listInterviewsForUser,
 } from "@/db-backend/interviews/interview-service";
+import { createServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-    const currentUser = await getCurrentAppUser();
+    const timing = createServerTiming("api.interviews.list");
+    const currentUser = await timing.measure("auth", () => getCurrentAppUser());
 
     if (!currentUser) {
+        timing.log({ status: 401 });
         return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const interviews = await listInterviewsForUser(currentUser.id);
-    return Response.json({ interviews });
+    const interviews = await timing.measure("db.list", () =>
+        listInterviewsForUser(currentUser.id)
+    );
+    const response = { interviews };
+
+    timing.log({
+        status: 200,
+        payloadBytes: JSON.stringify(response).length,
+    });
+
+    return Response.json(response);
 }
 
 export async function POST(request: Request) {

@@ -1,6 +1,9 @@
 import { db } from "@/db-backend/prisma/client";
 import { createClient } from "@/db-backend/auth/server-client";
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import {
+    getCurrentAppUser,
+    provisionCurrentAppUser,
+} from "@/db-backend/auth/current-app-user";
 import { requireSupabaseEnv } from "@/db-backend/auth/env";
 import { removeAvatarForUser } from "@/db-backend/profile/avatar-service";
 import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
@@ -21,6 +24,18 @@ function createStatelessSupabaseClient() {
             },
         }
     );
+}
+
+export async function POST() {
+    const currentUser = await provisionCurrentAppUser();
+
+    if (!currentUser) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    return Response.json({
+        user: currentUser,
+    });
 }
 
 export async function DELETE(request: Request) {

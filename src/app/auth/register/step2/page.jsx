@@ -2,10 +2,22 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 
 import RegisterStep2Form from "@/components/auth/RegisterStep2Form";
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import {
+    getCurrentAppUserState,
+    provisionCurrentAppUser,
+} from "@/db-backend/auth/current-app-user";
 
 export default async function RegisterStep2() {
-    const currentUser = await getCurrentAppUser();
+    const userState = await getCurrentAppUserState();
+
+    if (userState.status === "unauthenticated") {
+        redirect("/auth/login");
+    }
+
+    const currentUser =
+        userState.status === "ready"
+            ? userState.user
+            : await provisionCurrentAppUser();
 
     if (!currentUser) {
         redirect("/auth/login");

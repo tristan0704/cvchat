@@ -76,14 +76,23 @@ function formatDate(value: string | null) {
     }).format(new Date(value));
 }
 
-export default function InterviewTable() {
-    const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
-    const [loading, setLoading] = useState(true);
+export default function InterviewTable({
+    initialInterviews,
+}: {
+    initialInterviews?: InterviewListItem[];
+}) {
+    const [interviews, setInterviews] =
+        useState<InterviewListItem[]>(initialInterviews ?? []);
+    const [loading, setLoading] = useState(!initialInterviews);
     const [error, setError] = useState("");
     const [open, setOpen] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
     useEffect(() => {
+        if (initialInterviews) {
+            return;
+        }
+
         let cancelled = false;
 
         async function hydrateInterviews() {
@@ -128,7 +137,7 @@ export default function InterviewTable() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [initialInterviews]);
 
     async function handleDelete() {
         if (!selectedId) {

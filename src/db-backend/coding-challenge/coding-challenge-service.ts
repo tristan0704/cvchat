@@ -426,6 +426,17 @@ export async function evaluateCodingChallengeAttempt(args: {
         throw new Error("Coding challenge not found");
     }
 
+    if (attempt.evaluation && attempt.submittedCode === args.code) {
+        return {
+            draft: mapDraft({
+                attempt,
+                task: attempt.task,
+                evaluation: attempt.evaluation,
+            }),
+            evaluation: mapEvaluation(attempt.evaluation, attempt.id),
+        };
+    }
+
     const evaluationResult = await evaluateCodingChallengeSubmission(
         toTaskWithSolution({
             task: attempt.task,

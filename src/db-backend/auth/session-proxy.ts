@@ -2,6 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireSupabaseEnv } from "@/db-backend/auth/env";
 
+// Dateiübersicht:
+// Dieser Proxy-Helfer aktualisiert Supabase-Session-Cookies nur für
+// Seitennavigation. API-Routen laufen bewusst ohne Proxy und prüfen Auth im
+// jeweiligen Handler, damit Hot-Path-Requests keine doppelte Auth-Arbeit zahlen.
 function hasSupabaseSessionCookie(request: NextRequest) {
     return request.cookies.getAll().some((cookie) => {
         const cookieName = cookie.name.toLowerCase();
