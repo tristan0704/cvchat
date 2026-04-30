@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -32,51 +32,18 @@ function NavLink({ href, label, pathname, onClick }) {
   );
 }
 
-export default function Navbar() {
+export default function Navbar({ initialProfile }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [profile, setProfile] = useState({
-    username: "",
-    email: "",
-    avatarUrl: null,
-  });
-  const pathname = usePathname();
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function hydrateProfile() {
-      try {
-        const response = await fetch("/api/profile", {
-          method: "GET",
-          cache: "no-store",
-        });
-        const data = (await response.json().catch(() => null)) ?? null;
-
-        if (!response.ok || !data || data.error) {
-          return;
-        }
-
-        if (!cancelled) {
-          setProfile({
-            username:
-              typeof data.username === "string" ? data.username : "",
-            email: typeof data.email === "string" ? data.email : "",
-            avatarUrl:
-              typeof data.avatarUrl === "string" ? data.avatarUrl : null,
-          });
-        }
-      } catch {
-        // Navbar should stay usable even if profile hydration fails.
-      }
+  // Die Shell bekommt Basisdaten direkt vom Server und spart so einen Extra-Request.
+  const [profile] = useState(
+    initialProfile ?? {
+      username: "",
+      email: "",
+      avatarUrl: null,
     }
-
-    void hydrateProfile();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  );
+  const pathname = usePathname();
 
   const avatarFallback = useMemo(() => {
     return (

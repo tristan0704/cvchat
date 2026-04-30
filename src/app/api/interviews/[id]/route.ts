@@ -1,6 +1,7 @@
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import {
     deleteInterviewForUser,
+    getInterviewDetailLightForUser,
     getInterviewDetailForUser,
     updateInterviewProgressForUser,
 } from "@/db-backend/interviews/interview-service";
@@ -13,7 +14,7 @@ type RouteContext = {
     }>;
 };
 
-export async function GET(_: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
     const currentUser = await getCurrentAppUser();
 
     if (!currentUser) {
@@ -21,7 +22,12 @@ export async function GET(_: Request, context: RouteContext) {
     }
 
     const { id } = await context.params;
-    const interview = await getInterviewDetailForUser(currentUser.id, id);
+    const url = new URL(request.url);
+    const view = url.searchParams.get("view");
+    const interview =
+        view === "light"
+            ? await getInterviewDetailLightForUser(currentUser.id, id)
+            : await getInterviewDetailForUser(currentUser.id, id);
 
     if (!interview) {
         return Response.json({ error: "Interview not found" }, { status: 404 });

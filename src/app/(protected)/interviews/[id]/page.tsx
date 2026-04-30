@@ -68,7 +68,7 @@ type InterviewDetail = {
 };
 
 async function fetchInterviewDetail(interviewId: string) {
-    const response = await fetch(`/api/interviews/${interviewId}`, {
+    const response = await fetch(`/api/interviews/${interviewId}?view=light`, {
         method: "GET",
         cache: "no-store",
     });
@@ -706,8 +706,8 @@ function InterviewDetailPageContent() {
 
             timeoutId = window.setTimeout(async () => {
                 try {
-                    // Bedingtes Polling hält den Step-Status aktuell,
-                    // ohne dauerhaft Last zu erzeugen.
+                    // Bedingtes Polling lädt nur den leichten Snapshot
+                    // und hält so Navigation und Status günstig aktuell.
                     await refreshInterview();
                 } catch {
                     // Silent background refresh keeps step gating aligned with persisted data.

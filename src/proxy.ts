@@ -16,6 +16,14 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
     matcher: [
-        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+        // Der Proxy soll nur dort eingreifen, wo Session-Refresh
+        // oder geschützte Navigation tatsächlich relevant ist.
+        "/home",
+        "/learn",
+        "/profile",
+        "/settings",
+        "/interviews/:path*",
+        "/api/:path*",
+        "/auth/:path*",
     ],
 };

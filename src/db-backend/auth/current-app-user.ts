@@ -31,7 +31,53 @@ function readAuthIdentity(user: User | null): AuthIdentity | null {
     };
 }
 
-async function ensureAppUser(identity: AuthIdentity) {
+async function readSupabaseIdentity() {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error) {
+        return null;
+    }
+
+    return readAuthIdentity(data.user);
+}
+
+async function readAppUser(identity: AuthIdentity) {
+    const [user, settings, profile] = await db.$transaction([
+        db.user.findUnique({
+            where: {
+                id: identity.id,
+            },
+            select: {
+                id: true,
+            },
+        }),
+        db.userSettings.findUnique({
+            where: {
+                userId: identity.id,
+            },
+            select: {
+                userId: true,
+            },
+        }),
+        db.profile.findUnique({
+            where: {
+                userId: identity.id,
+            },
+            select: {
+                username: true,
+            },
+        }),
+    ]);
+
+    return {
+        userExists: Boolean(user),
+        settingsExist: Boolean(settings),
+        profile,
+    };
+}
+
+async function provisionMissingAppUserRecords(identity: AuthIdentity) {
     const [, , profile] = await db.$transaction([
         db.user.upsert({
             where: {
@@ -65,6 +111,24 @@ async function ensureAppUser(identity: AuthIdentity) {
         }),
     ]);
 
+    return profile;
+}
+
+async function ensureAppUser(identity: AuthIdentity) {
+    const appUser = await readAppUser(identity);
+
+    // Häufige Requests sollen keine unnötigen Schreibzugriffe auslösen.
+    if (appUser.userExists && appUser.settingsExist && appUser.profile) {
+        return {
+            email: identity.email,
+            id: identity.id,
+            profile: appUser.profile,
+        } satisfies CurrentAppUser;
+    }
+
+    // Nur wenn Basisdaten fehlen, provisionieren wir die App-Datensätze nach.
+    const profile = await provisionMissingAppUserRecords(identity);
+
     return {
         email: identity.email,
         id: identity.id,
@@ -73,14 +137,9 @@ async function ensureAppUser(identity: AuthIdentity) {
 }
 
 export async function getCurrentAppUser() {
-    const supabase = await createClient();
-    const { data, error } = await supabase.auth.getUser();
-
-    if (error) {
-        return null;
-    }
-
-    const identity = readAuthIdentity(data.user);
+    // Identität und App-Daten sind getrennt, damit der Hot Path
+    // später einfacher gegen Proxy- oder Cache-Optimierungen austauschbar bleibt.
+    const identity = await readSupabaseIdentity();
 
     if (!identity) {
         return null;

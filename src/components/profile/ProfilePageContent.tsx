@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 
 const PROFILE_CV_MAX_FILE_BYTES = 20_000_000;
 const PROFILE_AVATAR_MAX_FILE_BYTES = 5_000_000;
@@ -48,78 +48,30 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
-export default function ProfilePageContent() {
-    const [username, setUsername] = useState("");
-    const [email, setEmail] = useState("");
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+type ProfilePageContentProps = {
+    initialProfile: ProfileSnapshot;
+};
+
+export default function ProfilePageContent({
+    initialProfile,
+}: ProfilePageContentProps) {
+    const [username, setUsername] = useState(initialProfile.username);
+    const [email, setEmail] = useState(initialProfile.email);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(
+        initialProfile.avatarUrl
+    );
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [selectedCv, setSelectedCv] = useState<File | null>(null);
-    const [currentCv, setCurrentCv] = useState<ActiveCvSummary | null>(null);
-    const [loadingProfile, setLoadingProfile] = useState(true);
+    const [currentCv, setCurrentCv] = useState<ActiveCvSummary | null>(
+        initialProfile.activeCv
+    );
+    const [loadingProfile] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
     const [savingAvatar, setSavingAvatar] = useState(false);
     const [savingCv, setSavingCv] = useState(false);
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function hydrateProfile() {
-            setLoadingProfile(true);
-            setError("");
-
-            try {
-                const response = await fetch("/api/profile", {
-                    method: "GET",
-                    cache: "no-store",
-                });
-                const data = (await response.json().catch(() => null)) as
-                    | ProfileSnapshot
-                    | { error?: string }
-                    | null;
-
-                if (!response.ok || !data || "error" in data) {
-                    throw new Error(
-                        data && "error" in data && data.error
-                            ? data.error
-                            : "Profil konnte nicht geladen werden."
-                    );
-                }
-
-                if (cancelled) {
-                    return;
-                }
-
-                const profile = data as ProfileSnapshot;
-
-                setUsername(profile.username);
-                setEmail(profile.email);
-                setAvatarUrl(profile.avatarUrl);
-                setCurrentCv(profile.activeCv);
-            } catch (profileError) {
-                if (!cancelled) {
-                    setError(
-                        getErrorMessage(
-                            profileError,
-                            "Profil konnte nicht geladen werden."
-                        )
-                    );
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoadingProfile(false);
-                }
-            }
-        }
-
-        void hydrateProfile();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
 
     function handleCvChange(event: ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0] ?? null;

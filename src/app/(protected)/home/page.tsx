@@ -1,7 +1,8 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { redirect } from "next/navigation";
+
+import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { getHomeDashboardSnapshot } from "@/db-backend/interviews/interview-service";
 
 function StatCard({
     title,
@@ -44,47 +45,15 @@ type HomeSummary = {
     }>;
 };
 
-export default function HomePage() {
-    const [summary, setSummary] = useState<HomeSummary | null>(null);
-    const [error, setError] = useState("");
+export default async function HomePage() {
+    const currentUser = await getCurrentAppUser();
 
-    useEffect(() => {
-        let cancelled = false;
+    if (!currentUser) {
+        redirect("/auth/login");
+    }
 
-        async function hydrateSummary() {
-            try {
-                const response = await fetch("/api/home/summary", {
-                    method: "GET",
-                    cache: "no-store",
-                });
-                const data = (await response.json().catch(() => null)) as
-                    | (HomeSummary & { error?: string })
-                    | null;
-
-                if (!response.ok || !data || data.error) {
-                    throw new Error(data?.error || "Dashboard konnte nicht geladen werden.");
-                }
-
-                if (!cancelled) {
-                    setSummary(data);
-                }
-            } catch (loadError) {
-                if (!cancelled) {
-                    setError(
-                        loadError instanceof Error
-                            ? loadError.message
-                            : "Dashboard konnte nicht geladen werden."
-                    );
-                }
-            }
-        }
-
-        void hydrateSummary();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    // Vermeidet einen zusätzlichen Netzwerk-Umweg nach dem ersten Render.
+    const summary: HomeSummary = await getHomeDashboardSnapshot(currentUser.id);
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
@@ -93,21 +62,19 @@ export default function HomePage() {
 
                 <p className="mt-4 text-gray-400">Willkommen bei CareerPitch.</p>
 
-                {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
-
                 <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard
                         title="Interviews gesamt"
-                        value={String(summary?.totalInterviews ?? 0)}
-                        trend={summary?.totalInterviews ? "aktiv" : "neu"}
+                        value={String(summary.totalInterviews)}
+                        trend={summary.totalInterviews ? "aktiv" : "neu"}
                         trendUp={true}
                     />
 
                     <StatCard
                         title="Abgeschlossen"
-                        value={String(summary?.completedInterviews ?? 0)}
+                        value={String(summary.completedInterviews)}
                         trend={
-                            summary?.totalInterviews
+                            summary.totalInterviews
                                 ? `${summary.completedInterviews}/${summary.totalInterviews}`
                                 : "0/0"
                         }
@@ -117,7 +84,7 @@ export default function HomePage() {
                     <StatCard
                         title="CV Score"
                         value={
-                            summary?.cvScore === null || summary?.cvScore === undefined
+                            summary.cvScore === null || summary.cvScore === undefined
                                 ? "--"
                                 : `${summary.cvScore}%`
                         }
@@ -128,8 +95,8 @@ export default function HomePage() {
                     <StatCard
                         title="Erfolgsquote"
                         value={
-                            summary?.successRate === null ||
-                            summary?.successRate === undefined
+                            summary.successRate === null ||
+                            summary.successRate === undefined
                                 ? "--"
                                 : `${summary.successRate}%`
                         }
@@ -170,7 +137,7 @@ export default function HomePage() {
                     </Link>
                 </div>
 
-                {summary?.recentInterviews?.length ? (
+                {summary.recentInterviews.length ? (
                     <div className="mt-10 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
                         <h2 className="text-lg font-semibold text-white">
                             Letzte Interviews

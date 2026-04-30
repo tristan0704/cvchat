@@ -90,6 +90,46 @@ export type InterviewDetail = {
     codingChallenge: Awaited<ReturnType<typeof getLatestCodingChallengeAttempt>>;
 };
 
+export type InterviewDetailLight = {
+    id: string;
+    title: string;
+    role: string;
+    experience: string;
+    companySize: string;
+    currentStep: number;
+    status: InterviewStatus;
+    createdAt: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    cv: {
+        id: string;
+        fileName: string;
+        fileSizeBytes: number | null;
+        uploadedAt: string;
+    } | null;
+    plannedQuestions: Array<{
+        id: string;
+        sequence: number;
+        questionKey: string | null;
+        text: string;
+        priority: number | null;
+    }>;
+    cvFeedbackAnalysisId: string | null;
+    cvFeedback: CvFeedbackResult | null;
+    transcript: {
+        transcriptStatus: InterviewTranscriptStatus;
+        transcriptError: string;
+    } | null;
+    feedback: InterviewFeedbackEvaluation | null;
+    overallFeedback: InterviewOverallFeedback | null;
+    codingChallenge: {
+        evaluation: {
+            overallScore: number;
+            summary: string;
+        } | null;
+    } | null;
+};
+
 function buildInterviewTitle(config: {
     role: string;
     experience: string;
@@ -507,6 +547,134 @@ export async function listInterviewsForUser(userId: string) {
     return interviews.map(mapInterviewListItem);
 }
 
+function mapInterviewCore(interview: {
+    id: string;
+    title: string | null;
+    role: string;
+    experience: string;
+    companySize: string;
+    currentStep: number;
+    status: InterviewStatus;
+    createdAt: Date;
+    startedAt: Date | null;
+    completedAt: Date | null;
+}) {
+    return {
+        id: interview.id,
+        title:
+            interview.title ??
+            buildInterviewTitle({
+                role: interview.role,
+                experience: interview.experience,
+                companySize: interview.companySize,
+            }),
+        role: interview.role,
+        experience: interview.experience,
+        companySize: interview.companySize,
+        currentStep: interview.currentStep,
+        status: interview.status,
+        createdAt: interview.createdAt.toISOString(),
+        startedAt: interview.startedAt?.toISOString() ?? null,
+        completedAt: interview.completedAt?.toISOString() ?? null,
+    };
+}
+
+export async function getInterviewDetailLightForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        include: {
+            cvVersion: {
+                select: {
+                    id: true,
+                    fileName: true,
+                    fileSizeBytes: true,
+                    uploadedAt: true,
+                },
+            },
+            plannedQuestions: {
+                orderBy: {
+                    sequence: "asc",
+                },
+            },
+            cvFeedbackAnalysis: true,
+            // Der leichte Snapshot enthält nur Statusdaten für Navigation und Polling.
+            transcript: {
+                select: {
+                    transcriptStatus: true,
+                    transcriptError: true,
+                },
+            },
+            feedback: true,
+            overallFeedback: true,
+            codingChallengeAttempts: {
+                orderBy: [{ attemptNumber: "desc" }, { createdAt: "desc" }],
+                take: 1,
+                select: {
+                    evaluation: {
+                        select: {
+                            overallScore: true,
+                            summary: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!interview) {
+        return null;
+    }
+
+    return {
+        ...mapInterviewCore(interview),
+        cv: interview.cvVersion
+            ? {
+                  id: interview.cvVersion.id,
+                  fileName: interview.cvVersion.fileName ?? "Lebenslauf.pdf",
+                  fileSizeBytes: interview.cvVersion.fileSizeBytes,
+                  uploadedAt: interview.cvVersion.uploadedAt.toISOString(),
+              }
+            : null,
+        plannedQuestions: interview.plannedQuestions.map((question) => ({
+            id: question.id,
+            sequence: question.sequence,
+            questionKey: question.questionKey,
+            text: question.text,
+            priority: question.priority,
+        })),
+        cvFeedbackAnalysisId: interview.cvFeedbackAnalysisId,
+        cvFeedback: mapCvFeedbackAnalysis(interview.cvFeedbackAnalysis),
+        transcript: interview.transcript
+            ? {
+                  transcriptStatus: interview.transcript.transcriptStatus,
+                  transcriptError: interview.transcript.transcriptError ?? "",
+              }
+            : null,
+        feedback: mapInterviewFeedback(interview.feedback),
+        overallFeedback: mapInterviewOverallFeedback(interview.overallFeedback),
+        codingChallenge: interview.codingChallengeAttempts[0]
+            ? {
+                  evaluation: interview.codingChallengeAttempts[0].evaluation
+                      ? {
+                            overallScore:
+                                interview.codingChallengeAttempts[0].evaluation
+                                    .overallScore,
+                            summary:
+                                interview.codingChallengeAttempts[0].evaluation
+                                    .summary,
+                        }
+                      : null,
+              }
+            : null,
+    } satisfies InterviewDetailLight;
+}
+
 export async function getInterviewDetailForUser(userId: string, interviewId: string) {
     const interview = await db.interview.findFirst({
         where: {
@@ -554,22 +722,7 @@ export async function getInterviewDetailForUser(userId: string, interviewId: str
     }
 
     return {
-        id: interview.id,
-        title:
-            interview.title ??
-            buildInterviewTitle({
-                role: interview.role,
-                experience: interview.experience,
-                companySize: interview.companySize,
-            }),
-        role: interview.role,
-        experience: interview.experience,
-        companySize: interview.companySize,
-        currentStep: interview.currentStep,
-        status: interview.status,
-        createdAt: interview.createdAt.toISOString(),
-        startedAt: interview.startedAt?.toISOString() ?? null,
-        completedAt: interview.completedAt?.toISOString() ?? null,
+        ...mapInterviewCore(interview),
         cv: interview.cvVersion
             ? {
                   id: interview.cvVersion.id,
