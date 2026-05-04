@@ -106,7 +106,7 @@ export async function POST(request: Request) {
             status,
         });
     } catch (error) {
-        console.error("[api/interview/interview-feedback-fetch-fetch]", error);
+        console.error("[api/interview/interview-feedback-fetch]", error);
 
         return Response.json(
             { error: "Interview-Feedback konnte nicht analysiert werden." },

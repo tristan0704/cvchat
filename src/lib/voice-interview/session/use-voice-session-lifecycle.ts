@@ -28,6 +28,7 @@ import type { UseVoiceSessionLifecycleArgs } from "@/lib/voice-interview/session
 export function useVoiceSessionLifecycle({
                                              role,
                                              questionPlan,
+                                             faceAnalysisEnabled,
                                              faceLandmarkPanelRef,
                                              sessionRef,
                                              audioContextRef,
@@ -435,7 +436,9 @@ export function useVoiceSessionLifecycle({
              * Face-Analyse kann nach dem technischen Stop weiterlaufen.
              * Wir stoßen sie an, warten aber erst später darauf.
              */
-            const faceAnalysisPromise = faceLandmarkPanelRef.current?.stopAndAnalyze().catch(() => null)
+            const faceAnalysisPromise = faceAnalysisEnabled
+                ? faceLandmarkPanelRef.current?.stopAndAnalyze().catch(() => null)
+                : null
 
             /**
              * Falls ein komplettes Interview-Recap vorhanden ist, erzeugen wir eine URL.
@@ -472,6 +475,7 @@ export function useVoiceSessionLifecycle({
         }
     }, [
         callTimingRef,
+        faceAnalysisEnabled,
         faceLandmarkPanelRef,
         setSecondsLeft,
         startCallInFlightRef,

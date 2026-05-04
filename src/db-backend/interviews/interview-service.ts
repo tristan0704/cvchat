@@ -2,6 +2,7 @@ import "server-only";
 
 import type {
     FaceAnalysisOverallStatus,
+    InterviewMode,
     InterviewQaPairSource,
     InterviewRecapStatus,
     InterviewStatus,
@@ -52,6 +53,7 @@ export type InterviewDetail = {
     role: string;
     experience: string;
     companySize: string;
+    interviewMode: InterviewMode | null;
     currentStep: number;
     status: InterviewStatus;
     createdAt: string;
@@ -109,6 +111,7 @@ export type InterviewDetailLight = {
     role: string;
     experience: string;
     companySize: string;
+    interviewMode: InterviewMode | null;
     currentStep: number;
     status: InterviewStatus;
     createdAt: string;
@@ -568,6 +571,7 @@ function mapInterviewCore(interview: {
     role: string;
     experience: string;
     companySize: string;
+    interviewMode: InterviewMode | null;
     currentStep: number;
     status: InterviewStatus;
     createdAt: Date;
@@ -586,6 +590,7 @@ function mapInterviewCore(interview: {
         role: interview.role,
         experience: interview.experience,
         companySize: interview.companySize,
+        interviewMode: interview.interviewMode,
         currentStep: interview.currentStep,
         status: interview.status,
         createdAt: interview.createdAt.toISOString(),
@@ -725,6 +730,7 @@ async function getInterviewShellRowForUser(
             role: true,
             experience: true,
             companySize: true,
+            interviewMode: true,
             currentStep: true,
             status: true,
             createdAt: true,
@@ -872,6 +878,7 @@ export async function getInterviewStatusForUser(
             status: true,
             startedAt: true,
             completedAt: true,
+            interviewMode: true,
             runtimeTranscriptStatus: true,
             runtimeTranscriptError: true,
             statusVersion: true,
@@ -920,6 +927,7 @@ export async function getInterviewStatusForUser(
         status: interview.status,
         startedAt: interview.startedAt?.toISOString() ?? null,
         completedAt: interview.completedAt?.toISOString() ?? null,
+        interviewMode: interview.interviewMode,
         transcriptStatus: interview.transcript?.transcriptStatus ?? null,
         transcriptError: interview.transcript?.transcriptError ?? "",
         hasCvFeedback: Boolean(interview.cvFeedbackAnalysisId),
@@ -1289,6 +1297,7 @@ export async function updateInterviewProgressForUser(args: {
             role: true,
             status: true,
             currentStep: true,
+            interviewMode: true,
             createdAt: true,
             startedAt: true,
             completedAt: true,
@@ -1305,6 +1314,54 @@ export async function updateInterviewProgressForUser(args: {
 
     return {
         interview: mapInterviewListItem(updatedInterview),
+        status: mapInterviewRuntimeStatus(updatedInterview),
+    };
+}
+
+export async function updateInterviewModeForUser(args: {
+    userId: string;
+    interviewId: string;
+    interviewMode: InterviewMode;
+}) {
+    const existing = await db.interview.findFirst({
+        where: {
+            id: args.interviewId,
+            userId: args.userId,
+        },
+        select: {
+            id: true,
+            runtimeTranscriptStatus: true,
+        },
+    });
+
+    if (!existing) {
+        throw new Error("Interview not found");
+    }
+
+    if (
+        existing.runtimeTranscriptStatus &&
+        existing.runtimeTranscriptStatus !== "idle"
+    ) {
+        throw new Error("Interview mode cannot be changed after call start");
+    }
+
+    const updatedInterview = await db.interview.update({
+        where: {
+            id: existing.id,
+        },
+        data: {
+            interviewMode: args.interviewMode,
+            statusVersion: {
+                increment: 1,
+            },
+            lastActivityAt: new Date(),
+        },
+        select: {
+            ...interviewRuntimeStatusSelect,
+        },
+    });
+
+    return {
         status: mapInterviewRuntimeStatus(updatedInterview),
     };
 }
@@ -1600,11 +1657,16 @@ export async function saveInterviewFaceAnalysisForUser(args: {
         },
         select: {
             id: true,
+            interviewMode: true,
         },
     });
 
     if (!interview) {
         throw new Error("Interview not found");
+    }
+
+    if (interview.interviewMode === "voice") {
+        throw new Error("Face analysis is disabled for voice-only interviews");
     }
 
     return db.interviewFaceAnalysis.upsert({

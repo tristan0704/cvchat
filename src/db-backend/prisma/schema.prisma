@@ -19,6 +19,11 @@ enum InterviewStatus {
   cancelled
 }
 
+enum InterviewMode {
+  voice
+  face
+}
+
 enum InterviewTranscriptStatus {
   idle
   recording
@@ -181,6 +186,7 @@ model Interview {
   role                    String
   experience              String                  @default("")
   companySize             String                  @default("")
+  interviewMode           InterviewMode?
   currentStep             Int                     @default(1)
   status                  InterviewStatus         @default(draft)
   startedAt               DateTime?

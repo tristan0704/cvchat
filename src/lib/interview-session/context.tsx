@@ -12,8 +12,11 @@ type PlannedQuestion = {
     priority: number | null;
 };
 
+type InterviewMode = "voice" | "face";
+
 type InterviewSessionValue = {
     interviewId: string;
+    interviewMode: InterviewMode;
     role: string;
     config: InterviewCvConfig;
     plannedQuestions: PlannedQuestion[];
@@ -34,12 +37,14 @@ function mapPlannedQuestionsToQuestionPlan(
 
 function InterviewSessionScope({
     interviewId,
+    interviewMode,
     role,
     config,
     plannedQuestions,
     children,
 }: {
     interviewId: string;
+    interviewMode: InterviewMode;
     role: string;
     config: InterviewCvConfig;
     plannedQuestions: PlannedQuestion[];
@@ -50,13 +55,15 @@ function InterviewSessionScope({
         plannedQuestions.length > 0
             ? mapPlannedQuestionsToQuestionPlan(plannedQuestions)
             : undefined,
-        interviewId
+        interviewId,
+        interviewMode
     );
 
     return (
         <InterviewSessionContext.Provider
             value={{
                 interviewId,
+                interviewMode,
                 role,
                 config,
                 plannedQuestions,
@@ -70,11 +77,13 @@ function InterviewSessionScope({
 
 export function InterviewSessionProvider({
     interviewId,
+    interviewMode,
     config,
     plannedQuestions,
     children,
 }: {
     interviewId: string;
+    interviewMode: InterviewMode;
     config: InterviewCvConfig;
     plannedQuestions: PlannedQuestion[];
     children: ReactNode;
@@ -82,6 +91,7 @@ export function InterviewSessionProvider({
     const role = config.role.trim() || "Backend Developer";
     const sessionKey = [
         interviewId,
+        interviewMode,
         role,
         config.experience,
         config.companySize,
@@ -92,6 +102,7 @@ export function InterviewSessionProvider({
         <InterviewSessionScope
             key={sessionKey}
             interviewId={interviewId}
+            interviewMode={interviewMode}
             role={role}
             config={config}
             plannedQuestions={plannedQuestions}

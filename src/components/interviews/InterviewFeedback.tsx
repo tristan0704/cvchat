@@ -265,6 +265,7 @@ function AnalysisStateCard(args: {
     overallScore: number | null;
     summary: string;
     passedLikely: boolean | null;
+    showFaceAnalysis: boolean;
 }) {
     if (args.analysisStatus === "ready" && args.overallScore !== null) {
         const tone = getScoreTone(args.overallScore);
@@ -395,7 +396,11 @@ function AnalysisStateCard(args: {
             <SectionHeading
                 eyebrow="Interview Analyse"
                 title="Feedback wird nach dem Call erstellt"
-                description="Beende zuerst das Interview. Anschliessend werden Replay, Timing, Face-Metriken und die neue GPT-Auswertung angezeigt."
+                description={
+                    args.showFaceAnalysis
+                        ? "Beende zuerst das Interview. Anschließend werden Replay, Timing, Face-Metriken und die neue GPT-Auswertung angezeigt."
+                        : "Beende zuerst das Interview. Anschließend werden Replay, Timing und die neue GPT-Auswertung angezeigt."
+                }
                 badge={
                     <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
                         {args.transcriptStatus}
@@ -437,6 +442,7 @@ export default function InterviewFeedback({
     const session = useInterviewSession();
     const interviewId = session.interviewId;
     const controller = session.voiceInterview;
+    const showFaceAnalysis = session.interviewMode === "face";
     const role = session.role;
     const experience = session.config.experience ?? "";
     const companySize = session.config.companySize ?? "";
@@ -664,6 +670,7 @@ export default function InterviewFeedback({
                 overallScore={evaluation?.overallScore ?? null}
                 summary={evaluation?.summary ?? ""}
                 passedLikely={evaluation?.passedLikely ?? null}
+                showFaceAnalysis={showFaceAnalysis}
             />
 
             {evaluation ? (
@@ -878,8 +885,9 @@ export default function InterviewFeedback({
                 </div>
             </SurfaceCard>
 
-            <SurfaceCard>
-                <SectionHeading
+            {showFaceAnalysis ? (
+                <SurfaceCard>
+                    <SectionHeading
                     eyebrow="Face"
                     title="Face-Metriken"
                     description="Video-Metriken bleiben erhalten und werden im selben dunklen Feedback-System dargestellt."
@@ -898,7 +906,7 @@ export default function InterviewFeedback({
                             </span>
                         )
                     }
-                />
+                    />
 
                 {faceAnalysisReport ? (
                     <div className="mt-4 space-y-4">
@@ -973,7 +981,8 @@ export default function InterviewFeedback({
                         Face-Auswertung Daten sammeln kann.
                     </p>
                 )}
-            </SurfaceCard>
+                </SurfaceCard>
+            ) : null}
         </div>
     );
 }

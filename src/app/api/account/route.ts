@@ -56,7 +56,7 @@ export async function DELETE(request: Request) {
 
         if (!password) {
             return Response.json(
-                { error: "Bitte bestaetige dein Passwort." },
+                { error: "Bitte bestätige dein Passwort." },
                 { status: 400 }
             );
         }
@@ -99,14 +99,14 @@ export async function DELETE(request: Request) {
         await supabase.auth.signOut();
 
         return Response.json({
-            message: "Account geloescht.",
+            message: "Account gelöscht.",
         });
     } catch (error) {
         console.error("[api/account]", error);
 
         return Response.json(
             {
-                error: "Account konnte nicht geloescht werden.",
+                error: "Account konnte nicht gelöscht werden.",
             },
             { status: 500 }
         );

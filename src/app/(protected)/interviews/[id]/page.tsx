@@ -11,6 +11,30 @@ import InterviewVoiceStep from "@/components/interviews/InterviewVoiceStep";
 import { readApiErrorMessage } from "@/lib/api-error";
 import { InterviewSessionProvider, useOptionalInterviewSession } from "@/lib/interview-session/context";
 
+type InterviewMode = "voice" | "face";
+
+const INTERVIEW_MODE_OPTIONS: Array<{
+    id: InterviewMode;
+    title: string;
+    description: string;
+    badge: string;
+}> = [
+    {
+        id: "voice",
+        title: "Voice only",
+        description:
+            "Du führst den Call nur mit Mikrofon. Kamera und Face-Analyse bleiben vollständig aus.",
+        badge: "Ohne Kamera",
+    },
+    {
+        id: "face",
+        title: "Voice + Facecam",
+        description:
+            "Du übst im echten Call-Gefühl mit Kamera und optionaler Körpersprache-Auswertung.",
+        badge: "Vollständiger Call",
+    },
+];
+
 // Dateiübersicht:
 // Die Detailseite lädt einmal die vollständige Interview-Shell für Navigation,
 // Konfiguration und geplante Fragen. Laufende Aktualisierungen verwenden danach
@@ -23,6 +47,7 @@ type InterviewDetail = {
     role: string;
     experience: string;
     companySize: string;
+    interviewMode: InterviewMode | null;
     currentStep: number;
     status: string;
     startedAt: string | null;
@@ -88,6 +113,7 @@ type InterviewStatusSnapshot = {
     status: string;
     startedAt: string | null;
     completedAt: string | null;
+    interviewMode?: InterviewMode | null;
     transcriptStatus: "idle" | "recording" | "transcribing" | "ready" | "error" | null;
     transcriptError: string;
     hasCvFeedback: boolean;
@@ -154,6 +180,7 @@ function mergeInterviewStatus(
         status: status.status,
         startedAt: status.startedAt,
         completedAt: status.completedAt,
+        interviewMode: status.interviewMode ?? interview.interviewMode,
         transcript: status.transcriptStatus
             ? {
                   transcriptStatus: status.transcriptStatus,
@@ -267,6 +294,107 @@ function getNextStepRequirement(args: {
     return null;
 }
 
+function CallSetupStep({
+    interviewId,
+    selectedMode,
+    onModeSaved,
+}: {
+    interviewId: string;
+    selectedMode: InterviewMode | null;
+    onModeSaved: (mode: InterviewMode, status: InterviewStatusSnapshot | null) => void;
+}) {
+    const [pendingMode, setPendingMode] = useState<InterviewMode | null>(
+        selectedMode
+    );
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    async function saveMode(mode: InterviewMode) {
+        setPendingMode(mode);
+        setSaving(true);
+        setError("");
+
+        try {
+            const response = await fetch(`/api/interviews/${interviewId}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    interviewMode: mode,
+                }),
+            });
+            const data = (await response.json().catch(() => null)) as
+                | { status?: InterviewStatusSnapshot; error?: unknown; errorMessage?: string }
+                | null;
+
+            if (!response.ok) {
+                throw new Error(
+                    readApiErrorMessage(
+                        data,
+                        "Interview-Modus konnte nicht gespeichert werden."
+                    )
+                );
+            }
+
+            onModeSaved(mode, data?.status ?? null);
+        } catch (saveError) {
+            setError(
+                saveError instanceof Error
+                    ? saveError.message
+                    : "Interview-Modus konnte nicht gespeichert werden."
+            );
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="space-y-5">
+            <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
+                    Call-Setup
+                </p>
+                <h2 className="mt-1 text-xl font-semibold text-white">
+                    Wie möchtest du das Interview führen?
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
+                    Die Auswahl wird am Interview gespeichert. Voice only bleibt
+                    ohne Kamera-Permission und ohne Face-Analyse.
+                </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+                {INTERVIEW_MODE_OPTIONS.map((option) => (
+                    <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => void saveMode(option.id)}
+                        disabled={saving}
+                        className={`rounded-lg p-5 text-left outline outline-1 transition ${
+                            pendingMode === option.id
+                                ? "bg-indigo-500/15 outline-indigo-400"
+                                : "bg-gray-900 outline-white/10 hover:bg-white/5"
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                        <span className="inline-flex rounded-md bg-white/5 px-3 py-1 text-xs font-medium text-gray-300 outline outline-1 outline-white/10">
+                            {option.badge}
+                        </span>
+                        <p className="mt-4 text-base font-semibold text-white">
+                            {option.title}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-gray-400">
+                            {option.description}
+                        </p>
+                    </button>
+                ))}
+            </div>
+
+            {error ? <p className="text-sm text-red-300">{error}</p> : null}
+        </div>
+    );
+}
+
 function InterviewDetailStepContent({
     interview,
     step,
@@ -297,6 +425,8 @@ function InterviewDetailStepContent({
     const localTranscriptStatus =
         session?.voiceInterview.postCallTranscriptStatus ?? "idle";
     const hasTranscriptProgress = persistedTranscriptStatus !== "idle";
+    const visibleInterviewMode =
+        interview.interviewMode ?? (hasTranscriptProgress ? "face" : null);
     const hasInterviewFeedback = interview.hasInterviewFeedback;
     const maxAccessibleStep = getMaxAccessibleStep({
         interview,
@@ -383,7 +513,33 @@ function InterviewDetailStepContent({
                     {step === 1 ? (
                         <CvFeedbackStep onStatusUpdate={onStatusUpdate} />
                     ) : step === 2 ? (
-                        <InterviewVoiceStep />
+                        visibleInterviewMode ? (
+                            <InterviewVoiceStep />
+                        ) : (
+                            <CallSetupStep
+                                interviewId={interview.id}
+                                selectedMode={interview.interviewMode}
+                                onModeSaved={(mode, status) => {
+                                    setInterview((currentInterview) => {
+                                        if (!currentInterview) {
+                                            return currentInterview;
+                                        }
+
+                                        const nextInterview = {
+                                            ...currentInterview,
+                                            interviewMode: mode,
+                                        };
+
+                                        return status
+                                            ? mergeInterviewStatus(
+                                                  nextInterview,
+                                                  status
+                                              )
+                                            : nextInterview;
+                                    });
+                                }}
+                            />
+                        )
                     ) : step === 3 ? (
                         <InterviewFeedback
                             onEvaluationReady={() => void onRefreshInterview()}
@@ -1090,6 +1246,7 @@ function InterviewDetailPageContent() {
     return (
         <InterviewSessionProvider
             interviewId={interview.id}
+            interviewMode={interview.interviewMode ?? "face"}
             config={config}
             plannedQuestions={interview.plannedQuestions}
         >

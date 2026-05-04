@@ -63,6 +63,7 @@ export type EndgameControls = {
 export type UseVoiceSessionLifecycleArgs = {
     role: string
     questionPlan: Array<{ text: string }>
+    faceAnalysisEnabled: boolean
     faceLandmarkPanelRef: MutableRefObject<FaceLandmarkPanelHandle | null>
     sessionRef: MutableRefObject<Session | null>
     audioContextRef: MutableRefObject<AudioContext | null>

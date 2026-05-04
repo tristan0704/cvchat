@@ -7,6 +7,7 @@ import {
 } from "@/db-backend/interviews/read/interview-read-service";
 import {
     deleteInterviewForUser,
+    updateInterviewModeForUser,
     updateInterviewProgressForUser,
 } from "@/db-backend/interviews/write/interview-write-service";
 
@@ -64,8 +65,34 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = (await request.json().catch(() => null)) as
         | {
               currentStep?: unknown;
+              interviewMode?: unknown;
           }
         | null;
+
+    const interviewMode =
+        body && (body.interviewMode === "voice" || body.interviewMode === "face")
+            ? body.interviewMode
+            : null;
+
+    if (interviewMode) {
+        try {
+            const result = await updateInterviewModeForUser({
+                userId: currentUser.id,
+                interviewId: id,
+                interviewMode,
+            });
+
+            return Response.json(result);
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Interview-Modus konnte nicht gespeichert werden.";
+            const status = message === "Interview not found" ? 404 : 400;
+
+            return Response.json({ error: message }, { status });
+        }
+    }
 
     const currentStep =
         body && typeof body.currentStep === "number" ? body.currentStep : NaN;

@@ -1,6 +1,10 @@
 import "server-only";
 
-import type { InterviewStatus, InterviewTranscriptStatus } from "@prisma/client";
+import type {
+    InterviewMode,
+    InterviewStatus,
+    InterviewTranscriptStatus,
+} from "@prisma/client";
 
 import { db } from "@/db-backend/prisma/client";
 
@@ -10,6 +14,7 @@ export type InterviewStatusSnapshot = {
     status: InterviewStatus;
     startedAt: string | null;
     completedAt: string | null;
+    interviewMode: InterviewMode | null;
     transcriptStatus: InterviewTranscriptStatus | null;
     transcriptError: string;
     hasCvFeedback: boolean;
@@ -26,6 +31,7 @@ export const interviewRuntimeStatusSelect = {
     status: true,
     startedAt: true,
     completedAt: true,
+    interviewMode: true,
     runtimeTranscriptStatus: true,
     runtimeTranscriptError: true,
     hasCvFeedback: true,
@@ -42,6 +48,7 @@ type InterviewRuntimeStatusRow = {
     status: InterviewStatus;
     startedAt: Date | null;
     completedAt: Date | null;
+    interviewMode: InterviewMode | null;
     runtimeTranscriptStatus: InterviewTranscriptStatus | null;
     runtimeTranscriptError: string | null;
     hasCvFeedback: boolean;
@@ -98,6 +105,7 @@ export function mapInterviewRuntimeStatus(
         status: interview.status,
         startedAt: interview.startedAt?.toISOString() ?? null,
         completedAt: interview.completedAt?.toISOString() ?? null,
+        interviewMode: interview.interviewMode,
         transcriptStatus: interview.runtimeTranscriptStatus,
         transcriptError: interview.runtimeTranscriptError ?? "",
         hasCvFeedback: interview.hasCvFeedback,

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const TOTAL_STEPS = 3;
+
 type InterviewTemplateSummary = {
     id: string;
     title: string;
@@ -224,7 +226,9 @@ export default function NewInterviewPage() {
                 </p>
 
                 <div className="mt-8 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
-                    <p className="mb-4 text-sm text-gray-400">Schritt {step} von 3</p>
+                    <p className="mb-4 text-sm text-gray-400">
+                        Schritt {step} von {TOTAL_STEPS}
+                    </p>
 
                     {step === 1 ? (
                         <div className="space-y-4">
@@ -302,7 +306,7 @@ export default function NewInterviewPage() {
                             Zurück
                         </button>
 
-                        {step < 3 ? (
+                        {step < TOTAL_STEPS ? (
                             <button
                                 type="button"
                                 onClick={() => setStep((currentStep) => currentStep + 1)}

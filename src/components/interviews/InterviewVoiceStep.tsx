@@ -1,8 +1,7 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 
-import { FaceLandmarkPanel } from "@/components/interviews/face-landmark-panel";
 import { formatCountdown } from "@/lib/questionpool";
 import { useInterviewSession } from "@/lib/interview-session/context";
 import { LAST_MINUTE_THRESHOLD_SECONDS } from "@/lib/voice-interview/session/endgame";
@@ -11,6 +10,12 @@ import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-v
 type VoiceInterviewControllerState = ReturnType<
     typeof useVoiceInterviewController
 >;
+
+const FaceLandmarkPanel = lazy(() =>
+    import("@/components/interviews/face-landmark-panel").then((module) => ({
+        default: module.FaceLandmarkPanel,
+    }))
+);
 
 type StatusTone = "default" | "positive" | "danger" | "dark";
 
@@ -128,10 +133,12 @@ function resolveCallCopy(args: {
 
 function VoiceInterviewContent({
     role,
+    interviewMode,
     controller,
     interviewSessionId,
 }: {
     role: string;
+    interviewMode: "voice" | "face";
     controller: VoiceInterviewControllerState;
     interviewSessionId: string;
 }) {
@@ -212,20 +219,45 @@ function VoiceInterviewContent({
             </header>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                <FaceLandmarkPanel
-                    ref={faceLandmarkPanelRef}
-                    role={role}
-                    compact
-                    minimal
-                    title="Du"
-                    description=""
-                    showAnalysisSummary={false}
-                    analyzeOnStop
-                    showLandmarksOverlay={false}
-                    videoWidth={720}
-                    surface="dark"
-                    analysisSessionId={interviewSessionId}
-                />
+                {interviewMode === "face" ? (
+                    <Suspense
+                        fallback={
+                            <div className="min-h-[360px] rounded-xl bg-gray-900 p-6 text-sm text-gray-400 outline outline-1 outline-white/10">
+                                Kamera-Setup wird geladen...
+                            </div>
+                        }
+                    >
+                        <FaceLandmarkPanel
+                            ref={faceLandmarkPanelRef}
+                            role={role}
+                            compact
+                            minimal
+                            title="Du"
+                            description=""
+                            showAnalysisSummary={false}
+                            analyzeOnStop
+                            showLandmarksOverlay={false}
+                            videoWidth={720}
+                            surface="dark"
+                            analysisSessionId={interviewSessionId}
+                        />
+                    </Suspense>
+                ) : (
+                    <section className="min-h-[360px] rounded-xl bg-gray-900 p-6 outline outline-1 outline-white/10">
+                        <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
+                            <div className="flex size-24 items-center justify-center rounded-full bg-indigo-500/15 text-3xl font-semibold text-indigo-200 outline outline-1 outline-indigo-400/30">
+                                AI
+                            </div>
+                            <h2 className="mt-6 text-xl font-semibold text-white">
+                                Voice-only Call
+                            </h2>
+                            <p className="mt-2 max-w-md text-sm leading-6 text-gray-400">
+                                Kamera und Face-Analyse sind für dieses Interview
+                                deaktiviert. Es wird nur dein Mikrofon verwendet.
+                            </p>
+                        </div>
+                    </section>
+                )}
 
                 <aside className="space-y-4">
                     <section className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
@@ -318,6 +350,7 @@ export default function InterviewVoiceStep() {
     return (
         <VoiceInterviewContent
             role={session.role}
+            interviewMode={session.interviewMode}
             controller={session.voiceInterview}
             interviewSessionId={session.interviewId}
         />

@@ -35,7 +35,8 @@ type StopCallRef = MutableRefObject<StopCallFn | null>
 export function useVoiceInterviewController(
     role: string,
     questionPlanOverride?: ReturnType<typeof getInterviewQuestionPool>,
-    interviewId?: string
+    interviewId?: string,
+    interviewMode: "voice" | "face" = "face"
 ) {
     /**
      * Falls von außen ein fertiger Question Plan reinkommt, verwenden wir ihn.
@@ -400,6 +401,7 @@ export function useVoiceInterviewController(
     const { startCall } = useVoiceSessionLifecycle({
         role,
         questionPlan,
+        faceAnalysisEnabled: interviewMode === "face",
         faceLandmarkPanelRef,
         sessionRef,
         audioContextRef,
