@@ -295,60 +295,16 @@ function getNextStepRequirement(args: {
 }
 
 function CallSetupStep({
-    interviewId,
     selectedMode,
-    onModeSaved,
+    onModeChange,
+    disabled,
+    error,
 }: {
-    interviewId: string;
     selectedMode: InterviewMode | null;
-    onModeSaved: (mode: InterviewMode, status: InterviewStatusSnapshot | null) => void;
+    onModeChange: (mode: InterviewMode) => void;
+    disabled?: boolean;
+    error?: string;
 }) {
-    const [pendingMode, setPendingMode] = useState<InterviewMode | null>(
-        selectedMode
-    );
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-
-    async function saveMode(mode: InterviewMode) {
-        setPendingMode(mode);
-        setSaving(true);
-        setError("");
-
-        try {
-            const response = await fetch(`/api/interviews/${interviewId}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    interviewMode: mode,
-                }),
-            });
-            const data = (await response.json().catch(() => null)) as
-                | { status?: InterviewStatusSnapshot; error?: unknown; errorMessage?: string }
-                | null;
-
-            if (!response.ok) {
-                throw new Error(
-                    readApiErrorMessage(
-                        data,
-                        "Interview-Modus konnte nicht gespeichert werden."
-                    )
-                );
-            }
-
-            onModeSaved(mode, data?.status ?? null);
-        } catch (saveError) {
-            setError(
-                saveError instanceof Error
-                    ? saveError.message
-                    : "Interview-Modus konnte nicht gespeichert werden."
-            );
-        } finally {
-            setSaving(false);
-        }
-    }
-
     return (
         <div className="space-y-5">
             <div>
@@ -369,10 +325,10 @@ function CallSetupStep({
                     <button
                         key={option.id}
                         type="button"
-                        onClick={() => void saveMode(option.id)}
-                        disabled={saving}
+                        onClick={() => onModeChange(option.id)}
+                        disabled={disabled}
                         className={`rounded-lg p-5 text-left outline outline-1 transition ${
-                            pendingMode === option.id
+                            selectedMode === option.id
                                 ? "bg-indigo-500/15 outline-indigo-400"
                                 : "bg-gray-900 outline-white/10 hover:bg-white/5"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
@@ -412,7 +368,7 @@ function InterviewDetailStepContent({
     step: number;
     error: string;
     router: ReturnType<typeof useRouter>;
-    persistStep: (nextStep: number) => Promise<void>;
+    persistStep: (nextStep: number, extraData?: Record<string, any>) => Promise<void>;
     setInterview: React.Dispatch<React.SetStateAction<InterviewDetail | null>>;
     onStatusUpdate: (status: InterviewStatusSnapshot) => void;
     onRefreshInterview: () => Promise<void>;
@@ -420,27 +376,30 @@ function InterviewDetailStepContent({
     isPersistingStep: boolean;
     feedbackNavigationLock: string | null;
 }) {
+    const [pendingMode, setPendingMode] = useState<InterviewMode | null>(
+        interview.interviewMode
+    );
     const session = useOptionalInterviewSession();
+
     const persistedTranscriptStatus = interview.transcript?.transcriptStatus ?? "idle";
     const localTranscriptStatus =
         session?.voiceInterview.postCallTranscriptStatus ?? "idle";
     const hasTranscriptProgress = persistedTranscriptStatus !== "idle";
     const visibleInterviewMode =
         interview.interviewMode ?? (hasTranscriptProgress ? "face" : null);
-    const hasInterviewFeedback = interview.hasInterviewFeedback;
+
     const maxAccessibleStep = getMaxAccessibleStep({
         interview,
         hasTranscriptProgress,
-        hasInterviewFeedback,
+        hasInterviewFeedback: interview.hasInterviewFeedback,
     });
     const nextStepRequirement = getNextStepRequirement({
         step,
         interview,
         hasTranscriptProgress,
-        hasInterviewFeedback,
+        hasInterviewFeedback: interview.hasInterviewFeedback,
     });
-    const canAdvance =
-        step < 6 && step + 1 <= maxAccessibleStep && nextStepRequirement === null;
+
     const voiceNavigationLock =
         step === 2
             ? resolveVoiceNavigationLock({
@@ -450,25 +409,23 @@ function InterviewDetailStepContent({
                   persistedTranscriptStatus,
               })
             : null;
+
     const navigationLockMessage = voiceNavigationLock ?? feedbackNavigationLock;
     const canNavigateBack = step > 1 && !isPersistingStep && !navigationLockMessage;
+    const isCallSetup = step === 2 && !visibleInterviewMode;
     const canNavigateForward =
-        canAdvance && !isPersistingStep && !navigationLockMessage;
+        (isCallSetup ? !!pendingMode : canAdvance(step, maxAccessibleStep, nextStepRequirement)) &&
+        !isPersistingStep &&
+        !navigationLockMessage;
+
+    function canAdvance(s: number, max: number, req: string | null) {
+        return s < 6 && s + 1 <= max && req === null;
+    }
 
     useEffect(() => {
-        if (step !== 2) {
-            return;
+        if (step === 2 && ["transcribing", "ready", "error"].includes(localTranscriptStatus)) {
+            void onRefreshInterview();
         }
-
-        if (
-            localTranscriptStatus !== "transcribing" &&
-            localTranscriptStatus !== "ready" &&
-            localTranscriptStatus !== "error"
-        ) {
-            return;
-        }
-
-        void onRefreshInterview();
     }, [localTranscriptStatus, onRefreshInterview, step]);
 
     return (
@@ -478,33 +435,20 @@ function InterviewDetailStepContent({
                 <p className="mt-2 text-gray-400">Schritt {step} von 6</p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                    {[
-                        "CV",
-                        "Voice",
-                        "Interview",
-                        "Code",
-                        "Code Review",
-                        "Gesamt",
-                    ].map((label, index) => {
-                        const stepNumber = index + 1;
-                        const isActive = stepNumber === step;
-                        const isUnlocked = stepNumber <= maxAccessibleStep;
-
-                        return (
-                            <span
-                                key={label}
-                                className={`rounded-full px-3 py-1 text-xs ${
-                                    isActive
-                                        ? "bg-indigo-500 text-white"
-                                        : isUnlocked
-                                          ? "bg-white/10 text-gray-200"
-                                          : "bg-white/5 text-gray-500"
-                                }`}
-                            >
-                                {stepNumber}. {label}
-                            </span>
-                        );
-                    })}
+                    {["CV", "Voice", "Interview", "Code", "Code Review", "Gesamt"].map((label, index) => (
+                        <span
+                            key={label}
+                            className={`rounded-full px-3 py-1 text-xs ${
+                                index + 1 === step
+                                    ? "bg-indigo-500 text-white"
+                                    : index + 1 <= maxAccessibleStep
+                                      ? "bg-white/10 text-gray-200"
+                                      : "bg-white/5 text-gray-500"
+                            }`}
+                        >
+                            {index + 1}. {label}
+                        </span>
+                    ))}
                 </div>
 
                 {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
@@ -517,27 +461,9 @@ function InterviewDetailStepContent({
                             <InterviewVoiceStep />
                         ) : (
                             <CallSetupStep
-                                interviewId={interview.id}
-                                selectedMode={interview.interviewMode}
-                                onModeSaved={(mode, status) => {
-                                    setInterview((currentInterview) => {
-                                        if (!currentInterview) {
-                                            return currentInterview;
-                                        }
-
-                                        const nextInterview = {
-                                            ...currentInterview,
-                                            interviewMode: mode,
-                                        };
-
-                                        return status
-                                            ? mergeInterviewStatus(
-                                                  nextInterview,
-                                                  status
-                                              )
-                                            : nextInterview;
-                                    });
-                                }}
+                                selectedMode={pendingMode}
+                                onModeChange={setPendingMode}
+                                disabled={isPersistingStep}
                             />
                         )
                     ) : step === 3 ? (
@@ -552,16 +478,9 @@ function InterviewDetailStepContent({
                     ) : (
                         <OverallFeedbackBlock
                             interview={interview}
-                            onOverallFeedbackChange={(overallFeedback) => {
-                                setInterview((currentInterview) =>
-                                    currentInterview
-                                        ? {
-                                              ...currentInterview,
-                                              overallFeedback,
-                                          }
-                                        : currentInterview
-                                );
-                            }}
+                            onOverallFeedbackChange={(overallFeedback) =>
+                                setInterview((curr) => curr ? { ...curr, overallFeedback } : curr)
+                            }
                             onStatusUpdate={onStatusUpdate}
                         />
                     )}
@@ -577,22 +496,21 @@ function InterviewDetailStepContent({
 
                         {step < 6 ? (
                             <div className="text-right">
-                                {navigationLockMessage ? (
+                                {(navigationLockMessage || nextStepRequirement) && (
                                     <p className="mb-2 text-xs text-amber-300">
-                                        {navigationLockMessage}
+                                        {navigationLockMessage || nextStepRequirement}
                                     </p>
-                                ) : nextStepRequirement ? (
-                                    <p className="mb-2 text-xs text-amber-300">
-                                        {nextStepRequirement}
-                                    </p>
-                                ) : null}
-
+                                )}
                                 <button
-                                    onClick={() => void persistStep(step + 1)}
+                                    onClick={() =>
+                                        isCallSetup
+                                            ? pendingMode && persistStep(step, { interviewMode: pendingMode })
+                                            : persistStep(step + 1)
+                                    }
                                     disabled={!canNavigateForward}
                                     className="rounded-md bg-indigo-500 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
-                                    Weiter
+                                    {isCallSetup && isPersistingStep ? "Wird gespeichert..." : "Weiter"}
                                 </button>
                             </div>
                         ) : (
@@ -1184,7 +1102,7 @@ function InterviewDetailPageContent() {
         [interview]
     );
 
-    async function persistStep(nextStep: number) {
+    async function persistStep(nextStep: number, extraData?: Record<string, any>) {
         const boundedStep = Math.max(1, Math.min(6, nextStep));
         setIsPersistingStep(true);
 
@@ -1196,6 +1114,7 @@ function InterviewDetailPageContent() {
                 },
                 body: JSON.stringify({
                     currentStep: boundedStep,
+                    ...extraData,
                 }),
             });
 
