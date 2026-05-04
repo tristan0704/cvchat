@@ -1,5 +1,5 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { upsertInterviewTimingMetrics } from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { upsertInterviewTimingMetrics } from "@/db-backend/interviews/analysis/interview-analysis-service";
 import type { InterviewTimingMetrics } from "@/lib/voice-interview/core/types";
 
 export const runtime = "nodejs";
@@ -55,7 +55,7 @@ function readTimingMetrics(body: {
 }
 
 export async function PUT(request: Request, context: RouteContext) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });

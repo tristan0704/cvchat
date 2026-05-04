@@ -6,11 +6,13 @@ import type {
     CodingChallengeEvaluation,
     CodingChallengeEvaluationRequest,
     CodingChallengeEvaluationResponse,
+    CodingChallengeRuntimeStatusSnapshot,
 } from "@/lib/coding-challenge/types";
 
 type UseCodingChallengeSubmissionArgs = {
     interviewId: string;
     initialEvaluation?: CodingChallengeEvaluation | null;
+    onStatusUpdate?: (status: CodingChallengeRuntimeStatusSnapshot) => void;
 };
 
 const FALLBACK_ERROR = "Unable to submit coding challenge";
@@ -22,6 +24,7 @@ function getErrorMessage(error: unknown) {
 export function useCodingChallengeSubmission({
     interviewId,
     initialEvaluation = null,
+    onStatusUpdate,
 }: UseCodingChallengeSubmissionArgs) {
     const [evaluation, setEvaluation] =
         useState<CodingChallengeEvaluation | null>(initialEvaluation);
@@ -63,6 +66,9 @@ export function useCodingChallengeSubmission({
             }
 
             setEvaluation(data.evaluation);
+            if (data.status) {
+                onStatusUpdate?.(data.status);
+            }
             return data;
         } catch (error) {
             const message = getErrorMessage(error);

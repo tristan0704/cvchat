@@ -11,8 +11,13 @@ import {
 import { useCodingChallengeSubmission } from "@/lib/coding-challenge/use-coding-challenge-submission";
 import { useCodingChallengeTask } from "@/lib/coding-challenge/use-coding-challenge-task";
 import { useInterviewSession } from "@/lib/interview-session/context";
+import type { CodingChallengeRuntimeStatusSnapshot } from "@/lib/coding-challenge/types";
 
-export default function CodingChallengeEditor() {
+export default function CodingChallengeEditor({
+  onStatusUpdate,
+}: {
+  onStatusUpdate?: (status: CodingChallengeRuntimeStatusSnapshot) => void;
+}) {
   const session = useInterviewSession();
   const interviewId = session.interviewId;
   const roleLabel = session.role;
@@ -26,12 +31,14 @@ export default function CodingChallengeEditor() {
     updateCode,
   } = useCodingChallengeTask({
     interviewId,
+    onStatusUpdate,
     roleLabel,
   });
   const { evaluation, isSubmitting, submitError, submitSolution } =
     useCodingChallengeSubmission({
       interviewId,
       initialEvaluation: draft?.evaluation ?? null,
+      onStatusUpdate,
     });
 
   const lineCount = draft ? draft.code.split("\n").length : 0;

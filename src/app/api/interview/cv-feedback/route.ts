@@ -1,14 +1,15 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import {
     getCvFeedbackAnalysisForInterview,
     getOrCreateCvFeedbackAnalysisForInterview,
 } from "@/db-backend/cv/cv-service";
+import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
 import { CvFeedbackError } from "@/lib/cv/server/analyze-cv-feedback";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -73,8 +74,12 @@ export async function POST(req: Request) {
             interviewId,
             force,
         });
+        const status = await getInterviewRuntimeStatusForUser(
+            currentUser.id,
+            interviewId
+        );
 
-        return Response.json(data);
+        return Response.json({ ...data, status });
     } catch (error) {
         if (error instanceof CvFeedbackError) {
             return Response.json({ error: error.message }, { status: error.status });

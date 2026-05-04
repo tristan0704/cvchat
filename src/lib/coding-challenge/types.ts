@@ -66,7 +66,24 @@ export type CodingChallengeEvaluationRequest = {
   code: string;
 };
 
+export type CodingChallengeRuntimeStatusSnapshot = {
+  id: string;
+  currentStep: number;
+  status: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  transcriptStatus: "idle" | "recording" | "transcribing" | "ready" | "error" | null;
+  transcriptError: string;
+  hasCvFeedback: boolean;
+  hasInterviewFeedback: boolean;
+  hasOverallFeedback: boolean;
+  hasCodingEvaluation: boolean;
+  statusVersion: number;
+  lastActivityAt: string;
+};
+
 export type CodingChallengeEvaluationResponse = {
   draft?: CodingChallengeDraft;
   evaluation: CodingChallengeEvaluation;
+  status?: CodingChallengeRuntimeStatusSnapshot | null;
 };

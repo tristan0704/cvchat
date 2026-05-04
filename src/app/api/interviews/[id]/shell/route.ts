@@ -1,5 +1,6 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { getInterviewShellForUser } from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { notFound, ok, unauthorized } from "@/db-backend/api/responses";
+import { getInterviewRuntimeSnapshotForUser } from "@/db-backend/interviews/read/interview-read-service";
 import { createServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -12,29 +13,32 @@ type RouteContext = {
 
 export async function GET(_: Request, context: RouteContext) {
     const timing = createServerTiming("api.interviews.shell");
-    const currentUser = await timing.measure("auth", () => getCurrentAppUser());
+    const currentUser = await timing.measure("auth.identity", () =>
+        getCurrentApiIdentity()
+    );
 
     if (!currentUser) {
         timing.log({
             status: 401,
         });
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return unauthorized();
     }
 
     const { id } = await context.params;
-    const interview = await timing.measure("db.shell", () =>
-        getInterviewShellForUser(currentUser.id, id)
+    const snapshot = await timing.measure("db.snapshot", () =>
+        getInterviewRuntimeSnapshotForUser(currentUser.id, id)
     );
 
-    if (!interview) {
+    if (!snapshot) {
         timing.log({
             status: 404,
         });
-        return Response.json({ error: "Interview not found" }, { status: 404 });
+        return notFound("Interview not found");
     }
 
     const response = {
-        interview,
+        interview: snapshot.interview,
+        status: snapshot.status,
     };
 
     timing.log({
@@ -42,5 +46,5 @@ export async function GET(_: Request, context: RouteContext) {
         payloadBytes: JSON.stringify(response).length,
     });
 
-    return Response.json(response);
+    return ok(response);
 }

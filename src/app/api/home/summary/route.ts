@@ -1,5 +1,5 @@
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { getHomeDashboardSnapshot } from "@/db-backend/interviews/interview-service";
+import { getHomeDashboardSnapshot } from "@/db-backend/interviews/read/interview-read-service";
 
 export const runtime = "nodejs";
 

@@ -1,11 +1,14 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import {
-    deleteInterviewForUser,
     getInterviewDetailLightForUser,
     getInterviewDetailForUser,
+    getInterviewRuntimeSnapshotForUser,
     getInterviewShellForUser,
+} from "@/db-backend/interviews/read/interview-read-service";
+import {
+    deleteInterviewForUser,
     updateInterviewProgressForUser,
-} from "@/db-backend/interviews/interview-service";
+} from "@/db-backend/interviews/write/interview-write-service";
 
 export const runtime = "nodejs";
 
@@ -16,7 +19,7 @@ type RouteContext = {
 };
 
 export async function GET(request: Request, context: RouteContext) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,6 +28,17 @@ export async function GET(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const url = new URL(request.url);
     const view = url.searchParams.get("view");
+
+    if (view === "runtime") {
+        const snapshot = await getInterviewRuntimeSnapshotForUser(currentUser.id, id);
+
+        if (!snapshot) {
+            return Response.json({ error: "Interview not found" }, { status: 404 });
+        }
+
+        return Response.json(snapshot);
+    }
+
     const interview =
         view === "shell"
             ? await getInterviewShellForUser(currentUser.id, id)
@@ -40,7 +54,7 @@ export async function GET(request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -63,17 +77,17 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
     }
 
-    const interview = await updateInterviewProgressForUser({
+    const result = await updateInterviewProgressForUser({
         userId: currentUser.id,
         interviewId: id,
         currentStep,
     });
 
-    return Response.json({ interview });
+    return Response.json(result);
 }
 
 export async function DELETE(_: Request, context: RouteContext) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });

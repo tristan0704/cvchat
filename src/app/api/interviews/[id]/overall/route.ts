@@ -1,5 +1,5 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { getInterviewOverallFeedbackDetailForUser } from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { getInterviewOverallFeedbackDetailForUser } from "@/db-backend/interviews/read/interview-read-service";
 import { createServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -12,7 +12,9 @@ type RouteContext = {
 
 export async function GET(_: Request, context: RouteContext) {
     const timing = createServerTiming("api.interviews.overall");
-    const currentUser = await timing.measure("auth", () => getCurrentAppUser());
+    const currentUser = await timing.measure("auth.identity", () =>
+        getCurrentApiIdentity()
+    );
 
     if (!currentUser) {
         timing.log({ status: 401 });

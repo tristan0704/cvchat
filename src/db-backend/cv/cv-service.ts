@@ -309,11 +309,16 @@ export async function getOrCreateCvFeedbackAnalysisForInterview(args: {
                 where: {
                     id: interview.id,
                 },
-                data: {
-                    cvVersionId: cvVersion.id,
-                    cvFeedbackAnalysisId: existing.id,
+            data: {
+                cvVersionId: cvVersion.id,
+                cvFeedbackAnalysisId: existing.id,
+                hasCvFeedback: true,
+                statusVersion: {
+                    increment: 1,
                 },
-            });
+                lastActivityAt: new Date(),
+            },
+        });
 
             return {
                 cv: buildCvVersionSummary(cvVersion),
@@ -334,6 +339,11 @@ export async function getOrCreateCvFeedbackAnalysisForInterview(args: {
         data: {
             cvVersionId: cvVersion.id,
             cvFeedbackAnalysisId: analysis.id,
+            hasCvFeedback: true,
+            statusVersion: {
+                increment: 1,
+            },
+            lastActivityAt: new Date(),
         },
     });
 

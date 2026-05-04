@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { CodingChallengeDraft } from "@/lib/coding-challenge/types";
+import type {
+    CodingChallengeDraft,
+    CodingChallengeRuntimeStatusSnapshot,
+} from "@/lib/coding-challenge/types";
 
 // Dateiübersicht:
 // Der Hook weist genau eine Coding-Challenge pro Interview/Rolle zu und speichert
@@ -12,10 +15,12 @@ import type { CodingChallengeDraft } from "@/lib/coding-challenge/types";
 type UseCodingChallengeTaskArgs = {
     interviewId: string;
     roleLabel: string;
+    onStatusUpdate?: (status: CodingChallengeRuntimeStatusSnapshot) => void;
 };
 
 type CodingChallengeTaskResponse = {
     draft: CodingChallengeDraft;
+    status?: CodingChallengeRuntimeStatusSnapshot | null;
 };
 
 const FALLBACK_ERROR = "Unable to load coding challenge";
@@ -28,7 +33,7 @@ async function fetchCodingChallengeDraft(
     interviewId: string,
     role: string,
     excludeTaskId?: string
-): Promise<CodingChallengeDraft> {
+): Promise<CodingChallengeTaskResponse> {
     const searchParams = new URLSearchParams();
     searchParams.set("interviewId", interviewId);
     searchParams.set("role", role);
@@ -53,7 +58,7 @@ async function fetchCodingChallengeDraft(
         throw new Error(FALLBACK_ERROR);
     }
 
-    return data.draft;
+    return data;
 }
 
 async function persistDraft(interviewId: string, draft: CodingChallengeDraft) {
@@ -72,6 +77,7 @@ async function persistDraft(interviewId: string, draft: CodingChallengeDraft) {
 
 export function useCodingChallengeTask({
     interviewId,
+    onStatusUpdate,
     roleLabel,
 }: UseCodingChallengeTaskArgs) {
     const [draft, setDraft] = useState<CodingChallengeDraft | null>(null);
@@ -80,7 +86,7 @@ export function useCodingChallengeTask({
     const [error, setError] = useState("");
     const loadPromiseRef = useRef<{
         key: string;
-        promise: Promise<CodingChallengeDraft>;
+        promise: Promise<CodingChallengeTaskResponse>;
     } | null>(null);
 
     useEffect(() => {
@@ -103,9 +109,12 @@ export function useCodingChallengeTask({
                               ),
                           };
                 loadPromiseRef.current = request;
-                const nextDraft = await request.promise;
+                const response = await request.promise;
                 if (!cancelled) {
-                    setDraft(nextDraft);
+                    setDraft(response.draft);
+                    if (response.status) {
+                        onStatusUpdate?.(response.status);
+                    }
                 }
             } catch (loadError) {
                 if (!cancelled) {
@@ -131,7 +140,7 @@ export function useCodingChallengeTask({
         return () => {
             cancelled = true;
         };
-    }, [interviewId, roleLabel]);
+    }, [interviewId, onStatusUpdate, roleLabel]);
 
     useEffect(() => {
         if (!draft || !interviewId) {
@@ -178,12 +187,15 @@ export function useCodingChallengeTask({
         setError("");
 
         try {
-            const nextDraft = await fetchCodingChallengeDraft(
+            const response = await fetchCodingChallengeDraft(
                 interviewId,
                 roleLabel,
                 draft.task.id
             );
-            setDraft(nextDraft);
+            setDraft(response.draft);
+            if (response.status) {
+                onStatusUpdate?.(response.status);
+            }
         } catch (loadError) {
             setError(getErrorMessage(loadError));
         } finally {

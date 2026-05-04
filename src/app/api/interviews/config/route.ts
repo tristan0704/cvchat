@@ -1,10 +1,10 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import { listInterviewTemplateCatalog } from "@/db-backend/interviews/interview-template-service";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });

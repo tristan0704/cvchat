@@ -6,8 +6,9 @@
  * transcript shown in the UI and persisted for the feedback handoff.
  */
 
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { saveInterviewTranscript } from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
+import { saveInterviewTranscript } from "@/db-backend/interviews/analysis/interview-analysis-service";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback-fetch/fingerprint";
 import type {
     PostCallTranscriptStatus,
@@ -178,8 +179,10 @@ export async function POST(req: Request) {
             interviewerQuestions,
         });
 
+        let status: Awaited<ReturnType<typeof getInterviewRuntimeStatusForUser>> = null;
+
         if (interviewId) {
-            const currentUser = await getCurrentAppUser();
+            const currentUser = await getCurrentApiIdentity();
 
             if (currentUser) {
                 const transcriptExport = buildTranscriptQaExport(
@@ -200,20 +203,25 @@ export async function POST(req: Request) {
                     transcriptFingerprint:
                         buildInterviewTranscriptFingerprint(transcriptExport),
                     interviewerQuestions,
+                    qaMappingModel: result.qaMappingModel,
                     entries: transcriptEntries,
                     qaPairs: result.qaPairs,
                 });
+                status = await getInterviewRuntimeStatusForUser(
+                    currentUser.id,
+                    interviewId
+                );
             }
         }
 
-        return Response.json(result);
+        return Response.json({ ...result, status });
     } catch (error) {
         if (error instanceof TranscriptServiceError) {
             const fallbackResult = buildFallbackTranscriptResult(transcriptEntries);
 
             if (fallbackResult.transcriptText) {
                 if (interviewId) {
-                    const currentUser = await getCurrentAppUser();
+                    const currentUser = await getCurrentApiIdentity();
 
                     if (currentUser) {
                         const transcriptExport = buildTranscriptQaExport(
@@ -238,6 +246,7 @@ export async function POST(req: Request) {
                                     transcriptExport
                                 ),
                             interviewerQuestions,
+                            qaMappingModel: "live-transcript-fallback",
                             entries: transcriptEntries,
                             qaPairs: fallbackResult.qaPairs,
                         }).catch(() => undefined);
@@ -260,7 +269,7 @@ export async function POST(req: Request) {
             }
 
             if (interviewId) {
-                const currentUser = await getCurrentAppUser();
+                const currentUser = await getCurrentApiIdentity();
 
                 if (currentUser) {
                     await saveInterviewTranscript({
@@ -288,7 +297,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(request: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -360,8 +369,12 @@ export async function PATCH(request: Request) {
             entries: transcriptEntries,
             qaPairs,
         });
+        const status = await getInterviewRuntimeStatusForUser(
+            currentUser.id,
+            interviewId
+        );
 
-        return Response.json({ ok: true });
+        return Response.json({ ok: true, status });
     } catch (error) {
         console.error("[api/interview/transcript][patch]", error);
 

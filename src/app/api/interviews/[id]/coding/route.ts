@@ -1,5 +1,6 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { getInterviewCodingChallengeDetailForUser } from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { notFound, ok, unauthorized } from "@/db-backend/api/responses";
+import { getInterviewCodingChallengeDetailForUser } from "@/db-backend/interviews/read/interview-read-service";
 import { createServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -12,11 +13,13 @@ type RouteContext = {
 
 export async function GET(_: Request, context: RouteContext) {
     const timing = createServerTiming("api.interviews.coding");
-    const currentUser = await timing.measure("auth", () => getCurrentAppUser());
+    const currentUser = await timing.measure("auth.identity", () =>
+        getCurrentApiIdentity()
+    );
 
     if (!currentUser) {
         timing.log({ status: 401 });
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return unauthorized();
     }
 
     const { id } = await context.params;
@@ -26,7 +29,7 @@ export async function GET(_: Request, context: RouteContext) {
 
     if (codingChallenge === null) {
         timing.log({ status: 404 });
-        return Response.json({ error: "Coding challenge not found" }, { status: 404 });
+        return notFound("Coding challenge not found");
     }
 
     const response = {
@@ -38,5 +41,5 @@ export async function GET(_: Request, context: RouteContext) {
         payloadBytes: JSON.stringify(response).length,
     });
 
-    return Response.json(response);
+    return ok(response);
 }

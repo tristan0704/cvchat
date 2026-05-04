@@ -22,6 +22,22 @@ type ActiveCvSummary = {
     uploadedAt: string;
 };
 
+type RuntimeStatusSnapshot = {
+    id: string;
+    currentStep: number;
+    status: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    transcriptStatus: "idle" | "recording" | "transcribing" | "ready" | "error" | null;
+    transcriptError: string;
+    hasCvFeedback: boolean;
+    hasInterviewFeedback: boolean;
+    hasOverallFeedback: boolean;
+    hasCodingEvaluation: boolean;
+    statusVersion: number;
+    lastActivityAt: string;
+};
+
 function buildConfigBadges(config: InterviewCvConfig) {
     return [config.role, config.experience, config.companySize].filter(
         (value) => value.trim().length > 0
@@ -66,6 +82,7 @@ async function requestCvFeedback(interviewId: string, force = false) {
         | {
               cv?: ActiveCvSummary;
               result?: CvFeedbackResult | null;
+              status?: RuntimeStatusSnapshot | null;
               error?: string;
           }
         | null;
@@ -97,6 +114,7 @@ async function generateCvFeedback(interviewId: string) {
         | {
               cv?: ActiveCvSummary;
               result?: CvFeedbackResult;
+              status?: RuntimeStatusSnapshot | null;
               error?: string;
           }
         | null;
@@ -108,7 +126,11 @@ async function generateCvFeedback(interviewId: string) {
     return data;
 }
 
-export default function CvFeedbackStep() {
+export default function CvFeedbackStep({
+    onStatusUpdate,
+}: {
+    onStatusUpdate?: (status: RuntimeStatusSnapshot) => void;
+}) {
     const session = useInterviewSession();
     const config = session.config;
 
@@ -145,6 +167,9 @@ export default function CvFeedbackStep() {
 
                 setStoredCv(data.cv ?? null);
                 setResult(data.result ?? null);
+                if (data.status) {
+                    onStatusUpdate?.(data.status);
+                }
             } catch (storageError) {
                 if (!cancelled) {
                     setError(
@@ -168,7 +193,7 @@ export default function CvFeedbackStep() {
         return () => {
             cancelled = true;
         };
-    }, [session.interviewId]);
+    }, [onStatusUpdate, session.interviewId]);
 
     async function handleRefreshFeedback() {
         setLoading(true);
@@ -182,6 +207,9 @@ export default function CvFeedbackStep() {
             const data = await requestPromise;
             setStoredCv(data.cv ?? null);
             setResult(data.result ?? null);
+            if (data.status) {
+                onStatusUpdate?.(data.status);
+            }
         } catch (requestError) {
             setError(
                 getErrorMessage(

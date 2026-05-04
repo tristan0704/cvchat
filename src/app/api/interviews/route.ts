@@ -1,15 +1,15 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import {
-    createInterviewForUser,
-    listInterviewsForUser,
-} from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { listInterviewsForUser } from "@/db-backend/interviews/read/interview-read-service";
+import { createInterviewForUser } from "@/db-backend/interviews/write/interview-write-service";
 import { createServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
 
 export async function GET() {
     const timing = createServerTiming("api.interviews.list");
-    const currentUser = await timing.measure("auth", () => getCurrentAppUser());
+    const currentUser = await timing.measure("auth.identity", () =>
+        getCurrentApiIdentity()
+    );
 
     if (!currentUser) {
         timing.log({ status: 401 });
@@ -30,7 +30,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });

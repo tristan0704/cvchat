@@ -1,11 +1,11 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
-import type { InterviewOverallFeedbackResponse } from "@/lib/interview-overall-feedback-types/types";
+import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,6 +35,10 @@ export async function POST(request: Request) {
             interviewId,
             force,
         });
+        const status = await getInterviewRuntimeStatusForUser(
+            currentUser.id,
+            interviewId
+        );
 
         return Response.json({
             overallFeedback: {
@@ -48,7 +52,8 @@ export async function POST(request: Request) {
                 interviewScore: overallFeedback.interviewScore,
                 codingChallengeScore: overallFeedback.codingChallengeScore,
             },
-        } satisfies InterviewOverallFeedbackResponse);
+            status,
+        });
     } catch (error) {
         const message =
             error instanceof Error

@@ -207,32 +207,49 @@ export async function createOrRefreshInterviewOverallFeedback(args: {
         ? parseOverallFeedbackPayload(llmResult.content, fallback)
         : fallback;
 
-    return db.interviewOverallFeedback.upsert({
-        where: {
-            interviewId: interview.id,
-        },
-        update: {
-            analyzedAt: new Date(resolvedFeedback.analyzedAt),
-            overallScore: resolvedFeedback.overallScore,
-            summary: resolvedFeedback.summary,
-            strengths: resolvedFeedback.strengths,
-            issues: resolvedFeedback.issues,
-            improvements: resolvedFeedback.improvements,
-            cvScore: resolvedFeedback.cvScore,
-            interviewScore: resolvedFeedback.interviewScore,
-            codingChallengeScore: resolvedFeedback.codingChallengeScore,
-        },
-        create: {
-            interviewId: interview.id,
-            analyzedAt: new Date(resolvedFeedback.analyzedAt),
-            overallScore: resolvedFeedback.overallScore,
-            summary: resolvedFeedback.summary,
-            strengths: resolvedFeedback.strengths,
-            issues: resolvedFeedback.issues,
-            improvements: resolvedFeedback.improvements,
-            cvScore: resolvedFeedback.cvScore,
-            interviewScore: resolvedFeedback.interviewScore,
-            codingChallengeScore: resolvedFeedback.codingChallengeScore,
-        },
+    return db.$transaction(async (tx) => {
+        const overallFeedback = await tx.interviewOverallFeedback.upsert({
+            where: {
+                interviewId: interview.id,
+            },
+            update: {
+                analyzedAt: new Date(resolvedFeedback.analyzedAt),
+                overallScore: resolvedFeedback.overallScore,
+                summary: resolvedFeedback.summary,
+                strengths: resolvedFeedback.strengths,
+                issues: resolvedFeedback.issues,
+                improvements: resolvedFeedback.improvements,
+                cvScore: resolvedFeedback.cvScore,
+                interviewScore: resolvedFeedback.interviewScore,
+                codingChallengeScore: resolvedFeedback.codingChallengeScore,
+            },
+            create: {
+                interviewId: interview.id,
+                analyzedAt: new Date(resolvedFeedback.analyzedAt),
+                overallScore: resolvedFeedback.overallScore,
+                summary: resolvedFeedback.summary,
+                strengths: resolvedFeedback.strengths,
+                issues: resolvedFeedback.issues,
+                improvements: resolvedFeedback.improvements,
+                cvScore: resolvedFeedback.cvScore,
+                interviewScore: resolvedFeedback.interviewScore,
+                codingChallengeScore: resolvedFeedback.codingChallengeScore,
+            },
+        });
+
+        await tx.interview.update({
+            where: {
+                id: interview.id,
+            },
+            data: {
+                hasOverallFeedback: true,
+                statusVersion: {
+                    increment: 1,
+                },
+                lastActivityAt: new Date(),
+            },
+        });
+
+        return overallFeedback;
     });
 }

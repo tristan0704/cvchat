@@ -43,3 +43,9 @@ next-env.d.ts
 /src/generated/prisma
 /prisma/dev.db
 .env*.local
+/.dependency-cruiser.js
+/supabase/README.md
+/docs/performance-step-3-plan.md
+/.gemini/settings.json
+/.codex/dev-server.out.log
+/.codex/dev-server.err.log

@@ -6,8 +6,8 @@
  * body-language report used by the interview feedback flow.
  */
 
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { saveInterviewFaceAnalysisForUser } from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { saveInterviewFaceAnalysisForUser } from "@/db-backend/interviews/analysis/interview-analysis-service";
 import {
     analyzeFaceLandmarkSession,
     parseFaceLandmarkSnapshots,
@@ -113,7 +113,7 @@ export async function POST(req: Request) {
         });
 
         if (interviewId) {
-            const currentUser = await getCurrentAppUser();
+            const currentUser = await getCurrentApiIdentity();
 
             if (currentUser) {
                 await saveInterviewFaceAnalysisForUser({

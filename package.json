@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint",
+    "coding:seed": "node scripts/seed-coding-challenges.mjs",
     "prisma:generate": "prisma --config src/db-backend/prisma.config.ts generate",
     "prisma:validate": "prisma --config src/db-backend/prisma.config.ts validate",
     "prisma:studio": "prisma --config src/db-backend/prisma.config.ts studio"

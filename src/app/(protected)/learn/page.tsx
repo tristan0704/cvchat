@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { getHomeDashboardSnapshot } from "@/db-backend/interviews/interview-service";
+import { getHomeDashboardSnapshot } from "@/db-backend/interviews/read/interview-read-service";
 import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
 
 function LearnCard({

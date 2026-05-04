@@ -1,18 +1,18 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import {
     assignCodingChallengeAttempt,
     evaluateCodingChallengeAttempt,
     updateCodingChallengeDraft,
 } from "@/db-backend/coding-challenge/coding-challenge-service";
+import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
 import type {
     CodingChallengeEvaluationRequest,
-    CodingChallengeEvaluationResponse,
 } from "@/lib/coding-challenge/types";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -37,8 +37,12 @@ export async function GET(request: Request) {
             role,
             excludeTaskId,
         });
+        const status = await getInterviewRuntimeStatusForUser(
+            currentUser.id,
+            interviewId
+        );
 
-        return Response.json({ draft });
+        return Response.json({ draft, status });
     } catch (error) {
         console.error("[api/interview/coding-challenge]", error);
         const message =
@@ -60,7 +64,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -110,7 +114,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -153,11 +157,16 @@ export async function POST(request: Request) {
             attemptId,
             code,
         });
+        const status = await getInterviewRuntimeStatusForUser(
+            currentUser.id,
+            interviewId
+        );
 
         return Response.json({
             draft: result.draft,
             evaluation: result.evaluation,
-        } satisfies CodingChallengeEvaluationResponse);
+            status,
+        });
     } catch (error) {
         console.error("[api/interview/coding-challenge]", error);
         return Response.json(

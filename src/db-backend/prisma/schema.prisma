@@ -130,7 +130,6 @@ model CvVersion {
   updatedAt               DateTime                @updatedAt
 
   @@index([userId, uploadedAt])
-  @@index([userId, isActive])
   @@index([userId, extractedTextHash])
 }
 
@@ -171,8 +170,6 @@ model CvFeedbackAnalysis {
   updatedAt               DateTime                @updatedAt
 
   @@unique([cvVersionId, role, experience, companySize])
-  @@index([cvVersionId, analyzedAt])
-  @@index([role, analyzedAt])
 }
 
 model Interview {
@@ -188,7 +185,14 @@ model Interview {
   status                  InterviewStatus         @default(draft)
   startedAt               DateTime?
   completedAt             DateTime?
-  archivedAt              DateTime?
+  runtimeTranscriptStatus InterviewTranscriptStatus?
+  runtimeTranscriptError  String?                 @db.Text
+  hasCvFeedback           Boolean                 @default(false)
+  hasInterviewFeedback    Boolean                 @default(false)
+  hasOverallFeedback      Boolean                 @default(false)
+  hasCodingEvaluation     Boolean                 @default(false)
+  statusVersion           Int                     @default(0)
+  lastActivityAt          DateTime                @default(now())
   user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   cvVersion               CvVersion?              @relation(fields: [cvVersionId], references: [id], onDelete: SetNull)
   cvFeedbackAnalysis      CvFeedbackAnalysis?     @relation("InterviewCvFeedbackAnalysis", fields: [cvFeedbackAnalysisId], references: [id], onDelete: SetNull)
@@ -219,7 +223,6 @@ model InterviewPlannedQuestion {
   createdAt               DateTime                @default(now())
 
   @@unique([interviewId, sequence])
-  @@index([interviewId, priority])
 }
 
 model InterviewTranscript {
@@ -232,17 +235,9 @@ model InterviewTranscript {
   transcriptFingerprint   String?
   interviewerQuestions    String[]                @default([])
   qaMappingModel          String?
-  candidateAudioBucket    String?
-  candidateAudioPath      String?
-  candidateAudioMimeType  String?
-  candidateAudioBytes     Int?
   recapStatus             InterviewRecapStatus    @default(idle)
   recapError              String?                 @db.Text
   recapCaptureNote        String?                 @db.Text
-  recapAudioBucket        String?
-  recapAudioPath          String?
-  recapAudioMimeType      String?
-  recapAudioBytes         Int?
   interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   entries                 InterviewTranscriptEntry[]
   qaPairs                 InterviewTranscriptQaPair[]
@@ -251,7 +246,6 @@ model InterviewTranscript {
 
   @@index([transcriptStatus, updatedAt])
   @@index([recapStatus, updatedAt])
-  @@index([transcriptFingerprint])
 }
 
 model InterviewTranscriptEntry {
@@ -264,7 +258,6 @@ model InterviewTranscriptEntry {
   createdAt               DateTime                @default(now())
 
   @@unique([interviewTranscriptId, sequence])
-  @@index([interviewTranscriptId, speaker])
 }
 
 model InterviewTranscriptQaPair {
@@ -319,7 +312,6 @@ model InterviewFeedback {
   updatedAt               DateTime                @updatedAt
 
   @@index([role, analyzedAt])
-  @@index([transcriptFingerprint])
 }
 
 model InterviewOverallFeedback {
@@ -338,7 +330,6 @@ model InterviewOverallFeedback {
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 
-  @@index([overallScore, analyzedAt])
 }
 
 model InterviewFaceAnalysis {
@@ -374,14 +365,10 @@ model InterviewFaceAnalysis {
   parameters              Json
   alerts                  Json
   windows                 Json
-  sourceBucket            String?
-  sourcePath              String?
   interview               Interview               @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 
-  @@index([overallStatus, analyzedAt])
-  @@index([overallScore, analyzedAt])
 }
 
 model CodingChallengeTask {
@@ -434,8 +421,7 @@ model CodingChallengeAttempt {
   updatedAt               DateTime                @updatedAt
 
   @@unique([interviewId, attemptNumber])
-  @@index([interviewId, selectedAt])
-  @@index([taskId, status])
+  @@index([taskId])
 }
 
 model CodingChallengeEvaluation {
@@ -459,6 +445,4 @@ model CodingChallengeEvaluation {
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 
-  @@index([taskId, submittedAt])
-  @@index([overallScore, submittedAt])
 }

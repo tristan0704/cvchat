@@ -14,6 +14,13 @@ import { acquireTransactionalAdvisoryLock } from "@/db-backend/prisma/advisory-l
 import { getLatestCodingChallengeAttempt } from "@/db-backend/coding-challenge/coding-challenge-service";
 import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
 import { getInterviewTemplateById } from "@/db-backend/interviews/interview-template-service";
+import {
+    interviewRuntimeStatusSelect,
+    mapInterviewRuntimeStatus,
+    resolveMaxAccessibleStep,
+    resolveStatusForStep,
+} from "@/db-backend/interviews/runtime/readmodel";
+import type { InterviewStatusSnapshot } from "@/db-backend/interviews/runtime/readmodel";
 import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback-types/types";
 import { buildTranscriptQaExport } from "@/lib/interview-transcript";
 import type { TranscriptEntry, TranscriptQaPair } from "@/lib/interview-transcript/types";
@@ -171,18 +178,11 @@ export type InterviewOverallFeedbackDetail = {
     codingChallenge: InterviewShell["codingChallenge"];
 };
 
-export type InterviewStatusSnapshot = {
-    id: string;
-    currentStep: number;
-    status: InterviewStatus;
-    startedAt: string | null;
-    completedAt: string | null;
-    transcriptStatus: InterviewTranscriptStatus | null;
-    transcriptError: string;
-    hasCvFeedback: boolean;
-    hasInterviewFeedback: boolean;
-    hasOverallFeedback: boolean;
-    hasCodingEvaluation: boolean;
+export type { InterviewStatusSnapshot } from "@/db-backend/interviews/runtime/readmodel";
+
+export type InterviewRuntimeSnapshot = {
+    interview: InterviewShell;
+    status: InterviewStatusSnapshot;
 };
 
 function buildInterviewTitle(config: {
@@ -192,46 +192,6 @@ function buildInterviewTitle(config: {
 }) {
     const role = config.role.trim() || "Backend Developer";
     return `${role} Interview`;
-}
-
-function resolveStatusForStep(step: number): InterviewStatus {
-    if (step >= 6) {
-        return "completed";
-    }
-
-    if (step >= 2) {
-        return "in_progress";
-    }
-
-    return "ready";
-}
-
-function resolveMaxAccessibleStep(args: {
-    hasCvFeedback: boolean;
-    transcriptStatus: InterviewTranscriptStatus | null;
-    hasInterviewFeedback: boolean;
-    hasCodingEvaluation: boolean;
-}) {
-    if (args.hasCodingEvaluation) {
-        return 6;
-    }
-
-    if (args.hasInterviewFeedback) {
-        return 4;
-    }
-
-    if (
-        args.transcriptStatus &&
-        args.transcriptStatus !== "idle"
-    ) {
-        return 3;
-    }
-
-    if (args.hasCvFeedback) {
-        return 2;
-    }
-
-    return 1;
 }
 
 function mapInterviewListItem(item: {
@@ -750,11 +710,11 @@ export async function getInterviewDetailLightForUser(
     } satisfies InterviewDetailLight;
 }
 
-export async function getInterviewShellForUser(
+async function getInterviewShellRowForUser(
     userId: string,
     interviewId: string
 ) {
-    const interview = await db.interview.findFirst({
+    return db.interview.findFirst({
         where: {
             id: interviewId,
             userId,
@@ -770,6 +730,14 @@ export async function getInterviewShellForUser(
             createdAt: true,
             startedAt: true,
             completedAt: true,
+            runtimeTranscriptStatus: true,
+            runtimeTranscriptError: true,
+            hasCvFeedback: true,
+            hasInterviewFeedback: true,
+            hasOverallFeedback: true,
+            hasCodingEvaluation: true,
+            statusVersion: true,
+            lastActivityAt: true,
             cvVersion: {
                 select: {
                     id: true,
@@ -796,23 +764,6 @@ export async function getInterviewShellForUser(
                     roleSummary: true,
                 },
             },
-            // Shell-Polling darf nur Status- und Gating-Daten laden.
-            transcript: {
-                select: {
-                    transcriptStatus: true,
-                    transcriptError: true,
-                },
-            },
-            feedback: {
-                select: {
-                    id: true,
-                },
-            },
-            overallFeedback: {
-                select: {
-                    id: true,
-                },
-            },
             codingChallengeAttempts: {
                 orderBy: [{ attemptNumber: "desc" }, { createdAt: "desc" }],
                 take: 1,
@@ -827,11 +778,11 @@ export async function getInterviewShellForUser(
             },
         },
     });
+}
 
-    if (!interview) {
-        return null;
-    }
-
+function mapInterviewShell(interview: NonNullable<
+    Awaited<ReturnType<typeof getInterviewShellRowForUser>>
+>) {
     return {
         ...mapInterviewCore(interview),
         cv: interview.cvVersion
@@ -850,18 +801,16 @@ export async function getInterviewShellForUser(
             priority: question.priority,
         })),
         cvFeedback: mapCvFeedbackSummary(interview.cvFeedbackAnalysis),
-        hasCvFeedback: Boolean(interview.cvFeedbackAnalysis),
-        transcript: interview.transcript
+        hasCvFeedback: interview.hasCvFeedback,
+        transcript: interview.runtimeTranscriptStatus
             ? {
-                  transcriptStatus: interview.transcript.transcriptStatus,
-                  transcriptError: interview.transcript.transcriptError ?? "",
+                  transcriptStatus: interview.runtimeTranscriptStatus,
+                  transcriptError: interview.runtimeTranscriptError ?? "",
               }
             : null,
-        hasInterviewFeedback: Boolean(interview.feedback),
-        hasOverallFeedback: Boolean(interview.overallFeedback),
-        hasCodingEvaluation: Boolean(
-            interview.codingChallengeAttempts[0]?.evaluation
-        ),
+        hasInterviewFeedback: interview.hasInterviewFeedback,
+        hasOverallFeedback: interview.hasOverallFeedback,
+        hasCodingEvaluation: interview.hasCodingEvaluation,
         codingChallenge: interview.codingChallengeAttempts[0]
             ? {
                   evaluation: interview.codingChallengeAttempts[0].evaluation
@@ -879,6 +828,35 @@ export async function getInterviewShellForUser(
     } satisfies InterviewShell;
 }
 
+export async function getInterviewShellForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await getInterviewShellRowForUser(userId, interviewId);
+
+    if (!interview) {
+        return null;
+    }
+
+    return mapInterviewShell(interview);
+}
+
+export async function getInterviewRuntimeSnapshotForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await getInterviewShellRowForUser(userId, interviewId);
+
+    if (!interview) {
+        return null;
+    }
+
+    return {
+        interview: mapInterviewShell(interview),
+        status: mapInterviewRuntimeStatus(interview),
+    } satisfies InterviewRuntimeSnapshot;
+}
+
 export async function getInterviewStatusForUser(
     userId: string,
     interviewId: string
@@ -894,6 +872,10 @@ export async function getInterviewStatusForUser(
             status: true,
             startedAt: true,
             completedAt: true,
+            runtimeTranscriptStatus: true,
+            runtimeTranscriptError: true,
+            statusVersion: true,
+            lastActivityAt: true,
             cvFeedbackAnalysisId: true,
             // Status-Polling darf keine schweren Relationen laden. Dieser
             // Endpunkt hält Step-Gating aktuell und bleibt absichtlich unter
@@ -946,7 +928,27 @@ export async function getInterviewStatusForUser(
         hasCodingEvaluation: Boolean(
             interview.codingChallengeAttempts[0]?.evaluation
         ),
+        statusVersion: interview.statusVersion,
+        lastActivityAt: interview.lastActivityAt.toISOString(),
     } satisfies InterviewStatusSnapshot;
+}
+
+export async function getInterviewRuntimeStatusForUser(
+    userId: string,
+    interviewId: string
+) {
+    const interview = await db.interview.findFirst({
+        where: {
+            id: interviewId,
+            userId,
+        },
+        // Status-Polling liest nur den denormalisierten Runtime-Status. Die
+        // Detailtabellen bleiben die Quelle für Inhalte, aber nicht für jeden
+        // häufigen Poll.
+        select: interviewRuntimeStatusSelect,
+    });
+
+    return interview ? mapInterviewRuntimeStatus(interview) : null;
 }
 
 export async function getInterviewDetailForUser(userId: string, interviewId: string) {
@@ -1146,21 +1148,7 @@ export async function getInterviewCodingChallengeDetailForUser(
     userId: string,
     interviewId: string
 ) {
-    const interview = await db.interview.findFirst({
-        where: {
-            id: interviewId,
-            userId,
-        },
-        select: {
-            id: true,
-        },
-    });
-
-    if (!interview) {
-        return null;
-    }
-
-    return getLatestCodingChallengeAttempt(userId, interview.id);
+    return getLatestCodingChallengeAttempt(userId, interviewId);
 }
 
 export async function getInterviewOverallFeedbackDetailForUser(
@@ -1252,28 +1240,10 @@ export async function updateInterviewProgressForUser(args: {
             id: true,
             startedAt: true,
             completedAt: true,
-            cvFeedbackAnalysisId: true,
-            transcript: {
-                select: {
-                    transcriptStatus: true,
-                },
-            },
-            feedback: {
-                select: {
-                    id: true,
-                },
-            },
-            codingChallengeAttempts: {
-                orderBy: [{ attemptNumber: "desc" }, { createdAt: "desc" }],
-                take: 1,
-                select: {
-                    evaluation: {
-                        select: {
-                            id: true,
-                        },
-                    },
-                },
-            },
+            hasCvFeedback: true,
+            runtimeTranscriptStatus: true,
+            hasInterviewFeedback: true,
+            hasCodingEvaluation: true,
         },
     });
 
@@ -1282,12 +1252,10 @@ export async function updateInterviewProgressForUser(args: {
     }
 
     const maxAccessibleStep = resolveMaxAccessibleStep({
-        hasCvFeedback: Boolean(existing.cvFeedbackAnalysisId),
-        transcriptStatus: existing.transcript?.transcriptStatus ?? null,
-        hasInterviewFeedback: Boolean(existing.feedback),
-        hasCodingEvaluation: Boolean(
-            existing.codingChallengeAttempts[0]?.evaluation
-        ),
+        hasCvFeedback: existing.hasCvFeedback,
+        transcriptStatus: existing.runtimeTranscriptStatus,
+        hasInterviewFeedback: existing.hasInterviewFeedback,
+        hasCodingEvaluation: existing.hasCodingEvaluation,
     });
     const currentStep = Math.max(
         1,
@@ -1310,6 +1278,10 @@ export async function updateInterviewProgressForUser(args: {
                     : currentStep < 6
                       ? null
                       : existing.completedAt,
+            statusVersion: {
+                increment: 1,
+            },
+            lastActivityAt: new Date(),
         },
         select: {
             id: true,
@@ -1320,10 +1292,21 @@ export async function updateInterviewProgressForUser(args: {
             createdAt: true,
             startedAt: true,
             completedAt: true,
+            runtimeTranscriptStatus: true,
+            runtimeTranscriptError: true,
+            hasCvFeedback: true,
+            hasInterviewFeedback: true,
+            hasOverallFeedback: true,
+            hasCodingEvaluation: true,
+            statusVersion: true,
+            lastActivityAt: true,
         },
     });
 
-    return mapInterviewListItem(updatedInterview);
+    return {
+        interview: mapInterviewListItem(updatedInterview),
+        status: mapInterviewRuntimeStatus(updatedInterview),
+    };
 }
 
 export async function deleteInterviewForUser(userId: string, interviewId: string) {
@@ -1359,6 +1342,7 @@ export async function saveInterviewTranscript(args: {
     candidateTranscript?: string;
     transcriptFingerprint?: string;
     interviewerQuestions?: string[];
+    qaMappingModel?: string;
     entries?: TranscriptEntry[];
     qaPairs?: TranscriptQaPair[];
     recapStatus?: InterviewRecapStatus;
@@ -1381,6 +1365,10 @@ export async function saveInterviewTranscript(args: {
 
     const entries = args.entries ?? [];
     const qaPairs = args.qaPairs ?? [];
+    // Das Mapping-Modell wird nur gespeichert, wenn tatsächlich eine
+    // Frage-Antwort-Zuordnung vorliegt. So bleibt die Diagnose später prüfbar.
+    const qaMappingModel =
+        qaPairs.length > 0 ? args.qaMappingModel?.trim() || null : null;
     const transcriptExport =
         args.transcriptStatus === "ready"
             ? buildTranscriptQaExport(args.role, entries, {
@@ -1407,6 +1395,7 @@ export async function saveInterviewTranscript(args: {
                 transcriptExport: transcriptExport || null,
                 transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
                 interviewerQuestions: args.interviewerQuestions ?? [],
+                qaMappingModel,
                 recapStatus: args.recapStatus ?? "idle",
                 recapError: args.recapError?.trim() || null,
                 recapCaptureNote: args.recapCaptureNote?.trim() || null,
@@ -1436,6 +1425,7 @@ export async function saveInterviewTranscript(args: {
                 transcriptExport: transcriptExport || null,
                 transcriptFingerprint: args.transcriptFingerprint?.trim() || null,
                 interviewerQuestions: args.interviewerQuestions ?? [],
+                qaMappingModel,
                 recapStatus: args.recapStatus ?? "idle",
                 recapError: args.recapError?.trim() || null,
                 recapCaptureNote: args.recapCaptureNote?.trim() || null,
@@ -1454,6 +1444,20 @@ export async function saveInterviewTranscript(args: {
                         source: "ai_mapped",
                     })),
                 },
+            },
+        });
+
+        await tx.interview.update({
+            where: {
+                id: interview.id,
+            },
+            data: {
+                runtimeTranscriptStatus: args.transcriptStatus,
+                runtimeTranscriptError: args.transcriptError?.trim() || null,
+                statusVersion: {
+                    increment: 1,
+                },
+                lastActivityAt: new Date(),
             },
         });
     });
@@ -1525,45 +1529,62 @@ export async function saveInterviewFeedbackForUser(args: {
         throw new Error("Interview not found");
     }
 
-    return db.interviewFeedback.upsert({
-        where: {
-            interviewId: interview.id,
-        },
-        update: {
-            analyzedAt: new Date(args.evaluation.analyzedAt),
-            role: args.evaluation.role,
-            transcriptFingerprint: args.evaluation.transcriptFingerprint,
-            overallScore: args.evaluation.overallScore,
-            passedLikely: args.evaluation.passedLikely,
-            summary: args.evaluation.summary,
-            communicationScore: args.evaluation.communication.score,
-            communicationFeedback: args.evaluation.communication.feedback,
-            answerQualityScore: args.evaluation.answerQuality.score,
-            answerQualityFeedback: args.evaluation.answerQuality.feedback,
-            roleFitScore: args.evaluation.roleFit.score,
-            roleFitFeedback: args.evaluation.roleFit.feedback,
-            strengths: args.evaluation.strengths,
-            issues: args.evaluation.issues,
-            improvements: args.evaluation.improvements,
-        },
-        create: {
-            interviewId: interview.id,
-            analyzedAt: new Date(args.evaluation.analyzedAt),
-            role: args.evaluation.role,
-            transcriptFingerprint: args.evaluation.transcriptFingerprint,
-            overallScore: args.evaluation.overallScore,
-            passedLikely: args.evaluation.passedLikely,
-            summary: args.evaluation.summary,
-            communicationScore: args.evaluation.communication.score,
-            communicationFeedback: args.evaluation.communication.feedback,
-            answerQualityScore: args.evaluation.answerQuality.score,
-            answerQualityFeedback: args.evaluation.answerQuality.feedback,
-            roleFitScore: args.evaluation.roleFit.score,
-            roleFitFeedback: args.evaluation.roleFit.feedback,
-            strengths: args.evaluation.strengths,
-            issues: args.evaluation.issues,
-            improvements: args.evaluation.improvements,
-        },
+    return db.$transaction(async (tx) => {
+        const feedback = await tx.interviewFeedback.upsert({
+            where: {
+                interviewId: interview.id,
+            },
+            update: {
+                analyzedAt: new Date(args.evaluation.analyzedAt),
+                role: args.evaluation.role,
+                transcriptFingerprint: args.evaluation.transcriptFingerprint,
+                overallScore: args.evaluation.overallScore,
+                passedLikely: args.evaluation.passedLikely,
+                summary: args.evaluation.summary,
+                communicationScore: args.evaluation.communication.score,
+                communicationFeedback: args.evaluation.communication.feedback,
+                answerQualityScore: args.evaluation.answerQuality.score,
+                answerQualityFeedback: args.evaluation.answerQuality.feedback,
+                roleFitScore: args.evaluation.roleFit.score,
+                roleFitFeedback: args.evaluation.roleFit.feedback,
+                strengths: args.evaluation.strengths,
+                issues: args.evaluation.issues,
+                improvements: args.evaluation.improvements,
+            },
+            create: {
+                interviewId: interview.id,
+                analyzedAt: new Date(args.evaluation.analyzedAt),
+                role: args.evaluation.role,
+                transcriptFingerprint: args.evaluation.transcriptFingerprint,
+                overallScore: args.evaluation.overallScore,
+                passedLikely: args.evaluation.passedLikely,
+                summary: args.evaluation.summary,
+                communicationScore: args.evaluation.communication.score,
+                communicationFeedback: args.evaluation.communication.feedback,
+                answerQualityScore: args.evaluation.answerQuality.score,
+                answerQualityFeedback: args.evaluation.answerQuality.feedback,
+                roleFitScore: args.evaluation.roleFit.score,
+                roleFitFeedback: args.evaluation.roleFit.feedback,
+                strengths: args.evaluation.strengths,
+                issues: args.evaluation.issues,
+                improvements: args.evaluation.improvements,
+            },
+        });
+
+        await tx.interview.update({
+            where: {
+                id: interview.id,
+            },
+            data: {
+                hasInterviewFeedback: true,
+                statusVersion: {
+                    increment: 1,
+                },
+                lastActivityAt: new Date(),
+            },
+        });
+
+        return feedback;
     });
 }
 

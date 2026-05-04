@@ -10,6 +10,7 @@ import type {
     CodingChallengeDraft,
     CodingChallengeEvaluation,
 } from "@/lib/coding-challenge/types";
+import { readApiErrorMessage } from "@/lib/api-error";
 import { useInterviewSession } from "@/lib/interview-session/context";
 
 // Dateiübersicht:
@@ -124,14 +125,17 @@ export default function CodingChallengeFeedback() {
                         const data = (await response.json().catch(() => null)) as
                             | {
                                   codingChallenge?: CodingChallengeDraft | null;
-                                  error?: string;
+                                  error?: unknown;
+                                  errorMessage?: string;
                               }
                             | null;
 
                         if (!response.ok || !data?.codingChallenge) {
                             throw new Error(
-                                data?.error ||
+                                readApiErrorMessage(
+                                    data,
                                     "Coding challenge konnte nicht geladen werden."
+                                )
                             );
                         }
 

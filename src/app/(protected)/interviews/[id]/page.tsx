@@ -8,6 +8,7 @@ import CodingChallengeFeedback from "@/components/coding-challenge/coding-challe
 import CvFeedbackStep from "@/components/cv/CvFeedbackStep";
 import InterviewFeedback from "@/components/interviews/InterviewFeedback";
 import InterviewVoiceStep from "@/components/interviews/InterviewVoiceStep";
+import { readApiErrorMessage } from "@/lib/api-error";
 import { InterviewSessionProvider, useOptionalInterviewSession } from "@/lib/interview-session/context";
 
 // Dateiübersicht:
@@ -93,6 +94,8 @@ type InterviewStatusSnapshot = {
     hasInterviewFeedback: boolean;
     hasOverallFeedback: boolean;
     hasCodingEvaluation: boolean;
+    statusVersion: number;
+    lastActivityAt: string;
 };
 
 async function fetchInterviewDetail(interviewId: string) {
@@ -101,14 +104,23 @@ async function fetchInterviewDetail(interviewId: string) {
         cache: "no-store",
     });
     const data = (await response.json().catch(() => null)) as
-        | { interview?: InterviewDetail; error?: string }
+        | {
+              interview?: InterviewDetail;
+              status?: InterviewStatusSnapshot;
+              error?: unknown;
+              errorMessage?: string;
+          }
         | null;
 
     if (!response.ok || !data?.interview) {
-        throw new Error(data?.error || "Interview konnte nicht geladen werden.");
+        throw new Error(
+            readApiErrorMessage(data, "Interview konnte nicht geladen werden.")
+        );
     }
 
-    return data.interview;
+    return data.status
+        ? mergeInterviewStatus(data.interview, data.status)
+        : data.interview;
 }
 
 async function fetchInterviewStatus(interviewId: string) {
@@ -117,11 +129,16 @@ async function fetchInterviewStatus(interviewId: string) {
         cache: "no-store",
     });
     const data = (await response.json().catch(() => null)) as
-        | { status?: InterviewStatusSnapshot; error?: string }
+        | { status?: InterviewStatusSnapshot; error?: unknown; errorMessage?: string }
         | null;
 
     if (!response.ok || !data?.status) {
-        throw new Error(data?.error || "Interview-Status konnte nicht geladen werden.");
+        throw new Error(
+            readApiErrorMessage(
+                data,
+                "Interview-Status konnte nicht geladen werden."
+            )
+        );
     }
 
     return data.status;
@@ -257,6 +274,7 @@ function InterviewDetailStepContent({
     router,
     persistStep,
     setInterview,
+    onStatusUpdate,
     onRefreshInterview,
     onFeedbackNavigationLockChange,
     isPersistingStep,
@@ -268,6 +286,7 @@ function InterviewDetailStepContent({
     router: ReturnType<typeof useRouter>;
     persistStep: (nextStep: number) => Promise<void>;
     setInterview: React.Dispatch<React.SetStateAction<InterviewDetail | null>>;
+    onStatusUpdate: (status: InterviewStatusSnapshot) => void;
     onRefreshInterview: () => Promise<void>;
     onFeedbackNavigationLockChange: (message: string | null) => void;
     isPersistingStep: boolean;
@@ -362,7 +381,7 @@ function InterviewDetailStepContent({
 
                 <div className="mt-8 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
                     {step === 1 ? (
-                        <CvFeedbackStep />
+                        <CvFeedbackStep onStatusUpdate={onStatusUpdate} />
                     ) : step === 2 ? (
                         <InterviewVoiceStep />
                     ) : step === 3 ? (
@@ -371,7 +390,7 @@ function InterviewDetailStepContent({
                             onNavigationStateChange={onFeedbackNavigationLockChange}
                         />
                     ) : step === 4 ? (
-                        <CodingChallengeEditor />
+                        <CodingChallengeEditor onStatusUpdate={onStatusUpdate} />
                     ) : step === 5 ? (
                         <CodingChallengeFeedback />
                     ) : (
@@ -387,6 +406,7 @@ function InterviewDetailStepContent({
                                         : currentInterview
                                 );
                             }}
+                            onStatusUpdate={onStatusUpdate}
                         />
                     )}
 
@@ -489,11 +509,13 @@ function SummaryCard({
 function OverallFeedbackBlock({
     interview,
     onOverallFeedbackChange,
+    onStatusUpdate,
 }: {
     interview: InterviewDetail;
     onOverallFeedbackChange: (
         overallFeedback: InterviewDetail["overallFeedback"]
     ) => void;
+    onStatusUpdate: (status: InterviewStatusSnapshot) => void;
 }) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [generationError, setGenerationError] = useState("");
@@ -507,7 +529,10 @@ function OverallFeedbackBlock({
         codingChallenge: InterviewDetail["codingChallenge"];
     }> | null>(null);
     const overallGeneratePromiseRef = useRef<Promise<
-        InterviewDetail["overallFeedback"]
+        {
+            overallFeedback: InterviewDetail["overallFeedback"];
+            status: InterviewStatusSnapshot | null;
+        }
     > | null>(null);
     const [detail, setDetail] = useState<{
         overallFeedback: InterviewDetail["overallFeedback"];
@@ -629,6 +654,7 @@ function OverallFeedbackBlock({
                         const data = (await response.json().catch(() => null)) as
                             | {
                                   overallFeedback?: InterviewDetail["overallFeedback"];
+                                  status?: InterviewStatusSnapshot | null;
                                   error?: string;
                               }
                             | null;
@@ -640,10 +666,13 @@ function OverallFeedbackBlock({
                             );
                         }
 
-                        return data.overallFeedback;
+                        return {
+                            overallFeedback: data.overallFeedback,
+                            status: data.status ?? null,
+                        };
                     })();
                 overallGeneratePromiseRef.current = requestPromise;
-                const overallFeedback = await requestPromise;
+                const { overallFeedback, status } = await requestPromise;
 
                 if (!cancelled) {
                     setDetail((currentDetail) => ({
@@ -657,6 +686,9 @@ function OverallFeedbackBlock({
                             effectiveCodingChallenge,
                     }));
                     onOverallFeedbackChange(overallFeedback);
+                    if (status) {
+                        onStatusUpdate(status);
+                    }
                 }
             } catch (error) {
                 if (!cancelled) {
@@ -688,6 +720,7 @@ function OverallFeedbackBlock({
         interview.id,
         isGenerating,
         onOverallFeedbackChange,
+        onStatusUpdate,
     ]);
 
     const cards = [
@@ -894,6 +927,14 @@ function InterviewDetailPageContent() {
         [interviewId]
     );
 
+    const applyRuntimeStatus = useCallback((nextStatus: InterviewStatusSnapshot) => {
+        setInterview((currentInterview) =>
+            currentInterview
+                ? mergeInterviewStatus(currentInterview, nextStatus)
+                : currentInterview
+        );
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -922,17 +963,20 @@ function InterviewDetailPageContent() {
         let cancelled = false;
         let timeoutId: number | null = null;
 
+        const currentStep = interview?.currentStep ?? 1;
         const shouldPoll =
-            interview?.transcript?.transcriptStatus === "recording" ||
             interview?.transcript?.transcriptStatus === "transcribing" ||
-            ((interview?.currentStep ?? 1) < 6 && !interview?.hasOverallFeedback);
+            (currentStep === 1 && !interview?.hasCvFeedback) ||
+            (currentStep === 3 && !interview?.hasInterviewFeedback) ||
+            (currentStep === 4 && !interview?.hasCodingEvaluation) ||
+            (currentStep === 6 && !interview?.hasOverallFeedback);
 
         async function scheduleRefresh() {
             if (!shouldPoll || cancelled) {
                 return;
             }
 
-            const delayMs = document.visibilityState === "hidden" ? 30_000 : 6_000;
+            const delayMs = document.visibilityState === "hidden" ? 60_000 : 15_000;
 
             timeoutId = window.setTimeout(async () => {
                 try {
@@ -960,6 +1004,9 @@ function InterviewDetailPageContent() {
         };
     }, [
         interview?.currentStep,
+        interview?.hasCodingEvaluation,
+        interview?.hasCvFeedback,
+        interview?.hasInterviewFeedback,
         interview?.hasOverallFeedback,
         interview?.transcript?.transcriptStatus,
         refreshInterviewStatus,
@@ -1000,7 +1047,13 @@ function InterviewDetailPageContent() {
                 throw new Error("Interview-Schritt konnte nicht gespeichert werden.");
             }
 
-            const refreshedStatus = await fetchInterviewStatus(interviewId);
+            const data = (await response.json().catch(() => null)) as
+                | {
+                      status?: InterviewStatusSnapshot;
+                  }
+                | null;
+            const refreshedStatus =
+                data?.status ?? (await fetchInterviewStatus(interviewId));
             setInterview((currentInterview) =>
                 currentInterview
                     ? mergeInterviewStatus(currentInterview, refreshedStatus)
@@ -1047,6 +1100,7 @@ function InterviewDetailPageContent() {
                 router={router}
                 persistStep={persistStep}
                 setInterview={setInterview}
+                onStatusUpdate={applyRuntimeStatus}
                 onRefreshInterview={() => refreshInterviewStatus()}
                 onFeedbackNavigationLockChange={setFeedbackNavigationLock}
                 isPersistingStep={isPersistingStep}

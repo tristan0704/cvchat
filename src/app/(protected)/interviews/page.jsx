@@ -4,10 +4,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { listInterviewsForUser } from "@/db-backend/interviews/interview-service";
+import { listInterviewsForUser } from "@/db-backend/interviews/read/interview-read-service";
+import { createServerTiming } from "@/lib/server-timing";
 
 export default async function InterviewsPage() {
-  const currentUser = await getCurrentAppUser();
+  const timing = createServerTiming("page.interviews");
+  const currentUser = await timing.measure("auth.appUser", () =>
+    getCurrentAppUser()
+  );
 
   if (!currentUser) {
     redirect("/auth/login");
@@ -15,7 +19,14 @@ export default async function InterviewsPage() {
 
   // Die Liste wird als Initialdaten gerendert, damit der Browser keinen
   // zusätzlichen GET direkt nach dem Seitenaufbau auslösen muss.
-  const interviews = await listInterviewsForUser(currentUser.id);
+  const interviews = await timing.measure("db.interviewList", () =>
+    listInterviewsForUser(currentUser.id)
+  );
+
+  timing.log({
+    status: 200,
+    payloadBytes: JSON.stringify(interviews).length,
+  });
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { getHomeDashboardSnapshot } from "@/db-backend/interviews/interview-service";
+import { getHomeDashboardSnapshot } from "@/db-backend/interviews/read/interview-read-service";
+import { createServerTiming } from "@/lib/server-timing";
 
 function StatCard({
     title,
@@ -46,14 +47,24 @@ type HomeSummary = {
 };
 
 export default async function HomePage() {
-    const currentUser = await getCurrentAppUser();
+    const timing = createServerTiming("page.home");
+    const currentUser = await timing.measure("auth.appUser", () =>
+        getCurrentAppUser()
+    );
 
     if (!currentUser) {
         redirect("/auth/login");
     }
 
     // Vermeidet einen zusätzlichen Netzwerk-Umweg nach dem ersten Render.
-    const summary: HomeSummary = await getHomeDashboardSnapshot(currentUser.id);
+    const summary: HomeSummary = await timing.measure("db.homeSummary", () =>
+        getHomeDashboardSnapshot(currentUser.id)
+    );
+
+    timing.log({
+        status: 200,
+        payloadBytes: JSON.stringify(summary).length,
+    });
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">

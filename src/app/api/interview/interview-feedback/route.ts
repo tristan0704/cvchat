@@ -1,18 +1,14 @@
-import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import {
-    getInterviewFeedbackDetailForUser,
-    saveInterviewFeedbackForUser,
-} from "@/db-backend/interviews/interview-service";
+import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
+import { getInterviewFeedbackDetailForUser } from "@/db-backend/interviews/read/interview-read-service";
+import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
+import { saveInterviewFeedbackForUser } from "@/db-backend/interviews/analysis/interview-analysis-service";
 import { evaluateInterviewFeedback } from "@/app/api/interview/interview-feedback/evaluate-interview-feedback";
-import type {
-    InterviewFeedbackRequest,
-    InterviewFeedbackResponse,
-} from "@/lib/interview-feedback-fetch/types";
+import type { InterviewFeedbackRequest } from "@/lib/interview-feedback-fetch/types";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-    const currentUser = await getCurrentAppUser();
+    const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -71,9 +67,14 @@ export async function POST(request: Request) {
             existing?.feedback &&
             existing.feedback.transcriptFingerprint === transcriptFingerprint
         ) {
+            const status = await getInterviewRuntimeStatusForUser(
+                currentUser.id,
+                interviewId
+            );
             return Response.json({
                 evaluation: existing.feedback,
-            } satisfies InterviewFeedbackResponse);
+                status,
+            });
         }
 
         const evaluation = await evaluateInterviewFeedback({
@@ -95,10 +96,15 @@ export async function POST(request: Request) {
             interviewId,
             evaluation,
         });
+        const status = await getInterviewRuntimeStatusForUser(
+            currentUser.id,
+            interviewId
+        );
 
         return Response.json({
             evaluation,
-        } satisfies InterviewFeedbackResponse);
+            status,
+        });
     } catch (error) {
         console.error("[api/interview/interview-feedback-fetch-fetch]", error);
 

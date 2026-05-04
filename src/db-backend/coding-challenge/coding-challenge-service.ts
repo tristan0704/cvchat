@@ -126,11 +126,6 @@ function mapDraft(args: {
 }
 
 export async function ensureCodingChallengeTasksSeeded() {
-    const taskCount = await db.codingChallengeTask.count();
-    if (taskCount >= manifestTasks.length) {
-        return;
-    }
-
     for (const task of manifestTasks) {
         await db.codingChallengeTask.upsert({
             where: {
@@ -210,12 +205,12 @@ export async function getLatestCodingChallengeAttempt(
     userId: string,
     interviewId: string
 ) {
-    await ensureCodingChallengeTasksSeeded();
-    await getOwnedInterview(userId, interviewId);
-
     const attempt = await db.codingChallengeAttempt.findFirst({
         where: {
             interviewId,
+            interview: {
+                userId,
+            },
         },
         orderBy: {
             attemptNumber: "desc",
@@ -243,7 +238,6 @@ export async function assignCodingChallengeAttempt(args: {
     role: string;
     excludeTaskId?: string;
 }) {
-    await ensureCodingChallengeTasksSeeded();
     const interview = await getOwnedInterview(args.userId, args.interviewId);
 
     if (!interview.feedback) {
@@ -314,7 +308,7 @@ export async function assignCodingChallengeAttempt(args: {
             taskPool[Math.floor(Math.random() * taskPool.length)] ?? taskPool[0];
 
         if (!selectedTask) {
-            throw new Error("No coding challenge available");
+            throw new Error("No coding challenge available. Run npm run coding:seed first.");
         }
 
         const latestAttempt = await tx.codingChallengeAttempt.findFirst({
@@ -340,6 +334,23 @@ export async function assignCodingChallengeAttempt(args: {
             },
         });
 
+        if (args.excludeTaskId) {
+            // Eine neue Aufgabe ersetzt für das Step-Gating die alte Bewertung.
+            // Das Runtime-Flag beschreibt immer den neuesten Coding-Attempt.
+            await tx.interview.update({
+                where: {
+                    id: interview.id,
+                },
+                data: {
+                    hasCodingEvaluation: false,
+                    statusVersion: {
+                        increment: 1,
+                    },
+                    lastActivityAt: new Date(),
+                },
+            });
+        }
+
         return mapDraft({
             attempt,
             task: selectedTask,
@@ -353,8 +364,6 @@ export async function updateCodingChallengeDraft(args: {
     attemptId: string;
     code: string;
 }) {
-    await getOwnedInterview(args.userId, args.interviewId);
-
     const attempt = await db.codingChallengeAttempt.findFirst({
         where: {
             id: args.attemptId,
@@ -402,8 +411,6 @@ export async function evaluateCodingChallengeAttempt(args: {
     attemptId: string;
     code: string;
 }) {
-    await getOwnedInterview(args.userId, args.interviewId);
-
     const attempt = await db.codingChallengeAttempt.findFirst({
         where: {
             id: args.attemptId,
@@ -445,56 +452,73 @@ export async function evaluateCodingChallengeAttempt(args: {
         args.code
     );
 
-    const updatedAttempt = await db.codingChallengeAttempt.update({
-        where: {
-            id: attempt.id,
-        },
-        data: {
-            draftCode: args.code,
-            submittedCode: args.code,
-            submittedAt: new Date(evaluationResult.submittedAt),
-            lastEditedAt: new Date(),
-            status: "evaluated",
-        },
-    });
+    const { updatedAttempt, evaluation } = await db.$transaction(async (tx) => {
+        const updatedAttempt = await tx.codingChallengeAttempt.update({
+            where: {
+                id: attempt.id,
+            },
+            data: {
+                draftCode: args.code,
+                submittedCode: args.code,
+                submittedAt: new Date(evaluationResult.submittedAt),
+                lastEditedAt: new Date(),
+                status: "evaluated",
+            },
+        });
 
-    const evaluation = await db.codingChallengeEvaluation.upsert({
-        where: {
-            codingChallengeAttemptId: attempt.id,
-        },
-        update: {
-            taskId: attempt.taskId,
-            submittedAt: new Date(evaluationResult.submittedAt),
-            overallScore: evaluationResult.overallScore,
-            passedLikely: evaluationResult.passedLikely,
-            summary: evaluationResult.summary,
-            correctnessScore: evaluationResult.correctness.score,
-            correctnessFeedback: evaluationResult.correctness.feedback,
-            codeQualityScore: evaluationResult.codeQuality.score,
-            codeQualityFeedback: evaluationResult.codeQuality.feedback,
-            problemSolvingScore: evaluationResult.problemSolving.score,
-            problemSolvingFeedback: evaluationResult.problemSolving.feedback,
-            strengths: evaluationResult.strengths,
-            issues: evaluationResult.issues,
-            improvements: evaluationResult.improvements,
-        },
-        create: {
-            codingChallengeAttemptId: attempt.id,
-            taskId: attempt.taskId,
-            submittedAt: new Date(evaluationResult.submittedAt),
-            overallScore: evaluationResult.overallScore,
-            passedLikely: evaluationResult.passedLikely,
-            summary: evaluationResult.summary,
-            correctnessScore: evaluationResult.correctness.score,
-            correctnessFeedback: evaluationResult.correctness.feedback,
-            codeQualityScore: evaluationResult.codeQuality.score,
-            codeQualityFeedback: evaluationResult.codeQuality.feedback,
-            problemSolvingScore: evaluationResult.problemSolving.score,
-            problemSolvingFeedback: evaluationResult.problemSolving.feedback,
-            strengths: evaluationResult.strengths,
-            issues: evaluationResult.issues,
-            improvements: evaluationResult.improvements,
-        },
+        const evaluation = await tx.codingChallengeEvaluation.upsert({
+            where: {
+                codingChallengeAttemptId: attempt.id,
+            },
+            update: {
+                taskId: attempt.taskId,
+                submittedAt: new Date(evaluationResult.submittedAt),
+                overallScore: evaluationResult.overallScore,
+                passedLikely: evaluationResult.passedLikely,
+                summary: evaluationResult.summary,
+                correctnessScore: evaluationResult.correctness.score,
+                correctnessFeedback: evaluationResult.correctness.feedback,
+                codeQualityScore: evaluationResult.codeQuality.score,
+                codeQualityFeedback: evaluationResult.codeQuality.feedback,
+                problemSolvingScore: evaluationResult.problemSolving.score,
+                problemSolvingFeedback: evaluationResult.problemSolving.feedback,
+                strengths: evaluationResult.strengths,
+                issues: evaluationResult.issues,
+                improvements: evaluationResult.improvements,
+            },
+            create: {
+                codingChallengeAttemptId: attempt.id,
+                taskId: attempt.taskId,
+                submittedAt: new Date(evaluationResult.submittedAt),
+                overallScore: evaluationResult.overallScore,
+                passedLikely: evaluationResult.passedLikely,
+                summary: evaluationResult.summary,
+                correctnessScore: evaluationResult.correctness.score,
+                correctnessFeedback: evaluationResult.correctness.feedback,
+                codeQualityScore: evaluationResult.codeQuality.score,
+                codeQualityFeedback: evaluationResult.codeQuality.feedback,
+                problemSolvingScore: evaluationResult.problemSolving.score,
+                problemSolvingFeedback: evaluationResult.problemSolving.feedback,
+                strengths: evaluationResult.strengths,
+                issues: evaluationResult.issues,
+                improvements: evaluationResult.improvements,
+            },
+        });
+
+        await tx.interview.update({
+            where: {
+                id: args.interviewId,
+            },
+            data: {
+                hasCodingEvaluation: true,
+                statusVersion: {
+                    increment: 1,
+                },
+                lastActivityAt: new Date(),
+            },
+        });
+
+        return { updatedAttempt, evaluation };
     });
 
     return {
