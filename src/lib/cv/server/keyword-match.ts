@@ -42,7 +42,8 @@ function scoreBucket(matches: number, total: number, weight: number) {
 
 export function analyzeKeywordMatch(
   cvText: string,
-  profile: RoleProfile
+  profile: RoleProfile,
+  language = "de"
 ): CvRoleMatchAnalysis {
   const normalizedCv = normalize(cvText);
   const matchedMustHave = collectMatches(normalizedCv, profile.mustHave);
@@ -65,9 +66,13 @@ export function analyzeKeywordMatch(
   ];
 
   const summary =
-    missingMustHave.length > 0
-      ? `Solider Fit für ${profile.role}, aber einige Muss-Kriterien sind im Lebenslauf nicht klar belegt.`
-      : `Guter Fit für ${profile.role} mit mehreren passenden Signalen im Lebenslauf.`;
+    language === "en"
+      ? missingMustHave.length > 0
+        ? `Solid fit for ${profile.role}, but some must-have criteria are not clearly backed up in the CV.`
+        : `Good fit for ${profile.role} with several relevant signals in the CV.`
+      : missingMustHave.length > 0
+        ? `Solider Fit für ${profile.role}, aber einige Muss-Kriterien sind im Lebenslauf nicht klar belegt.`
+        : `Guter Fit für ${profile.role} mit mehreren passenden Signalen im Lebenslauf.`;
 
   return {
     score,

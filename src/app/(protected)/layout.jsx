@@ -7,6 +7,7 @@ import {
 } from "@/db-backend/auth/current-app-user";
 import { createAvatarUrlForPath } from "@/db-backend/profile/avatar-service";
 import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { I18nProvider } from "@/lib/i18n/context";
 
 export default async function HomeLayout({ children }) {
   const userState = await getCurrentAppUserState();
@@ -40,10 +41,12 @@ export default async function HomeLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <Navbar initialProfile={navbarProfile} />
+    <I18nProvider language={profile.language}>
+      <div className="min-h-screen bg-gray-900 text-white">
+        <Navbar initialProfile={navbarProfile} />
 
-      <main>{children}</main>
-    </div>
+        <main>{children}</main>
+      </div>
+    </I18nProvider>
   );
 }

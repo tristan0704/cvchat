@@ -1,6 +1,7 @@
 "use client";
 
 import type { CvRoleMatchAnalysis } from "@/lib/cv/types";
+import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   analysis: CvRoleMatchAnalysis;
@@ -9,9 +10,11 @@ type Props = {
 function SkillList({
   title,
   items,
+  emptyLabel,
 }: {
   title: string;
   items: string[];
+  emptyLabel: string;
 }) {
   return (
     <div className="space-y-2 rounded-xl bg-gray-900 p-4 outline outline-1 outline-white/10">
@@ -28,19 +31,22 @@ function SkillList({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-gray-500">Keine Daten</p>
+        <p className="text-sm text-gray-500">{emptyLabel}</p>
       )}
     </div>
   );
 }
 
 export default function CvRoleMatchCard({ analysis }: Props) {
+  const { dictionary } = useI18n();
+  const labels = dictionary.cvFeedback;
+
   return (
     <section className="space-y-4 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-gray-500">
-            Rollenfit
+            {labels.roleFit}
           </p>
           <p className="mt-1 text-sm text-gray-300">{analysis.summary}</p>
         </div>
@@ -51,13 +57,26 @@ export default function CvRoleMatchCard({ analysis }: Props) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <SkillList title="Passende Skills" items={analysis.matched} />
-        <SkillList title="Fehlende Muss-Kriterien" items={analysis.missingMustHave} />
         <SkillList
-          title="Zusätzliche passende Signale"
-          items={analysis.niceToHaveMatches}
+          title={labels.matchingSkills}
+          items={analysis.matched}
+          emptyLabel={labels.noData}
         />
-        <SkillList title="Bonus-Treffer" items={analysis.bonusMatches} />
+        <SkillList
+          title={labels.missingMustHave}
+          items={analysis.missingMustHave}
+          emptyLabel={labels.noData}
+        />
+        <SkillList
+          title={labels.additionalSignals}
+          items={analysis.niceToHaveMatches}
+          emptyLabel={labels.noData}
+        />
+        <SkillList
+          title={labels.bonusMatches}
+          items={analysis.bonusMatches}
+          emptyLabel={labels.noData}
+        />
       </div>
     </section>
   );

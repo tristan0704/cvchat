@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/db-backend/prisma/client";
 import { callOpenAiChat } from "@/lib/openai";
 import type { InterviewOverallFeedback } from "@/lib/interview-overall-feedback-types/types";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 type AggregatedFeedbackSource = {
     cvScore: number | null;
@@ -36,8 +37,10 @@ function normalizeStringList(value: unknown) {
 }
 
 function buildFallbackOverallFeedback(
-    source: AggregatedFeedbackSource
+    source: AggregatedFeedbackSource,
+    language: unknown = "de"
 ): InterviewOverallFeedback {
+    const outputLanguage = normalizeLanguage(language);
     const availableScores = [
         source.cvScore,
         source.interviewScore,
@@ -52,30 +55,48 @@ function buildFallbackOverallFeedback(
 
     const strengths = [
         source.cvScore !== null && source.cvScore >= 70
-            ? "Der Lebenslauf passt bereits solide zur Zielrolle."
+            ? outputLanguage === "en"
+                ? "The CV is already a solid fit for the target role."
+                : "Der Lebenslauf passt bereits solide zur Zielrolle."
             : null,
         source.interviewScore !== null && source.interviewScore >= 70
-            ? "Die fachliche und kommunikative Interview-Leistung ist tragfähig."
+            ? outputLanguage === "en"
+                ? "The technical and communication performance in the interview is dependable."
+                : "Die fachliche und kommunikative Interview-Leistung ist tragfähig."
             : null,
         source.codingChallengeScore !== null && source.codingChallengeScore >= 70
-            ? "Die Coding-Challenge zeigt eine belastbare praktische Umsetzung."
+            ? outputLanguage === "en"
+                ? "The coding challenge shows a reliable practical implementation."
+                : "Die Coding-Challenge zeigt eine belastbare praktische Umsetzung."
             : null,
     ].filter((item): item is string => Boolean(item));
     const issues = [
         source.cvScore !== null && source.cvScore < 60
-            ? "Der CV transportiert Rolle, Wirkung oder Schwerpunkte noch nicht klar genug."
+            ? outputLanguage === "en"
+                ? "The CV does not communicate role, impact, or priorities clearly enough yet."
+                : "Der CV transportiert Rolle, Wirkung oder Schwerpunkte noch nicht klar genug."
             : null,
         source.interviewScore !== null && source.interviewScore < 60
-            ? "Im Interview fehlen noch Präzision, Struktur oder klare Beispiele."
+            ? outputLanguage === "en"
+                ? "The interview still lacks precision, structure, or clear examples."
+                : "Im Interview fehlen noch Präzision, Struktur oder klare Beispiele."
             : null,
         source.codingChallengeScore !== null && source.codingChallengeScore < 60
-            ? "In der Coding-Challenge fehlt noch Robustheit oder saubere Problemlösung."
+            ? outputLanguage === "en"
+                ? "The coding challenge still lacks robustness or clean problem solving."
+                : "In der Coding-Challenge fehlt noch Robustheit oder saubere Problemlösung."
             : null,
     ].filter((item): item is string => Boolean(item));
-    const improvements = [
-        "Die schwächste Teilbewertung sollte gezielt vor dem nächsten Interview überarbeitet werden.",
-        "Antworten, CV-Story und Coding-Vorgehen sollten dieselbe Zielrolle konsistent unterstützen.",
-    ];
+    const improvements =
+        outputLanguage === "en"
+            ? [
+                  "The weakest sub-score should be improved deliberately before the next interview.",
+                  "Answers, CV story, and coding approach should consistently support the same target role.",
+              ]
+            : [
+                  "Die schwächste Teilbewertung sollte gezielt vor dem nächsten Interview überarbeitet werden.",
+                  "Antworten, CV-Story und Coding-Vorgehen sollten dieselbe Zielrolle konsistent unterstützen.",
+              ];
 
     const summaryParts = [
         source.cvSummary,
@@ -88,7 +109,9 @@ function buildFallbackOverallFeedback(
         overallScore,
         summary:
             summaryParts[0] ??
-            "Es liegen noch nicht genug Step-Ergebnisse für eine belastbare Gesamtbewertung vor.",
+            (outputLanguage === "en"
+                ? "There are not enough step results yet for a reliable overall evaluation."
+                : "Es liegen noch nicht genug Step-Ergebnisse für eine belastbare Gesamtbewertung vor."),
         strengths,
         issues,
         improvements,
@@ -147,6 +170,7 @@ export async function createOrRefreshInterviewOverallFeedback(args: {
     userId: string;
     interviewId: string;
     force?: boolean;
+    language?: string;
 }) {
     const interview = await db.interview.findFirst({
         where: {
@@ -171,7 +195,7 @@ export async function createOrRefreshInterviewOverallFeedback(args: {
         throw new Error("Interview not found");
     }
 
-    if (interview.overallFeedback && !args.force) {
+    if (interview.overallFeedback && !args.force && !args.language) {
         return interview.overallFeedback;
     }
 
@@ -193,12 +217,17 @@ export async function createOrRefreshInterviewOverallFeedback(args: {
         throw new Error("Interview is not ready for overall feedback");
     }
 
-    const fallback = buildFallbackOverallFeedback(source);
+    const outputLanguage = normalizeLanguage(args.language);
+    const languageInstruction =
+        outputLanguage === "en"
+            ? "Write all user-facing text values in English."
+            : "Formuliere alle sichtbaren Textwerte auf Deutsch.";
+    const fallback = buildFallbackOverallFeedback(source, outputLanguage);
     const llmResult = await callOpenAiChat({
         model: "gpt-4o-mini",
         temperature: 0.2,
         prompt:
-            "Du bist ein erfahrener Karriere-Coach. Erstelle aus den gelieferten Step-Ergebnissen eine knappe Gesamtbewertung auf Deutsch. Antworte ausschliesslich als JSON mit den Feldern summary (string), strengths (string[]), issues (string[]), improvements (string[]). Die Summary soll 2-4 Saetze enthalten und die Scores beruecksichtigen, ohne neue Fakten zu erfinden.",
+            `Du bist ein erfahrener Karriere-Coach. Erstelle aus den gelieferten Step-Ergebnissen eine knappe Gesamtbewertung. ${languageInstruction} Antworte ausschliesslich als JSON mit den Feldern summary (string), strengths (string[]), issues (string[]), improvements (string[]). Die Summary soll 2-4 Saetze enthalten und die Scores beruecksichtigen, ohne neue Fakten zu erfinden.`,
         question: buildUserPrompt(interview.role, source),
         timeoutMs: 20_000,
     });

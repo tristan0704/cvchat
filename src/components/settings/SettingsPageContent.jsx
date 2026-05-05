@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useI18n } from "@/lib/i18n/context";
+
 function getErrorMessage(error, fallback) {
     return error instanceof Error ? error.message : fallback;
 }
 
 export default function SettingsPageContent({ initialSettings }) {
+    const { dictionary } = useI18n();
+    const labels = dictionary.settings;
     const router = useRouter();
     const [deletePassword, setDeletePassword] = useState("");
     const [notifications, setNotifications] = useState(
@@ -43,15 +47,16 @@ export default function SettingsPageContent({ initialSettings }) {
             const data = await response.json().catch(() => null);
 
             if (!response.ok || !data) {
-                throw new Error("Einstellungen konnten nicht gespeichert werden.");
+                throw new Error(labels.saveError);
             }
 
-            setStatus(data.message || "Einstellungen gespeichert.");
+            setStatus(labels.saved);
+            router.refresh();
         } catch (settingsError) {
             setError(
                 getErrorMessage(
                     settingsError,
-                    "Einstellungen konnten nicht gespeichert werden."
+                    labels.saveError
                 )
             );
         } finally {
@@ -61,7 +66,7 @@ export default function SettingsPageContent({ initialSettings }) {
 
     async function handleDeleteAccount() {
         const confirmed = window.confirm(
-            "Willst du deinen Account wirklich dauerhaft löschen?"
+            labels.deleteConfirm
         );
 
         if (!confirmed) {
@@ -86,18 +91,20 @@ export default function SettingsPageContent({ initialSettings }) {
 
             if (!response.ok || !data) {
                 throw new Error(
-                    data?.error || "Account konnte nicht gelöscht werden."
+                    data?.error || labels.deleteError
                 );
             }
 
             setDeletePassword("");
-            router.push("/auth/login?message=Account%20gel%C3%B6scht.");
+            router.push(
+                "/auth/login?message=" + encodeURIComponent(labels.deletedMessage)
+            );
             router.refresh();
         } catch (deleteError) {
             setError(
                 getErrorMessage(
                     deleteError,
-                    "Account konnte nicht gelöscht werden."
+                    labels.deleteError
                 )
             );
         } finally {
@@ -108,40 +115,40 @@ export default function SettingsPageContent({ initialSettings }) {
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <main className="mx-auto max-w-7xl px-4 py-10">
-                <h1 className="text-3xl font-bold">Einstellungen</h1>
-                <p className="mt-2 text-gray-400">Passe deine App-Erfahrung an</p>
+                <h1 className="text-3xl font-bold">{labels.title}</h1>
+                <p className="mt-2 text-gray-400">{labels.description}</p>
 
                 <div className="mt-8 space-y-6">
                     {loading ? (
                         <div className="rounded-xl bg-gray-800/50 p-4 text-sm text-gray-400 outline outline-1 outline-white/10">
-                            Einstellungen werden geladen...
+                            {labels.loading}
                         </div>
                     ) : null}
 
                     <div className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10 space-y-4">
-                        <h2 className="text-lg font-semibold">Allgemein</h2>
+                        <h2 className="text-lg font-semibold">{labels.general}</h2>
 
                         <div>
                             <label className="mb-1 block text-sm text-gray-400">
-                                Sprache
+                                {labels.language}
                             </label>
                             <select
                                 value={language}
                                 onChange={(e) => setLanguage(e.target.value)}
                                 className="w-full rounded-md bg-gray-900 px-3 py-2 text-white outline outline-1 outline-white/10 focus:outline-indigo-500"
                             >
-                                <option value="de">Deutsch</option>
-                                <option value="en">Englisch</option>
+                                <option value="de">{labels.german}</option>
+                                <option value="en">{labels.english}</option>
                             </select>
                         </div>
                     </div>
 
                     <div className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10 space-y-4">
-                        <h2 className="text-lg font-semibold">Benachrichtigungen</h2>
+                        <h2 className="text-lg font-semibold">{labels.notifications}</h2>
 
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-gray-300">
-                                E-Mail-Benachrichtigungen
+                                {labels.emailNotifications}
                             </p>
                             <button
                                 onClick={() => setNotifications(!notifications)}
@@ -161,11 +168,11 @@ export default function SettingsPageContent({ initialSettings }) {
                     </div>
 
                     <div className="rounded-xl bg-red-500/10 p-6 outline outline-1 outline-red-500/20 space-y-4">
-                        <h2 className="text-lg font-semibold text-red-400">Account</h2>
+                        <h2 className="text-lg font-semibold text-red-400">{labels.account}</h2>
 
                         <div>
                             <label className="mb-1 block text-sm text-red-200">
-                                Passwort bestätigen
+                                {labels.confirmPassword}
                             </label>
                             <input
                                 type="password"
@@ -183,8 +190,8 @@ export default function SettingsPageContent({ initialSettings }) {
                             className="rounded-md bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {deletingAccount
-                                ? "Account wird gelöscht..."
-                                : "Account löschen"}
+                                ? labels.deletingAccount
+                                : labels.deleteAccount}
                         </button>
                     </div>
 
@@ -194,7 +201,7 @@ export default function SettingsPageContent({ initialSettings }) {
                             disabled={saving}
                             className="rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {saving ? "Speichere..." : "Einstellungen speichern"}
+                            {saving ? labels.saving : labels.saveSettings}
                         </button>
                     </div>
 

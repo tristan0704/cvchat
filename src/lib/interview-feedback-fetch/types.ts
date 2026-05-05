@@ -24,6 +24,7 @@ export type InterviewFeedbackRequest = {
     companySize?: string
     transcript: string
     transcriptFingerprint: string
+    language?: string
 }
 
 export type InterviewFeedbackResponse = {

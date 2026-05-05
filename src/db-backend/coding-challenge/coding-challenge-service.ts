@@ -410,6 +410,7 @@ export async function evaluateCodingChallengeAttempt(args: {
     interviewId: string;
     attemptId: string;
     code: string;
+    language?: string;
 }) {
     const attempt = await db.codingChallengeAttempt.findFirst({
         where: {
@@ -433,7 +434,7 @@ export async function evaluateCodingChallengeAttempt(args: {
         throw new Error("Coding challenge not found");
     }
 
-    if (attempt.evaluation && attempt.submittedCode === args.code) {
+    if (attempt.evaluation && attempt.submittedCode === args.code && !args.language) {
         return {
             draft: mapDraft({
                 attempt,
@@ -449,7 +450,8 @@ export async function evaluateCodingChallengeAttempt(args: {
             task: attempt.task,
             solution: attempt.task.solution,
         }),
-        args.code
+        args.code,
+        args.language
     );
 
     const { updatedAttempt, evaluation } = await db.$transaction(async (tx) => {

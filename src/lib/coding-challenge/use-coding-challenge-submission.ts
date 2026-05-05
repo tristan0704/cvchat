@@ -8,6 +8,7 @@ import type {
     CodingChallengeEvaluationResponse,
     CodingChallengeRuntimeStatusSnapshot,
 } from "@/lib/coding-challenge/types";
+import { useI18n } from "@/lib/i18n/context";
 
 type UseCodingChallengeSubmissionArgs = {
     interviewId: string;
@@ -26,6 +27,7 @@ export function useCodingChallengeSubmission({
     initialEvaluation = null,
     onStatusUpdate,
 }: UseCodingChallengeSubmissionArgs) {
+    const { language } = useI18n();
     const [evaluation, setEvaluation] =
         useState<CodingChallengeEvaluation | null>(initialEvaluation);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,6 +51,7 @@ export function useCodingChallengeSubmission({
                 body: JSON.stringify({
                     interviewId,
                     ...payload,
+                    language,
                 }),
             });
 

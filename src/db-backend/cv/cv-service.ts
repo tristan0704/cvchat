@@ -87,6 +87,7 @@ function buildCvVersionSummary(cv: CvVersion) {
 async function createCvFeedbackAnalysis(args: {
     cvVersion: CvVersion;
     config: InterviewCvConfig;
+    language?: string;
 }) {
     const { cvVersion } = args;
     const config = normalizeConfig(args.config);
@@ -103,6 +104,7 @@ async function createCvFeedbackAnalysis(args: {
         cvText,
         fileName: cvVersion.fileName ?? "Lebenslauf.pdf",
         config,
+        language: args.language,
     });
 
     const analysis = await db.cvFeedbackAnalysis.upsert({
@@ -247,6 +249,7 @@ export async function getOrCreateCvFeedbackAnalysisForInterview(args: {
     userId: string;
     interviewId: string;
     force?: boolean;
+    language?: string;
 }) {
     const interview = await db.interview.findFirst({
         where: {
@@ -330,6 +333,7 @@ export async function getOrCreateCvFeedbackAnalysisForInterview(args: {
     const { analysis, result } = await createCvFeedbackAnalysis({
         cvVersion,
         config,
+        language: args.language,
     });
 
     await db.interview.update({

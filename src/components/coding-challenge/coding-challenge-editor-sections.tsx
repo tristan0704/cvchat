@@ -1,14 +1,12 @@
 import type { ReactNode } from "react";
 import Editor from "@monaco-editor/react";
 
-import {
-  DIFFICULTY_LABELS,
-  LANGUAGE_LABELS,
-} from "@/lib/coding-challenge/labels";
+import { LANGUAGE_LABELS } from "@/lib/coding-challenge/labels";
 import type {
   PublicCodingChallengeTask,
   CodingChallengeLanguage,
 } from "@/lib/coding-challenge/types";
+import { useI18n } from "@/lib/i18n/context";
 
 function TaskPanel({
   title,
@@ -83,12 +81,14 @@ export function CodingChallengeHeader({
   onResetCode: () => void;
   onSubmit: () => void;
 }) {
+  const { dictionary } = useI18n();
+
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-gray-900 p-5 lg:flex-row lg:items-start lg:justify-between">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-400">
           <span>{task.role}</span>
-          <span>{DIFFICULTY_LABELS[task.difficulty]}</span>
+          <span>{dictionary.coding.difficulty[task.difficulty]}</span>
           <span>{LANGUAGE_LABELS[task.language]}</span>
           <span>{task.estimatedMinutes} min</span>
         </div>

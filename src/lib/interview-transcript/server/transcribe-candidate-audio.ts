@@ -7,6 +7,7 @@ import {
   normalizeTranscriptText,
   type TranscriptQaPair,
 } from "@/lib/interview-transcript";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 const GEMINI_API_VERSION = "v1alpha";
 const PRIMARY_TRANSCRIPTION_MODEL =
@@ -105,6 +106,7 @@ type TranscribeCandidateAudioArgs = {
   audio: File;
   role: string;
   interviewerQuestions: string[];
+  language?: string;
 };
 
 type TranscribeCandidateAudioResult = {
@@ -120,7 +122,9 @@ export async function transcribeCandidateAudio({
   audio,
   role,
   interviewerQuestions,
+  language = "de",
 }: TranscribeCandidateAudioArgs): Promise<TranscribeCandidateAudioResult> {
+  const outputLanguage = normalizeLanguage(language);
   const ai = new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -184,11 +188,19 @@ export async function transcribeCandidateAudio({
                 parts: [
                   {
                     text: [
-                      "Du transkribierst nur die Sprache des Kandidaten aus einem technischen Interview auf Deutsch.",
+                      outputLanguage === "en"
+                        ? "Transcribe only the candidate's speech from a technical interview in English."
+                        : "Du transkribierst nur die Sprache des Kandidaten aus einem technischen Interview auf Deutsch.",
                       `Die Zielrolle ist: ${role || "Backend Developer"}.`,
-                      "Liefere nur das bereinigte Transcript als fortlaufenden deutschen Text mit normaler Satzzeichensetzung.",
-                      "Keine Sprecherlabels. Keine Analyse. Keine Zusammenfassung. Kein Markdown.",
-                      "Wenn einzelne Woerter unklar sind, rekonstruiere konservativ und erfinde keine fachlichen Details hinzu.",
+                      outputLanguage === "en"
+                        ? "Return only the cleaned transcript as continuous English text with normal punctuation."
+                        : "Liefere nur das bereinigte Transcript als fortlaufenden deutschen Text mit normaler Satzzeichensetzung.",
+                      outputLanguage === "en"
+                        ? "No speaker labels. No analysis. No summary. No Markdown."
+                        : "Keine Sprecherlabels. Keine Analyse. Keine Zusammenfassung. Kein Markdown.",
+                      outputLanguage === "en"
+                        ? "If individual words are unclear, reconstruct conservatively and do not invent technical details."
+                        : "Wenn einzelne Woerter unklar sind, rekonstruiere konservativ und erfinde keine fachlichen Details hinzu.",
                     ].join("\n"),
                   },
                   createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
@@ -220,6 +232,7 @@ export async function transcribeCandidateAudio({
                 role,
                 interviewerQuestions,
                 candidateTranscript: transcriptText,
+                language: outputLanguage,
               });
               qaPairs = qaMappingResult.qaPairs;
               qaMappingModel = qaMappingResult.model;

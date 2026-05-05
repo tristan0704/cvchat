@@ -5,6 +5,8 @@ import {
     updateCodingChallengeDraft,
 } from "@/db-backend/coding-challenge/coding-challenge-service";
 import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 import type {
     CodingChallengeEvaluationRequest,
 } from "@/lib/coding-challenge/types";
@@ -157,11 +159,13 @@ export async function POST(request: Request) {
             );
         }
 
+        const profile = await getProfileSnapshot(currentUser.id);
         const result = await evaluateCodingChallengeAttempt({
             userId: currentUser.id,
             interviewId,
             attemptId,
             code,
+            language: normalizeLanguage(profile.language),
         });
         const status = await getInterviewRuntimeStatusForUser(
             currentUser.id,

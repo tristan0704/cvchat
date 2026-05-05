@@ -2,6 +2,8 @@
 
 import { lazy, Suspense, type ReactNode } from "react";
 
+import { useI18n } from "@/lib/i18n/context";
+import type { AppDictionary } from "@/lib/i18n/dictionaries";
 import { formatCountdown } from "@/lib/questionpool";
 import { useInterviewSession } from "@/lib/interview-session/context";
 import { LAST_MINUTE_THRESHOLD_SECONDS } from "@/lib/voice-interview/session/endgame";
@@ -45,89 +47,93 @@ function StatusPill({
 }
 
 function resolveConnectionMeta(
-    connectionStatus: VoiceInterviewControllerState["connectionStatus"]
+    connectionStatus: VoiceInterviewControllerState["connectionStatus"],
+    labels: AppDictionary["voiceInterview"]
 ) {
     switch (connectionStatus) {
         case "connected":
-            return { label: "Verbunden", tone: "positive" as const };
+            return { label: labels.connected, tone: "positive" as const };
         case "connecting":
-            return { label: "Verbinde...", tone: "default" as const };
+            return { label: labels.connecting, tone: "default" as const };
         case "error":
-            return { label: "Fehler", tone: "danger" as const };
+            return { label: labels.error, tone: "danger" as const };
         default:
-            return { label: "Bereit", tone: "default" as const };
+            return { label: labels.ready, tone: "default" as const };
     }
 }
 
 function resolvePhaseMeta(
-    callLifecyclePhase: VoiceInterviewControllerState["callLifecyclePhase"]
+    callLifecyclePhase: VoiceInterviewControllerState["callLifecyclePhase"],
+    labels: AppDictionary["voiceInterview"]
 ) {
     switch (callLifecyclePhase) {
         case "opening":
-            return { label: "Setup", tone: "default" as const };
+            return { label: labels.setup, tone: "default" as const };
         case "interviewing":
-            return { label: "Im Gespräch", tone: "positive" as const };
+            return { label: labels.interviewing, tone: "positive" as const };
         case "closing":
-            return { label: "Letzte Antwort", tone: "default" as const };
+            return { label: labels.closing, tone: "default" as const };
         case "stopping":
-            return { label: "Beende Call", tone: "default" as const };
+            return { label: labels.stopping, tone: "default" as const };
         default:
-            return { label: "Noch nicht gestartet", tone: "default" as const };
+            return { label: labels.notStarted, tone: "default" as const };
     }
 }
 
 function resolveAssistantStatus(
     callLifecyclePhase: VoiceInterviewControllerState["callLifecyclePhase"],
-    playbackActive: boolean
+    playbackActive: boolean,
+    labels: AppDictionary["voiceInterview"]
 ) {
-    if (playbackActive) return "KI spricht";
-    if (callLifecyclePhase === "interviewing") return "KI hört zu";
-    if (callLifecyclePhase === "opening") return "Verbindung läuft";
+    if (playbackActive) return labels.assistantSpeaking;
+    if (callLifecyclePhase === "interviewing") return labels.assistantListening;
+    if (callLifecyclePhase === "opening") return labels.connectionRunning;
     if (callLifecyclePhase === "closing" || callLifecyclePhase === "stopping") {
-        return "Call endet";
+        return labels.callEnding;
     }
 
-    return "Bereit";
+    return labels.ready;
 }
 
 function resolveCallCopy(args: {
     callLifecyclePhase: VoiceInterviewControllerState["callLifecyclePhase"];
     connectionStatus: VoiceInterviewControllerState["connectionStatus"];
     error: string;
+    labels: AppDictionary["voiceInterview"];
 }) {
-    const { callLifecyclePhase, connectionStatus, error } = args;
+    const { callLifecyclePhase, connectionStatus, error, labels } = args;
 
     if (error) {
         return {
-            title: "Call konnte nicht sauber gestartet werden",
-            description: "Prüfe Mikrofonfreigabe und Browser-Support, dann starte erneut.",
+            title: labels.startErrorTitle,
+            description: labels.startErrorDescription,
         };
     }
 
     if (callLifecyclePhase === "opening" || connectionStatus === "connecting") {
         return {
-            title: "Verbindung wird aufgebaut",
-            description: "Mikrofon, Session und KI-Interviewer werden gerade vorbereitet.",
+            title: labels.connectingTitle,
+            description: labels.connectingDescription,
         };
     }
 
     if (callLifecyclePhase === "interviewing") {
         return {
-            title: "Interview läuft",
-            description: "Fokussiere dich auf das Gespräch. Das Feedback kommt im nächsten Schritt.",
+            title: labels.runningTitle,
+            description: labels.runningDescription,
         };
     }
 
     if (callLifecyclePhase === "closing" || callLifecyclePhase === "stopping") {
         return {
-            title: "Call wird beendet",
-            description: "Die laufende Session wird kontrolliert geschlossen.",
+            title: labels.stoppingTitle,
+            description: labels.stoppingDescription,
         };
     }
 
     return {
-        title: "Bereit für den Live-Call",
-        description: "Starte das Interview, sobald Mikrofon und Kamera bereit sind.",
+        title: labels.readyTitle,
+        description: labels.readyDescription,
     };
 }
 
@@ -142,6 +148,8 @@ function VoiceInterviewContent({
     controller: VoiceInterviewControllerState;
     interviewSessionId: string;
 }) {
+    const { dictionary } = useI18n();
+    const labels = dictionary.voiceInterview;
     const {
         faceLandmarkPanelRef,
         connectionStatus,
@@ -155,16 +163,18 @@ function VoiceInterviewContent({
         requestGracefulStop,
     } = controller;
 
-    const connectionMeta = resolveConnectionMeta(connectionStatus);
-    const phaseMeta = resolvePhaseMeta(callLifecyclePhase);
+    const connectionMeta = resolveConnectionMeta(connectionStatus, labels);
+    const phaseMeta = resolvePhaseMeta(callLifecyclePhase, labels);
     const assistantStatus = resolveAssistantStatus(
         callLifecyclePhase,
-        playbackActive
+        playbackActive,
+        labels
     );
     const callCopy = resolveCallCopy({
         callLifecyclePhase,
         connectionStatus,
         error,
+        labels,
     });
     const isConnecting =
         callLifecyclePhase === "opening" || connectionStatus === "connecting";
@@ -193,14 +203,13 @@ function VoiceInterviewContent({
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
-                            Live-Interview
+                            {labels.liveInterview}
                         </p>
                         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-                            Sprach-Call
+                            {labels.title}
                         </h1>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                            Reduzierte Live-Ansicht fuer den laufenden Call mit{" "}
-                            {role}.
+                            {labels.description} {role}.
                         </p>
                     </div>
 
@@ -223,7 +232,7 @@ function VoiceInterviewContent({
                     <Suspense
                         fallback={
                             <div className="min-h-[360px] rounded-xl bg-gray-900 p-6 text-sm text-gray-400 outline outline-1 outline-white/10">
-                                Kamera-Setup wird geladen...
+                                {labels.cameraSetupLoading}
                             </div>
                         }
                     >
@@ -232,7 +241,7 @@ function VoiceInterviewContent({
                             role={role}
                             compact
                             minimal
-                            title="Du"
+                            title={labels.candidateTitle}
                             description=""
                             showAnalysisSummary={false}
                             analyzeOnStop
@@ -246,14 +255,13 @@ function VoiceInterviewContent({
                     <section className="min-h-[360px] rounded-xl bg-gray-900 p-6 outline outline-1 outline-white/10">
                         <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
                             <div className="flex size-24 items-center justify-center rounded-full bg-indigo-500/15 text-3xl font-semibold text-indigo-200 outline outline-1 outline-indigo-400/30">
-                                KI
+                                {labels.assistantInitials}
                             </div>
                             <h2 className="mt-6 text-xl font-semibold text-white">
-                                Call nur mit Sprache
+                                {labels.voiceOnlyTitle}
                             </h2>
                             <p className="mt-2 max-w-md text-sm leading-6 text-gray-400">
-                                Kamera und Face-Analyse sind für dieses Interview
-                                deaktiviert. Es wird nur dein Mikrofon verwendet.
+                                {labels.voiceOnlyDescription}
                             </p>
                         </div>
                     </section>
@@ -287,14 +295,13 @@ function VoiceInterviewContent({
 
                         <div className="mt-4 rounded-xl bg-gray-900 p-4 outline outline-1 outline-white/10">
                             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
-                                Rolle
+                                {labels.role}
                             </p>
                             <p className="mt-2 text-base font-semibold text-white">
                                 {role}
                             </p>
                             <p className="mt-1 text-sm text-gray-400">
-                                Transkript, Zusammenfassung und weitere Auswertung bleiben
-                                bewusst im separaten Feedback-Schritt.
+                                {labels.separateFeedbackStep}
                             </p>
                         </div>
 
@@ -306,15 +313,13 @@ function VoiceInterviewContent({
 
                         {!microphoneSupported ? (
                             <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                                Mikrofon funktioniert nur mit HTTPS oder
-                                localhost und aktiver Freigabe.
+                                {labels.microphoneUnsupported}
                             </div>
                         ) : null}
 
                         {microphoneSupported && !recorderSupported ? (
                             <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                                Dieser Browser unterstützt die benötigte
-                                Aufnahme-Konfiguration nicht.
+                                {labels.recorderUnsupported}
                             </div>
                         ) : null}
 
@@ -325,7 +330,7 @@ function VoiceInterviewContent({
                                 disabled={!canStart}
                                 className="flex-1 rounded-md bg-indigo-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {isConnecting ? "Verbinde..." : "Call starten"}
+                                {isConnecting ? labels.connecting : labels.startCall}
                             </button>
 
                             <button
@@ -334,7 +339,7 @@ function VoiceInterviewContent({
                                 disabled={!canStop}
                                 className="rounded-md bg-gray-900 px-4 py-3 text-sm font-medium text-gray-200 outline outline-1 outline-white/10 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                Beenden
+                                {labels.stopCall}
                             </button>
                         </div>
                     </section>

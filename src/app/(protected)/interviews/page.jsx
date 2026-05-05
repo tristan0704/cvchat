@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { listInterviewsForUser } from "@/db-backend/interviews/read/interview-read-service";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { getDictionary } from "@/lib/i18n/dictionaries";
 import { createServerTiming } from "@/lib/server-timing";
 
 export default async function InterviewsPage() {
@@ -19,9 +21,11 @@ export default async function InterviewsPage() {
 
   // Die Liste wird als Initialdaten gerendert, damit der Browser keinen
   // zusätzlichen GET direkt nach dem Seitenaufbau auslösen muss.
-  const interviews = await timing.measure("db.interviewList", () =>
-    listInterviewsForUser(currentUser.id)
-  );
+  const [interviews, profile] = await Promise.all([
+    timing.measure("db.interviewList", () => listInterviewsForUser(currentUser.id)),
+    getProfileSnapshot(currentUser.id),
+  ]);
+  const labels = getDictionary(profile.language).interviews;
 
   timing.log({
     status: 200,
@@ -33,9 +37,9 @@ export default async function InterviewsPage() {
       <main className="mx-auto max-w-7xl px-4 py-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Interviews</h1>
+            <h1 className="text-3xl font-bold">{labels.title}</h1>
             <p className="mt-4 text-gray-400">
-              Verwalte deine Interview-Simulationen.
+              {labels.description}
             </p>
           </div>
 
@@ -44,7 +48,7 @@ export default async function InterviewsPage() {
             href="/interviews/new"
             className="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 transition"
           >
-            + Neues Interview
+            {labels.newInterview}
           </Link>
         </div>
 

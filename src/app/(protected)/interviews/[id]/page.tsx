@@ -9,31 +9,11 @@ import CvFeedbackStep from "@/components/cv/CvFeedbackStep";
 import InterviewFeedback from "@/components/interviews/InterviewFeedback";
 import InterviewVoiceStep from "@/components/interviews/InterviewVoiceStep";
 import { readApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n/context";
+import type { AppDictionary } from "@/lib/i18n/dictionaries";
 import { InterviewSessionProvider, useOptionalInterviewSession } from "@/lib/interview-session/context";
 
 type InterviewMode = "voice" | "face";
-
-const INTERVIEW_MODE_OPTIONS: Array<{
-    id: InterviewMode;
-    title: string;
-    description: string;
-    badge: string;
-}> = [
-    {
-        id: "voice",
-        title: "Nur Sprache",
-        description:
-            "Du führst den Call nur mit Mikrofon. Kamera und Face-Analyse bleiben vollständig aus.",
-        badge: "Ohne Kamera",
-    },
-    {
-        id: "face",
-        title: "Sprache und Kamera",
-        description:
-            "Du übst im echten Call-Gefühl mit Kamera und optionaler Körpersprache-Auswertung.",
-        badge: "Vollständiger Call",
-    },
-];
 
 // Dateiübersicht:
 // Die Detailseite lädt einmal die vollständige Interview-Shell für Navigation,
@@ -124,7 +104,7 @@ type InterviewStatusSnapshot = {
     lastActivityAt: string;
 };
 
-async function fetchInterviewDetail(interviewId: string) {
+async function fetchInterviewDetail(interviewId: string, fallbackError: string) {
     const response = await fetch(`/api/interviews/${interviewId}/shell`, {
         method: "GET",
         cache: "no-store",
@@ -140,7 +120,7 @@ async function fetchInterviewDetail(interviewId: string) {
 
     if (!response.ok || !data?.interview) {
         throw new Error(
-            readApiErrorMessage(data, "Interview konnte nicht geladen werden.")
+            readApiErrorMessage(data, fallbackError)
         );
     }
 
@@ -149,7 +129,7 @@ async function fetchInterviewDetail(interviewId: string) {
         : data.interview;
 }
 
-async function fetchInterviewStatus(interviewId: string) {
+async function fetchInterviewStatus(interviewId: string, fallbackError: string) {
     const response = await fetch(`/api/interviews/${interviewId}/status`, {
         method: "GET",
         cache: "no-store",
@@ -162,7 +142,7 @@ async function fetchInterviewStatus(interviewId: string) {
         throw new Error(
             readApiErrorMessage(
                 data,
-                "Interview-Status konnte nicht geladen werden."
+                fallbackError
             )
         );
     }
@@ -234,9 +214,10 @@ function resolveVoiceNavigationLock(args: {
         | "transcribing"
         | "ready"
         | "error";
+    labels: AppDictionary["interviewDetail"];
 }) {
     if (args.callLifecyclePhase === "opening") {
-        return "Der Step-Wechsel bleibt gesperrt, während die Voice-Session aufgebaut wird.";
+        return args.labels.lockOpening;
     }
 
     if (
@@ -244,7 +225,7 @@ function resolveVoiceNavigationLock(args: {
         args.callLifecyclePhase === "closing" ||
         args.callLifecyclePhase === "stopping"
     ) {
-        return "Der Step-Wechsel bleibt gesperrt, solange der Call noch läuft oder beendet wird.";
+        return args.labels.lockRunning;
     }
 
     if (
@@ -253,7 +234,7 @@ function resolveVoiceNavigationLock(args: {
         args.persistedTranscriptStatus === "recording" ||
         args.persistedTranscriptStatus === "transcribing"
     ) {
-        return "Der Step-Wechsel bleibt gesperrt, während das Transkript verarbeitet wird.";
+        return args.labels.lockTranscript;
     }
 
     return null;
@@ -264,31 +245,32 @@ function getNextStepRequirement(args: {
     interview: InterviewDetail;
     hasTranscriptProgress: boolean;
     hasInterviewFeedback: boolean;
+    labels: AppDictionary["interviewDetail"];
 }) {
-    const { step, interview, hasTranscriptProgress, hasInterviewFeedback } = args;
+    const { step, interview, hasTranscriptProgress, hasInterviewFeedback, labels } = args;
 
     if (step === 1) {
         return interview.hasCvFeedback || interview.cvFeedback
             ? null
-            : "Schritt 1 braucht zuerst ein gespeichertes CV-Feedback.";
+            : labels.requirementCv;
     }
 
     if (step === 2) {
         return hasTranscriptProgress
             ? null
-            : "Schritt 2 braucht zuerst einen beendeten Call mit gestarteter Transkriptverarbeitung.";
+            : labels.requirementTranscript;
     }
 
     if (step === 3) {
         return hasInterviewFeedback
             ? null
-            : "Schritt 3 braucht zuerst ein fertiges Interview-Feedback.";
+            : labels.requirementInterview;
     }
 
     if (step === 4) {
         return interview.hasCodingEvaluation || interview.codingChallenge?.evaluation
             ? null
-            : "Schritt 4 braucht zuerst eine abgegebene und bewertete Coding-Challenge.";
+            : labels.requirementCoding;
     }
 
     return null;
@@ -305,23 +287,44 @@ function CallSetupStep({
     disabled?: boolean;
     error?: string;
 }) {
+    const { dictionary } = useI18n();
+    const labels = dictionary.interviewDetail;
+    const interviewModeOptions: Array<{
+        id: InterviewMode;
+        title: string;
+        description: string;
+        badge: string;
+    }> = [
+        {
+            id: "voice",
+            title: labels.voiceOnly,
+            description: labels.voiceOnlyDescription,
+            badge: labels.noCamera,
+        },
+        {
+            id: "face",
+            title: labels.voiceFace,
+            description: labels.voiceFaceDescription,
+            badge: labels.fullCall,
+        },
+    ];
+
     return (
         <div className="space-y-5">
             <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
-                    Call-Setup
+                    {labels.callSetup}
                 </p>
                 <h2 className="mt-1 text-xl font-semibold text-white">
-                    Wie möchtest du das Interview führen?
+                    {labels.callSetupTitle}
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                    Die Auswahl wird am Interview gespeichert. Nur Sprache bleibt
-                    ohne Kamerafreigabe und ohne Face-Analyse.
+                    {labels.callSetupDescription}
                 </p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-                {INTERVIEW_MODE_OPTIONS.map((option) => (
+                {interviewModeOptions.map((option) => (
                     <button
                         key={option.id}
                         type="button"
@@ -376,6 +379,8 @@ function InterviewDetailStepContent({
     isPersistingStep: boolean;
     feedbackNavigationLock: string | null;
 }) {
+    const { dictionary } = useI18n();
+    const labels = dictionary.interviewDetail;
     const [pendingMode, setPendingMode] = useState<InterviewMode | null>(
         interview.interviewMode
     );
@@ -398,6 +403,7 @@ function InterviewDetailStepContent({
         interview,
         hasTranscriptProgress,
         hasInterviewFeedback: interview.hasInterviewFeedback,
+        labels,
     });
 
     const voiceNavigationLock =
@@ -407,6 +413,7 @@ function InterviewDetailStepContent({
                       session?.voiceInterview.callLifecyclePhase ?? "idle",
                   localTranscriptStatus,
                   persistedTranscriptStatus,
+                  labels,
               })
             : null;
 
@@ -432,10 +439,12 @@ function InterviewDetailStepContent({
         <div className="min-h-screen bg-gray-900 text-white">
             <main className="mx-auto max-w-7xl px-4 py-10">
                 <h1 className="text-3xl font-bold">{interview.title}</h1>
-                <p className="mt-2 text-gray-400">Schritt {step} von 6</p>
+                <p className="mt-2 text-gray-400">
+                    {labels.step} {step} {labels.of} 6
+                </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                    {["CV", "Sprache", "Interview", "Code", "Code-Bewertung", "Gesamt"].map((label, index) => (
+                    {labels.steps.map((label, index) => (
                         <span
                             key={label}
                             className={`rounded-full px-3 py-1 text-xs ${
@@ -491,7 +500,7 @@ function InterviewDetailStepContent({
                             disabled={!canNavigateBack}
                             className="text-sm text-gray-400 disabled:opacity-30"
                         >
-                            Zurück
+                            {labels.back}
                         </button>
 
                         {step < 6 ? (
@@ -510,7 +519,7 @@ function InterviewDetailStepContent({
                                     disabled={!canNavigateForward}
                                     className="rounded-md bg-indigo-500 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
-                                    {isCallSetup && isPersistingStep ? "Wird gespeichert..." : "Weiter"}
+                                    {isCallSetup && isPersistingStep ? labels.saving : labels.next}
                                 </button>
                             </div>
                         ) : (
@@ -519,13 +528,13 @@ function InterviewDetailStepContent({
                                     className="rounded-md bg-gray-700 px-4 py-2 text-sm hover:bg-gray-600"
                                     onClick={() => router.push("/interviews/new")}
                                 >
-                                    Neu starten
+                                    {labels.restart}
                                 </button>
                                 <button
                                     onClick={() => router.push("/interviews")}
                                     className="rounded-md bg-indigo-500 px-4 py-2 text-sm hover:bg-indigo-400"
                                 >
-                                    Abschließen
+                                    {labels.finish}
                                 </button>
                             </div>
                         )}
@@ -540,10 +549,12 @@ function SummaryCard({
     label,
     score,
     summary,
+    labels,
 }: {
     label: string;
     score: number | null;
     summary: string;
+    labels: AppDictionary["interviewDetail"];
 }) {
     const resolvedScore = score ?? 0;
     const badgeColor =
@@ -554,12 +565,12 @@ function SummaryCard({
               : "bg-gray-500/20 text-gray-300";
     const ratingLabel =
         score === null
-            ? "Offen"
+            ? labels.ratingOpen
             : resolvedScore >= 75
-              ? "Gut"
+              ? labels.ratingGood
               : resolvedScore >= 50
-                ? "Mittel"
-                : "Schwach";
+                ? labels.ratingMedium
+                : labels.ratingWeak;
 
     return (
         <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10">
@@ -591,6 +602,8 @@ function OverallFeedbackBlock({
     ) => void;
     onStatusUpdate: (status: InterviewStatusSnapshot) => void;
 }) {
+    const { dictionary } = useI18n();
+    const labels = dictionary.interviewDetail;
     const [isGenerating, setIsGenerating] = useState(false);
     const [generationError, setGenerationError] = useState("");
     const overallHydratePromiseRef = useRef<Promise<{
@@ -660,7 +673,7 @@ function OverallFeedbackBlock({
                         if (!response.ok || !data) {
                             throw new Error(
                                 data?.error ||
-                                    "Gesamtfeedback-Daten konnten nicht geladen werden."
+                                    labels.overallLoadError
                             );
                         }
 
@@ -683,7 +696,7 @@ function OverallFeedbackBlock({
                     setGenerationError(
                         error instanceof Error
                             ? error.message
-                        : "Gesamtfeedback-Daten konnten nicht geladen werden."
+                        : labels.overallLoadError
                     );
                 }
             } finally {
@@ -696,7 +709,7 @@ function OverallFeedbackBlock({
         return () => {
             cancelled = true;
         };
-    }, [interview.id]);
+    }, [interview.id, labels.overallLoadError]);
 
     useEffect(() => {
         if (!canGenerateOverallFeedback || effectiveOverallFeedback || isGenerating) {
@@ -736,7 +749,7 @@ function OverallFeedbackBlock({
                         if (!response.ok || !data?.overallFeedback) {
                             throw new Error(
                                 data?.error ||
-                                    "Gesamtfeedback konnte nicht erstellt werden."
+                                    labels.overallCreateError
                             );
                         }
 
@@ -769,7 +782,7 @@ function OverallFeedbackBlock({
                     setGenerationError(
                         error instanceof Error
                             ? error.message
-                            : "Gesamtfeedback konnte nicht erstellt werden."
+                            : labels.overallCreateError
                     );
                 }
             } finally {
@@ -795,6 +808,8 @@ function OverallFeedbackBlock({
         isGenerating,
         onOverallFeedbackChange,
         onStatusUpdate,
+        labels.overallCreateError,
+        labels.overallLoadError,
     ]);
 
     const cards = [
@@ -806,7 +821,7 @@ function OverallFeedbackBlock({
                 null,
             summary:
                 effectiveCvFeedback?.roleAnalysis.summary ||
-                "Noch kein CV-Feedback gespeichert.",
+                labels.noCvFeedback,
         },
         {
             label: "Interview",
@@ -816,7 +831,7 @@ function OverallFeedbackBlock({
                 null,
             summary:
                 effectiveInterviewFeedback?.summary ||
-                "Noch kein Interview-Feedback gespeichert.",
+                labels.noInterviewFeedback,
         },
         {
             label: "Code",
@@ -826,13 +841,13 @@ function OverallFeedbackBlock({
                 null,
             summary:
                 effectiveCodingChallenge?.evaluation?.summary ||
-                "Noch kein Coding-Feedback gespeichert.",
+                labels.noCodingFeedback,
         },
     ];
 
     return (
         <div>
-            <h2 className="text-lg font-semibold">Gesamtbewertung</h2>
+            <h2 className="text-lg font-semibold">{labels.overallTitle}</h2>
             <div className="mt-4 grid grid-cols-3 gap-3">
                 {cards.map((item) => (
                     <SummaryCard
@@ -840,13 +855,14 @@ function OverallFeedbackBlock({
                         label={item.label}
                         score={item.score}
                         summary={item.summary}
+                        labels={labels}
                     />
                 ))}
             </div>
 
             {isGenerating ? (
                 <div className="mt-4 rounded-lg bg-gray-900 p-4 text-sm text-gray-300">
-                    Gesamtfeedback wird aus den gespeicherten Step-Ergebnissen erstellt.
+                    {labels.overallGenerating}
                 </div>
             ) : generationError ? (
                 <div className="mt-4 rounded-lg bg-red-500/10 p-4 text-sm text-red-200">
@@ -865,7 +881,7 @@ function OverallFeedbackBlock({
 
                     <div className="rounded-lg bg-green-500/10 p-4">
                         <p className="mb-2 text-sm font-medium text-green-300">
-                            Positiv
+                            {labels.positive}
                         </p>
                         <ul className="space-y-1 text-sm text-green-200">
                             {effectiveOverallFeedback.strengths.map((item) => (
@@ -876,7 +892,7 @@ function OverallFeedbackBlock({
 
                     <div className="rounded-lg bg-red-500/10 p-4">
                         <p className="mb-2 text-sm font-medium text-red-300">
-                            Verbesserung
+                            {labels.improvement}
                         </p>
                         <ul className="space-y-1 text-sm text-red-200">
                             {[
@@ -890,8 +906,7 @@ function OverallFeedbackBlock({
                 </div>
             ) : (
                 <div className="mt-4 rounded-lg bg-gray-900 p-4 text-sm text-gray-300">
-                    Schließe zuerst CV, Interview und Coding-Challenge ab, damit
-                    hier eine Gesamtbewertung erscheint.
+                    {labels.overallMissing}
                 </div>
             )}
         </div>
@@ -899,6 +914,8 @@ function OverallFeedbackBlock({
 }
 
 function InterviewDetailPageContent() {
+    const { dictionary } = useI18n();
+    const labels = dictionary.interviewDetail;
     const params = useParams<{ id: string }>();
     const interviewId = params.id;
     const router = useRouter();
@@ -939,7 +956,10 @@ function InterviewDetailPageContent() {
             }
 
             try {
-                const nextInterview = await fetchInterviewDetail(interviewId);
+                const nextInterview = await fetchInterviewDetail(
+                    interviewId,
+                    labels.loadError
+                );
                 setInterview(nextInterview);
 
                 if (syncStep) {
@@ -949,7 +969,7 @@ function InterviewDetailPageContent() {
                 setError(
                     interviewError instanceof Error
                         ? interviewError.message
-                        : "Interview konnte nicht geladen werden."
+                        : labels.loadError
                 );
                 throw interviewError;
             } finally {
@@ -960,7 +980,7 @@ function InterviewDetailPageContent() {
                 }
             }
         },
-        [interviewId]
+        [interviewId, labels.loadError]
     );
 
     const refreshInterviewStatus = useCallback(
@@ -977,7 +997,10 @@ function InterviewDetailPageContent() {
             statusRefreshInFlightRef.current = true;
 
             try {
-                const nextStatus = await fetchInterviewStatus(interviewId);
+                const nextStatus = await fetchInterviewStatus(
+                    interviewId,
+                    labels.statusLoadError
+                );
                 setInterview((currentInterview) =>
                     currentInterview
                         ? mergeInterviewStatus(currentInterview, nextStatus)
@@ -991,14 +1014,14 @@ function InterviewDetailPageContent() {
                 setError(
                     statusError instanceof Error
                         ? statusError.message
-                        : "Interview-Status konnte nicht geladen werden."
+                        : labels.statusLoadError
                 );
                 throw statusError;
             } finally {
                 statusRefreshInFlightRef.current = false;
             }
         },
-        [interviewId]
+        [interviewId, labels.statusLoadError]
     );
 
     const applyRuntimeStatus = useCallback((nextStatus: InterviewStatusSnapshot) => {
@@ -1020,7 +1043,7 @@ function InterviewDetailPageContent() {
                     setError(
                         interviewError instanceof Error
                             ? interviewError.message
-                            : "Interview konnte nicht geladen werden."
+                            : labels.loadError
                     );
                 }
             }
@@ -1031,7 +1054,7 @@ function InterviewDetailPageContent() {
         return () => {
             cancelled = true;
         };
-    }, [interviewId, refreshInterview]);
+    }, [interviewId, labels.loadError, refreshInterview]);
 
     useEffect(() => {
         let cancelled = false;
@@ -1119,7 +1142,7 @@ function InterviewDetailPageContent() {
             });
 
             if (!response.ok) {
-                throw new Error("Interview-Schritt konnte nicht gespeichert werden.");
+                throw new Error(labels.stepSaveError);
             }
 
             const data = (await response.json().catch(() => null)) as
@@ -1128,7 +1151,8 @@ function InterviewDetailPageContent() {
                   }
                 | null;
             const refreshedStatus =
-                data?.status ?? (await fetchInterviewStatus(interviewId));
+                data?.status ??
+                (await fetchInterviewStatus(interviewId, labels.statusLoadError));
             setInterview((currentInterview) =>
                 currentInterview
                     ? mergeInterviewStatus(currentInterview, refreshedStatus)
@@ -1139,7 +1163,7 @@ function InterviewDetailPageContent() {
             setError(
                 persistError instanceof Error
                     ? persistError.message
-                    : "Interview-Schritt konnte nicht gespeichert werden."
+                    : labels.stepSaveError
             );
         } finally {
             setIsPersistingStep(false);
@@ -1155,7 +1179,7 @@ function InterviewDetailPageContent() {
             <div className="min-h-screen bg-gray-900 text-white">
                 <main className="mx-auto max-w-7xl px-4 py-10">
                     <div className="rounded-xl bg-gray-800/50 p-6 text-sm text-red-300 outline outline-1 outline-white/10">
-                        {error || "Interview konnte nicht geladen werden."}
+                        {error || labels.loadError}
                     </div>
                 </main>
             </div>

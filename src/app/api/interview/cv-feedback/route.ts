@@ -5,6 +5,8 @@ import {
 } from "@/db-backend/cv/cv-service";
 import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
 import { CvFeedbackError } from "@/lib/cv/server/analyze-cv-feedback";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 export const runtime = "nodejs";
 
@@ -69,10 +71,12 @@ export async function POST(req: Request) {
             );
         }
 
+        const profile = await getProfileSnapshot(currentUser.id);
         const data = await getOrCreateCvFeedbackAnalysisForInterview({
             userId: currentUser.id,
             interviewId,
             force,
+            language: normalizeLanguage(profile.language),
         });
         const status = await getInterviewRuntimeStatusForUser(
             currentUser.id,

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useI18n } from "@/lib/i18n/context";
+
 const TOTAL_STEPS = 3;
 
 type InterviewTemplateSummary = {
@@ -52,6 +54,8 @@ function StepButton({
 }
 
 export default function NewInterviewPage() {
+    const { dictionary } = useI18n();
+    const labels = dictionary.newInterview;
     const [step, setStep] = useState(1);
     const [catalog, setCatalog] = useState<InterviewTemplateCatalog | null>(null);
     const [role, setRole] = useState("");
@@ -87,7 +91,7 @@ export default function NewInterviewPage() {
                         if (!response.ok || !data?.catalog) {
                             throw new Error(
                                 data?.error ||
-                                    "Interview-Konfiguration konnte nicht geladen werden."
+                                    labels.loadError
                             );
                         }
 
@@ -104,7 +108,7 @@ export default function NewInterviewPage() {
                     setError(
                         loadError instanceof Error
                             ? loadError.message
-                            : "Interview-Konfiguration konnte nicht geladen werden."
+                            : labels.loadError
                     );
                 }
             } finally {
@@ -120,7 +124,7 @@ export default function NewInterviewPage() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [labels.loadError]);
 
     const roleTemplates = useMemo(
         () =>
@@ -151,7 +155,7 @@ export default function NewInterviewPage() {
 
     async function handleCreateInterview() {
         if (!selectedTemplate) {
-            setError("Bitte wähle eine vollständige Interview-Konfiguration.");
+            setError(labels.incompleteError);
             return;
         }
 
@@ -174,7 +178,7 @@ export default function NewInterviewPage() {
 
             if (!response.ok || !data?.interview?.id) {
                 throw new Error(
-                    data?.error || "Interview konnte nicht erstellt werden."
+                    data?.error || labels.createError
                 );
             }
 
@@ -183,7 +187,7 @@ export default function NewInterviewPage() {
             setError(
                 createError instanceof Error
                     ? createError.message
-                    : "Interview konnte nicht erstellt werden."
+                    : labels.createError
             );
         } finally {
             setCreating(false);
@@ -210,7 +214,7 @@ export default function NewInterviewPage() {
             <div className="min-h-screen bg-gray-900 text-white">
                 <main className="mx-auto max-w-7xl px-4 py-10">
                     <div className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
-                        Interview-Konfiguration wird geladen...
+                        {labels.loading}
                     </div>
                 </main>
             </div>
@@ -220,19 +224,19 @@ export default function NewInterviewPage() {
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <main className="mx-auto max-w-7xl px-4 py-10">
-                <h1 className="text-3xl font-bold">Interview starten</h1>
+                <h1 className="text-3xl font-bold">{labels.title}</h1>
                 <p className="mt-4 text-gray-400">
-                    Wähle eine DB-gestützte Interview-Konfiguration.
+                    {labels.description}
                 </p>
 
                 <div className="mt-8 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
                     <p className="mb-4 text-sm text-gray-400">
-                        Schritt {step} von {TOTAL_STEPS}
+                        {labels.step} {step} {labels.of} {TOTAL_STEPS}
                     </p>
 
                     {step === 1 ? (
                         <div className="space-y-4">
-                            <h2 className="text-lg font-semibold">1. Zielrolle</h2>
+                            <h2 className="text-lg font-semibold">1. {labels.role}</h2>
                             <div className="grid gap-3 md:grid-cols-3">
                                 {(catalog?.roles ?? []).map((item) => (
                                     <StepButton
@@ -249,7 +253,7 @@ export default function NewInterviewPage() {
 
                     {step === 2 ? (
                         <div className="space-y-4">
-                            <h2 className="text-lg font-semibold">2. Erfahrung</h2>
+                            <h2 className="text-lg font-semibold">2. {labels.experience}</h2>
                             <div className="grid gap-3 md:grid-cols-3">
                                 {experienceOptions.map((item) => (
                                     <StepButton
@@ -267,7 +271,7 @@ export default function NewInterviewPage() {
                     {step === 3 ? (
                         <div className="space-y-4">
                             <h2 className="text-lg font-semibold">
-                                3. Unternehmensgröße
+                                3. {labels.companySize}
                             </h2>
                             <div className="grid gap-3 md:grid-cols-3">
                                 {companySizeOptions.map((item) => (
@@ -303,7 +307,7 @@ export default function NewInterviewPage() {
                             disabled={step === 1 || creating}
                             className="text-sm text-gray-400 hover:text-white disabled:opacity-30"
                         >
-                            Zurück
+                            {labels.back}
                         </button>
 
                         {step < TOTAL_STEPS ? (
@@ -318,7 +322,7 @@ export default function NewInterviewPage() {
                                 }
                                 className="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                Weiter
+                                {labels.next}
                             </button>
                         ) : (
                             <button
@@ -327,7 +331,7 @@ export default function NewInterviewPage() {
                                 disabled={!selectedTemplate || creating}
                                 className="rounded-md bg-green-500 px-4 py-2 text-sm font-medium hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {creating ? "Erstelle..." : "Interview starten"}
+                                {creating ? labels.creating : labels.start}
                             </button>
                         )}
                     </div>

@@ -2,15 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import {
-    DIFFICULTY_LABELS,
-    LANGUAGE_LABELS,
-} from "@/lib/coding-challenge/labels";
+import { LANGUAGE_LABELS } from "@/lib/coding-challenge/labels";
 import type {
     CodingChallengeDraft,
     CodingChallengeEvaluation,
 } from "@/lib/coding-challenge/types";
 import { readApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n/context";
 import { useInterviewSession } from "@/lib/interview-session/context";
 
 // Dateiübersicht:
@@ -18,12 +16,19 @@ import { useInterviewSession } from "@/lib/interview-session/context";
 // verhindert doppelte Detail-GETs beim Mounten, damit nicht mehrere identische
 // Reads mit voller Task- und Evaluation-Payload entstehen.
 
-function getScoreTone(score: number) {
+function getScoreTone(
+    score: number,
+    labels: {
+        scoreStrong: string;
+        scoreSolid: string;
+        scoreWeak: string;
+    }
+) {
     if (score >= 75) {
         return {
             badge: "bg-green-500/20 text-green-300",
             bar: "bg-green-400",
-            label: "Stark",
+            label: labels.scoreStrong,
         };
     }
 
@@ -31,14 +36,14 @@ function getScoreTone(score: number) {
         return {
             badge: "bg-yellow-500/20 text-yellow-300",
             bar: "bg-yellow-400",
-            label: "Solide",
+            label: labels.scoreSolid,
         };
     }
 
     return {
         badge: "bg-red-500/20 text-red-300",
         bar: "bg-red-400",
-        label: "Schwach",
+        label: labels.scoreWeak,
     };
 }
 
@@ -46,12 +51,14 @@ function ScoreCard({
     title,
     value,
     feedback,
+    toneLabels,
 }: {
     title: string;
     value: number;
     feedback: string;
+    toneLabels: Parameters<typeof getScoreTone>[1];
 }) {
-    const tone = getScoreTone(value);
+    const tone = getScoreTone(value, toneLabels);
 
     return (
         <section className="rounded-xl border border-white/10 bg-gray-900 p-5">
@@ -98,6 +105,7 @@ function ListCard({
 }
 
 export default function CodingChallengeFeedback() {
+    const { dictionary } = useI18n();
     const session = useInterviewSession();
     const interviewId = session.interviewId;
     const [draft, setDraft] = useState<CodingChallengeDraft | null>(null);
@@ -180,14 +188,13 @@ export default function CodingChallengeFeedback() {
     if (!evaluation) {
         return (
             <div className="rounded-xl border border-white/10 bg-gray-900 p-6 text-sm text-gray-300">
-                Reiche zuerst in Schritt 4 eine Coding-Lösung ein, damit hier
-                das persistierte Feedback erscheint.
+                {dictionary.coding.submitFirst}
             </div>
         );
     }
 
     const task = draft?.task;
-    const overallTone = getScoreTone(evaluation.overallScore);
+    const overallTone = getScoreTone(evaluation.overallScore, dictionary.common);
 
     return (
         <div className="space-y-6">
@@ -196,17 +203,17 @@ export default function CodingChallengeFeedback() {
                     <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-400">
                             {task ? <span>{task.role}</span> : null}
-                            {task ? <span>{DIFFICULTY_LABELS[task.difficulty]}</span> : null}
+                            {task ? <span>{dictionary.coding.difficulty[task.difficulty]}</span> : null}
                             {task ? <span>{LANGUAGE_LABELS[task.language]}</span> : null}
                             <span>
                                 {evaluation.passedLikely
-                                    ? "Wahrscheinlich passend"
-                                    : "Noch Nacharbeit nötig"}
+                                    ? dictionary.coding.likelyMatch
+                                    : dictionary.coding.needsWork}
                             </span>
                         </div>
 
                         <h2 className="text-xl font-semibold text-white">
-                            {task?.name ?? "Coding-Challenge-Feedback"}
+                            {task?.name ?? dictionary.coding.feedbackTitle}
                         </h2>
                         <p className="max-w-3xl text-sm text-gray-300">
                             {evaluation.summary}
@@ -215,7 +222,9 @@ export default function CodingChallengeFeedback() {
 
                     <div className="min-w-[180px] rounded-xl border border-white/10 bg-gray-950 p-4">
                         <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm text-gray-400">Gesamtscore</p>
+                            <p className="text-sm text-gray-400">
+                                {dictionary.coding.overallScore}
+                            </p>
                             <span className={`rounded-full px-3 py-1 text-xs ${overallTone.badge}`}>
                                 {overallTone.label}
                             </span>
@@ -235,26 +244,29 @@ export default function CodingChallengeFeedback() {
 
             <div className="grid gap-4 lg:grid-cols-3">
                 <ScoreCard
-                    title="Korrektheit"
+                    title={dictionary.coding.correctness}
                     value={evaluation.correctness.score}
                     feedback={evaluation.correctness.feedback}
+                    toneLabels={dictionary.common}
                 />
                 <ScoreCard
-                    title="Code-Qualität"
+                    title={dictionary.coding.codeQuality}
                     value={evaluation.codeQuality.score}
                     feedback={evaluation.codeQuality.feedback}
+                    toneLabels={dictionary.common}
                 />
                 <ScoreCard
-                    title="Problemlösung"
+                    title={dictionary.coding.problemSolving}
                     value={evaluation.problemSolving.score}
                     feedback={evaluation.problemSolving.feedback}
+                    toneLabels={dictionary.common}
                 />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
-                <ListCard title="Stärken" items={evaluation.strengths} />
-                <ListCard title="Risiken" items={evaluation.issues} />
-                <ListCard title="Verbesserungen" items={evaluation.improvements} />
+                <ListCard title={dictionary.coding.strengths} items={evaluation.strengths} />
+                <ListCard title={dictionary.coding.risks} items={evaluation.issues} />
+                <ListCard title={dictionary.coding.improvements} items={evaluation.improvements} />
             </div>
         </div>
     );

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { getHomeDashboardSnapshot } from "@/db-backend/interviews/read/interview-read-service";
 import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { getDictionary } from "@/lib/i18n/dictionaries";
 
 function LearnCard({
     href,
@@ -40,49 +41,50 @@ export default async function LearnPage() {
         getHomeDashboardSnapshot(currentUser.id),
         getProfileSnapshot(currentUser.id),
     ]);
+    const dictionary = getDictionary(profile.language);
+    const labels = dictionary.learn;
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <main className="mx-auto max-w-7xl px-4 py-10">
-                <h1 className="text-3xl font-bold">Lernen</h1>
+                <h1 className="text-3xl font-bold">{labels.title}</h1>
                 <p className="mt-4 max-w-2xl text-gray-400">
-                    Dieser Bereich zeigt dir die nächsten sinnvollen Schritte
-                    auf Basis deiner gespeicherten Profil-, CV- und Interviewdaten.
+                    {labels.description}
                 </p>
 
                 <div className="mt-10 grid gap-6 md:grid-cols-3">
                     <LearnCard
                         href="/interviews/new"
-                        title="Neue Simulation starten"
-                        description="Wähle eine Interview-Konfiguration aus der DB und starte den nächsten Durchlauf."
-                        detail={`${summary.totalInterviews} Interviews gespeichert`}
+                        title={labels.startTitle}
+                        description={labels.startDescription}
+                        detail={`${summary.totalInterviews} ${labels.savedInterviews}`}
                     />
                     <LearnCard
                         href="/interviews"
-                        title="Vorherige Durchläufe auswerten"
-                        description="Öffne gespeicherte Interview-Sessions, Coding-Challenges und Gesamtfeedback erneut."
-                        detail={`${summary.completedInterviews} Interviews abgeschlossen`}
+                        title={labels.reviewTitle}
+                        description={labels.reviewDescription}
+                        detail={`${summary.completedInterviews} ${labels.completedInterviews}`}
                     />
                     <LearnCard
                         href="/profile"
-                        title="Profil und CV aktualisieren"
-                        description="Pflege deinen aktiven Lebenslauf, damit neue Interviews mit den aktuellen Daten starten."
+                        title={labels.profileTitle}
+                        description={labels.profileDescription}
                         detail={
                             profile.activeCv
-                                ? `Aktiver CV: ${profile.activeCv.fileName}`
-                                : "Noch kein aktiver CV hinterlegt"
+                                ? `${labels.activeCv}: ${profile.activeCv.fileName}`
+                                : labels.noActiveCv
                         }
                     />
                 </div>
 
                 <div className="mt-10 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
                     <h2 className="text-lg font-semibold text-white">
-                        Aktueller Stand
+                        {labels.currentState}
                     </h2>
                     <div className="mt-4 grid gap-4 md:grid-cols-3">
                         <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10">
                             <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                                CV Score
+                                {labels.cvScore}
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-white">
                                 {summary.cvScore === null ? "--" : `${summary.cvScore}%`}
@@ -90,7 +92,7 @@ export default async function LearnPage() {
                         </div>
                         <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10">
                             <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                                Erfolgsquote
+                                {labels.successRate}
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-white">
                                 {summary.successRate === null
@@ -100,7 +102,7 @@ export default async function LearnPage() {
                         </div>
                         <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10">
                             <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-                                Sprache
+                                {labels.language}
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-white">
                                 {profile.language.toUpperCase()}

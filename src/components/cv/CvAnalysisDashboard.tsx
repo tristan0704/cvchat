@@ -1,19 +1,18 @@
 "use client";
 
 import type { CvQualityAnalysis } from "@/lib/cv/types";
+import { useI18n } from "@/lib/i18n/context";
 
 type Props = {
   data: CvQualityAnalysis;
 };
 
-const metricEntries: Array<
-  [keyof Omit<CvQualityAnalysis, "overallScore" | "improvements">, string]
-> = [
-  ["sections", "Abschnitte"],
-  ["impact", "Wirkung"],
-  ["length", "Länge"],
-  ["contact", "Kontakt"],
-  ["clarity", "Klarheit"],
+const metricKeys: Array<keyof Omit<CvQualityAnalysis, "overallScore" | "improvements">> = [
+  "sections",
+  "impact",
+  "length",
+  "contact",
+  "clarity",
 ];
 
 function getBarColor(score: number) {
@@ -23,11 +22,14 @@ function getBarColor(score: number) {
 }
 
 export default function CvAnalysisDashboard({ data }: Props) {
+  const { dictionary } = useI18n();
+  const labels = dictionary.cvFeedback;
+
   return (
     <section className="space-y-6 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
       <div className="space-y-1 text-center">
         <p className="text-sm uppercase tracking-[0.3em] text-gray-500">
-          Gesamtbewertung
+          {labels.overallEvaluation}
         </p>
         <p className="text-5xl font-semibold text-white">
           {Math.round(data.overallScore)}%
@@ -35,7 +37,7 @@ export default function CvAnalysisDashboard({ data }: Props) {
       </div>
 
       <div className="space-y-4">
-        {metricEntries.map(([key, label]) => {
+        {metricKeys.map((key) => {
           const dimension = data[key];
 
           return (
@@ -45,7 +47,7 @@ export default function CvAnalysisDashboard({ data }: Props) {
             >
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                  {label}
+                  {labels.metrics[key]}
                 </p>
                 <p className="text-sm font-semibold text-white">
                   {Math.round(dimension.score)}%
@@ -69,7 +71,7 @@ export default function CvAnalysisDashboard({ data }: Props) {
 
       <div className="space-y-2 rounded-xl bg-gray-900 p-4 outline outline-1 outline-white/10">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">
-          Verbesserungen
+          {labels.improvements}
         </p>
 
         {data.improvements.length > 0 ? (
@@ -81,7 +83,7 @@ export default function CvAnalysisDashboard({ data }: Props) {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-400">Keine Verbesserungen angegeben.</p>
+          <p className="text-sm text-gray-400">{labels.noImprovements}</p>
         )}
       </div>
     </section>

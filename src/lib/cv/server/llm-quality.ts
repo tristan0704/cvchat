@@ -3,6 +3,7 @@ import "server-only";
 import { callOpenAiChat } from "@/lib/openai";
 import type { CvQualityAnalysis, InterviewCvConfig } from "@/lib/cv/types";
 import { parseJsonObject } from "@/lib/cv/server/json";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 const FALLBACK_FEEDBACK = "Inhalt konnte nicht analysiert werden.";
 
@@ -16,6 +17,16 @@ export const FALLBACK_QUALITY_RESULT: CvQualityAnalysis = {
   improvements: ["Keine Analyse verfügbar."],
 };
 
+const FALLBACK_QUALITY_RESULT_EN: CvQualityAnalysis = {
+  overallScore: 50,
+  sections: { score: 50, feedback: "Sections could not be analyzed." },
+  impact: { score: 50, feedback: "Impact could not be analyzed." },
+  length: { score: 50, feedback: "Length could not be analyzed." },
+  contact: { score: 50, feedback: "Contact information could not be analyzed." },
+  clarity: { score: 50, feedback: "Clarity could not be analyzed." },
+  improvements: ["No analysis available."],
+};
+
 function clampScore(value: unknown): number {
   const numeric = typeof value === "number" ? value : Number(value);
   if (Number.isNaN(numeric)) return 50;
@@ -24,9 +35,15 @@ function clampScore(value: unknown): number {
   return Math.round(numeric);
 }
 
-function parseDimension(value: unknown) {
+function getFallbackQualityResult(language: unknown) {
+  return normalizeLanguage(language) === "en"
+    ? FALLBACK_QUALITY_RESULT_EN
+    : FALLBACK_QUALITY_RESULT;
+}
+
+function parseDimension(value: unknown, fallbackFeedback = FALLBACK_FEEDBACK) {
   if (!value || typeof value !== "object") {
-    return { score: 50, feedback: FALLBACK_FEEDBACK };
+    return { score: 50, feedback: fallbackFeedback };
   }
 
   const entry = value as Record<string, unknown>;
@@ -35,11 +52,17 @@ function parseDimension(value: unknown) {
     feedback:
       typeof entry.feedback === "string" && entry.feedback.trim().length > 0
         ? entry.feedback.trim()
-        : FALLBACK_FEEDBACK,
+        : fallbackFeedback,
   };
 }
 
-function buildPrompt(cvText: string, config: InterviewCvConfig) {
+function buildPrompt(cvText: string, config: InterviewCvConfig, language: unknown) {
+  const outputLanguage = normalizeLanguage(language);
+  const languageInstruction =
+    outputLanguage === "en"
+      ? "* Write all user-facing feedback in English."
+      : "* Formuliere sämtliches Feedback auf Deutsch.";
+
   return {
     prompt: [
       "Du bist ein erfahrener Recruiter und Career Coach.",
@@ -70,7 +93,7 @@ function buildPrompt(cvText: string, config: InterviewCvConfig) {
       "}",
       "",
       "Regeln:",
-      "* Formuliere sämtliches Feedback auf Deutsch.",
+      languageInstruction,
       "* Begründe alles ausschließlich mit dem Inhalt des Lebenslaufs und dem Zielkontext.",
       "* Sei präzise, kurz und konkret umsetzbar.",
       "* Erfinde keine Erfahrungen, die im Lebenslauf nicht erkennbar sind.",
@@ -81,14 +104,16 @@ function buildPrompt(cvText: string, config: InterviewCvConfig) {
 
 export async function analyzeCvQualityWithLLM(
   cvText: string,
-  config: InterviewCvConfig
+  config: InterviewCvConfig,
+  language: unknown = "de"
 ): Promise<CvQualityAnalysis> {
+  const fallbackQualityResult = getFallbackQualityResult(language);
   const trimmed = cvText.trim();
   if (!trimmed) {
-    return FALLBACK_QUALITY_RESULT;
+    return fallbackQualityResult;
   }
 
-  const { prompt, question } = buildPrompt(trimmed, config);
+  const { prompt, question } = buildPrompt(trimmed, config, language);
 
   try {
     const ai = await callOpenAiChat({
@@ -100,7 +125,7 @@ export async function analyzeCvQualityWithLLM(
 
     if (!ai.ok || !ai.content) {
       console.warn("[cv-feedback] OpenAI call failed", ai.error);
-      return FALLBACK_QUALITY_RESULT;
+      return fallbackQualityResult;
     }
 
     const parsed = parseJsonObject<Record<string, unknown>>(ai.content);
@@ -116,18 +141,20 @@ export async function analyzeCvQualityWithLLM(
 
     return {
       overallScore: clampScore(parsed.overallScore),
-      sections: parseDimension(parsed.sections),
-      impact: parseDimension(parsed.impact),
-      length: parseDimension(parsed.length),
-      contact: parseDimension(parsed.contact),
-      clarity: parseDimension(parsed.clarity),
+      sections: parseDimension(parsed.sections, fallbackQualityResult.sections.feedback),
+      impact: parseDimension(parsed.impact, fallbackQualityResult.impact.feedback),
+      length: parseDimension(parsed.length, fallbackQualityResult.length.feedback),
+      contact: parseDimension(parsed.contact, fallbackQualityResult.contact.feedback),
+      clarity: parseDimension(parsed.clarity, fallbackQualityResult.clarity.feedback),
       improvements:
         improvements.length > 0
           ? improvements
-          : ["Keine konkreten Verbesserungen angegeben."],
+          : normalizeLanguage(language) === "en"
+            ? ["No concrete improvements provided."]
+            : ["Keine konkreten Verbesserungen angegeben."],
     };
   } catch (error) {
     console.error("[cv-feedback]", error);
-    return FALLBACK_QUALITY_RESULT;
+    return fallbackQualityResult;
   }
 }

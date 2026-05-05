@@ -1,6 +1,8 @@
 import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import { createOrRefreshInterviewOverallFeedback } from "@/db-backend/interviews/overall-feedback-service";
 import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 export const runtime = "nodejs";
 
@@ -30,10 +32,12 @@ export async function POST(request: Request) {
             );
         }
 
+        const profile = await getProfileSnapshot(currentUser.id);
         const overallFeedback = await createOrRefreshInterviewOverallFeedback({
             userId: currentUser.id,
             interviewId,
             force,
+            language: normalizeLanguage(profile.language),
         });
         const status = await getInterviewRuntimeStatusForUser(
             currentUser.id,

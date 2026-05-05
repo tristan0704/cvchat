@@ -6,8 +6,10 @@ import type {
   CodingChallengeTask,
 } from "@/lib/coding-challenge/types";
 import { callOpenAiChat } from "@/lib/openai";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 const FALLBACK_FEEDBACK = "Abgabe konnte nicht analysiert werden.";
+const FALLBACK_FEEDBACK_EN = "Submission could not be analyzed.";
 
 function clampScore(value: unknown) {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -33,11 +35,14 @@ function normalizeStringArray(value: unknown) {
     .filter((item) => item.length > 0);
 }
 
-function parseDimension(value: unknown): CodingChallengeEvaluationDimension {
+function parseDimension(
+  value: unknown,
+  fallbackFeedback = FALLBACK_FEEDBACK
+): CodingChallengeEvaluationDimension {
   if (!value || typeof value !== "object") {
     return {
       score: 50,
-      feedback: FALLBACK_FEEDBACK,
+      feedback: fallbackFeedback,
     };
   }
 
@@ -47,7 +52,7 @@ function parseDimension(value: unknown): CodingChallengeEvaluationDimension {
     feedback:
       typeof entry.feedback === "string" && entry.feedback.trim().length > 0
         ? entry.feedback.trim()
-        : FALLBACK_FEEDBACK,
+        : fallbackFeedback,
   };
 }
 
@@ -64,7 +69,19 @@ function extractJsonString(content: string) {
   return trimmed;
 }
 
-function buildPrompt(task: CodingChallengeTask, code: string) {
+function getFallbackFeedback(language: unknown) {
+  return normalizeLanguage(language) === "en"
+    ? FALLBACK_FEEDBACK_EN
+    : FALLBACK_FEEDBACK;
+}
+
+function buildPrompt(task: CodingChallengeTask, code: string, language: unknown) {
+  const outputLanguage = normalizeLanguage(language);
+  const languageInstruction =
+    outputLanguage === "en"
+      ? "Write all user-facing feedback in English."
+      : "Formuliere sämtliches Feedback auf Deutsch.";
+
   return {
     prompt: [
       "Du bist ein erfahrener technischer Interviewer und bewertest die Abgabe einer Coding-Challenge.",
@@ -73,7 +90,7 @@ function buildPrompt(task: CodingChallengeTask, code: string) {
       "Gehe davon aus, dass keine Codeausführung verfügbar ist. Beurteile nur per statischer Analyse.",
       "Gib ausschließlich gültiges JSON ohne Markdown und ohne zusätzliche Erklärung zurück.",
       "Erwähne die versteckte Referenzlösung nicht direkt im Feedback.",
-      "Formuliere sämtliches Feedback auf Deutsch.",
+      languageInstruction,
     ].join(" "),
     question: [
       `Aufgabenname: ${task.name}`,
@@ -131,9 +148,11 @@ function buildPrompt(task: CodingChallengeTask, code: string) {
 
 export async function evaluateCodingChallengeSubmission(
   task: CodingChallengeTask,
-  code: string
+  code: string,
+  language: unknown = "de"
 ): Promise<CodingChallengeEvaluation> {
-  const { prompt, question } = buildPrompt(task, code);
+  const { prompt, question } = buildPrompt(task, code, language);
+  const fallbackFeedback = getFallbackFeedback(language);
 
   const ai = await callOpenAiChat({
     prompt,
@@ -159,10 +178,10 @@ export async function evaluateCodingChallengeSubmission(
     summary:
       typeof parsed.summary === "string" && parsed.summary.trim().length > 0
         ? parsed.summary.trim()
-        : FALLBACK_FEEDBACK,
-    correctness: parseDimension(parsed.correctness),
-    codeQuality: parseDimension(parsed.codeQuality),
-    problemSolving: parseDimension(parsed.problemSolving),
+        : fallbackFeedback,
+    correctness: parseDimension(parsed.correctness, fallbackFeedback),
+    codeQuality: parseDimension(parsed.codeQuality, fallbackFeedback),
+    problemSolving: parseDimension(parsed.problemSolving, fallbackFeedback),
     strengths: normalizeStringArray(parsed.strengths),
     issues: normalizeStringArray(parsed.issues),
     improvements: normalizeStringArray(parsed.improvements),

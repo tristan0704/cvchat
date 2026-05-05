@@ -9,7 +9,9 @@
 import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtime";
 import { saveInterviewTranscript } from "@/db-backend/interviews/analysis/interview-analysis-service";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback-fetch/fingerprint";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 import type {
     PostCallTranscriptStatus,
     Speaker,
@@ -172,18 +174,20 @@ export async function POST(req: Request) {
     }
 
     try {
+        const currentUser = await getCurrentApiIdentity();
+        const profile = currentUser ? await getProfileSnapshot(currentUser.id) : null;
+        const language = normalizeLanguage(profile?.language);
         const result = await transcribeCandidateAudio({
             apiKey,
             audio,
             role,
             interviewerQuestions,
+            language,
         });
 
         let status: Awaited<ReturnType<typeof getInterviewRuntimeStatusForUser>> = null;
 
         if (interviewId) {
-            const currentUser = await getCurrentApiIdentity();
-
             if (currentUser) {
                 const transcriptExport = buildTranscriptQaExport(
                     role,

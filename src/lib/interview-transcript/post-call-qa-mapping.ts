@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai"
+import { normalizeLanguage } from "@/lib/i18n/dictionaries"
 import { normalizeTranscriptText } from "@/lib/interview-transcript/text"
 import type { TranscriptQaPair } from "@/lib/interview-transcript/types"
 
@@ -28,6 +29,7 @@ type MapPostCallTranscriptToQaPairsArgs = {
     role: string
     interviewerQuestions: string[]
     candidateTranscript: string
+    language?: string
 }
 
 function normalizeModelName(model: string): string {
@@ -50,10 +52,29 @@ function normalizeQuestions(interviewerQuestions: string[]): string[] {
         .filter((question) => !!question)
 }
 
-function buildQaMappingPrompt(role: string, interviewerQuestions: string[], candidateTranscript: string): string {
+function buildQaMappingPrompt(role: string, interviewerQuestions: string[], candidateTranscript: string, language: unknown): string {
     const serializedQuestions = interviewerQuestions.map((question, index) => `${index + 1}. ${question}`).join("\n")
+    const outputLanguage = normalizeLanguage(language)
 
     //Gemini Prompt für QA Mapping
+
+    if (outputLanguage === "en") {
+        return [
+            "For an English technical interview, match each recruiter question to the most suitable candidate answer.",
+            `The target role is: ${role || "Backend Developer"}.`,
+            "You receive the questions in the exact order they were asked and the complete post-call candidate transcript.",
+            "Return exactly one JSON object with the field answers.",
+            `answers must contain exactly ${interviewerQuestions.length} entries, in the same order as the questions.`,
+            "Use only content from the candidate transcript.",
+            "Do not invent answer parts, new questions, or evaluations.",
+            "If an answer cannot be matched confidently, return an empty string for that entry.",
+            "Questions:",
+            serializedQuestions,
+            "",
+            "Candidate full transcript:",
+            candidateTranscript,
+        ].join("\n")
+    }
 
     return [
         "Ordne fuer ein deutsches technisches Interview jede gestellte Recruiter-Frage der passendsten Kandidatenantwort zu.",
@@ -77,10 +98,15 @@ function parseQaMappingResponse(responseText: string): string[] {
     return Array.isArray(parsed.answers) ? parsed.answers.filter((answer) => typeof answer === "string") : []
 }
 
-function buildAlignedQaPairs(interviewerQuestions: string[], answers: string[]): TranscriptQaPair[] {
+function buildAlignedQaPairs(interviewerQuestions: string[], answers: string[], language: unknown): TranscriptQaPair[] {
+    const fallbackAnswer =
+        normalizeLanguage(language) === "en"
+            ? "(no answer captured)"
+            : "(keine Antwort erfasst)"
+
     return interviewerQuestions.map((question, index) => ({
         question,
-        answer: normalizeTranscriptText(answers[index] || "") || "(keine Antwort erfasst)",
+        answer: normalizeTranscriptText(answers[index] || "") || fallbackAnswer,
     }))
 }
 
@@ -104,7 +130,7 @@ export async function mapPostCallTranscriptToQaPairs(args: MapPostCallTranscript
         try {
             const response = await args.ai.models.generateContent({
                 model,
-                contents: buildQaMappingPrompt(args.role, interviewerQuestions, candidateTranscript),
+                contents: buildQaMappingPrompt(args.role, interviewerQuestions, candidateTranscript, args.language),
                 config: {
                     temperature: 0.1,
                     responseMimeType: "application/json",
@@ -120,7 +146,7 @@ export async function mapPostCallTranscriptToQaPairs(args: MapPostCallTranscript
 
             const answers = parseQaMappingResponse(responseText)
             return {
-                qaPairs: buildAlignedQaPairs(interviewerQuestions, answers),
+                qaPairs: buildAlignedQaPairs(interviewerQuestions, answers, args.language),
                 model,
             }
         } catch (error) {

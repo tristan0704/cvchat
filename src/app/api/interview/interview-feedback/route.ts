@@ -4,6 +4,8 @@ import { getInterviewRuntimeStatusForUser } from "@/db-backend/interviews/runtim
 import { saveInterviewFeedbackForUser } from "@/db-backend/interviews/analysis/interview-analysis-service";
 import { evaluateInterviewFeedback } from "@/app/api/interview/interview-feedback/evaluate-interview-feedback";
 import type { InterviewFeedbackRequest } from "@/lib/interview-feedback-fetch/types";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 export const runtime = "nodejs";
 
@@ -58,6 +60,9 @@ export async function POST(request: Request) {
             );
         }
 
+        const profile = await getProfileSnapshot(currentUser.id);
+        const language = normalizeLanguage(profile.language);
+        const languageAwareFingerprint = `${transcriptFingerprint}:${language}`;
         const existing = await getInterviewFeedbackDetailForUser(
             currentUser.id,
             interviewId
@@ -65,7 +70,7 @@ export async function POST(request: Request) {
 
         if (
             existing?.feedback &&
-            existing.feedback.transcriptFingerprint === transcriptFingerprint
+            existing.feedback.transcriptFingerprint === languageAwareFingerprint
         ) {
             const status = await getInterviewRuntimeStatusForUser(
                 currentUser.id,
@@ -89,6 +94,7 @@ export async function POST(request: Request) {
                     : "",
             transcript,
             transcriptFingerprint,
+            language,
         });
 
         await saveInterviewFeedbackForUser({

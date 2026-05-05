@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n/context";
+
 export default function DeleteDialog({
   open,
   onClose,
@@ -9,6 +11,9 @@ export default function DeleteDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const { dictionary } = useI18n();
+  const labels = dictionary.interviews;
+
   if (!open) return null;
 
   return (
@@ -18,11 +23,10 @@ export default function DeleteDialog({
 
       {/* MODAL */}
       <div className="relative z-10 w-full max-w-md rounded-xl bg-gray-800 p-6 outline outline-1 outline-white/10">
-        <h2 className="text-lg font-semibold text-white">Interview löschen</h2>
+        <h2 className="text-lg font-semibold text-white">{labels.deleteTitle}</h2>
 
         <p className="mt-2 text-sm text-gray-400">
-          Bist du sicher, dass du dieses Interview löschen möchtest? Diese
-          Aktion kann nicht rückgängig gemacht werden.
+          {labels.deleteDescription}
         </p>
 
         {/* ACTIONS */}
@@ -31,14 +35,14 @@ export default function DeleteDialog({
             onClick={onClose}
             className="rounded-md bg-gray-700 px-4 py-2 text-sm hover:bg-gray-600"
           >
-            Abbrechen
+            {dictionary.common.cancel}
           </button>
 
           <button
             onClick={onConfirm}
             className="rounded-md bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-400"
           >
-            Löschen
+            {labels.delete}
           </button>
         </div>
       </div>

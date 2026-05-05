@@ -7,6 +7,7 @@ import type {
     InterviewFeedbackRequest,
     InterviewFeedbackResponse,
 } from "@/lib/interview-feedback-fetch/types";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 type UseInterviewFeedbackAnalysisArgs = InterviewFeedbackRequest & {
     interviewId: string;
@@ -17,6 +18,7 @@ type UseInterviewFeedbackAnalysisArgs = InterviewFeedbackRequest & {
 export function useInterviewFeedbackAnalysis(
     args: UseInterviewFeedbackAnalysisArgs
 ) {
+    const languageAwareFingerprint = `${args.transcriptFingerprint}:${normalizeLanguage(args.language)}`;
     const [evaluation, setEvaluation] =
         useState<InterviewFeedbackEvaluation | null>(
             args.existingEvaluation ?? null
@@ -29,7 +31,7 @@ export function useInterviewFeedbackAnalysis(
     useEffect(() => {
         if (
             args.existingEvaluation &&
-            args.existingEvaluation.transcriptFingerprint === args.transcriptFingerprint
+            args.existingEvaluation.transcriptFingerprint === languageAwareFingerprint
         ) {
             setEvaluation(args.existingEvaluation);
             setStatus("ready");
@@ -63,6 +65,7 @@ export function useInterviewFeedbackAnalysis(
                         companySize: args.companySize,
                         transcript: args.transcript,
                         transcriptFingerprint: args.transcriptFingerprint,
+                        language: args.language,
                     }),
                 });
 
@@ -110,9 +113,11 @@ export function useInterviewFeedbackAnalysis(
         args.existingEvaluation,
         args.experience,
         args.interviewId,
+        args.language,
         args.role,
         args.transcript,
         args.transcriptFingerprint,
+        languageAwareFingerprint,
     ]);
 
     return {

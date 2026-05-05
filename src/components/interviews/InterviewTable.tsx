@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import DeleteDialog from "@/components/ui/DeleteDialog";
+import { useI18n } from "@/lib/i18n/context";
+import type { AppDictionary } from "@/lib/i18n/dictionaries";
 
 type InterviewStatus =
     | "draft"
@@ -26,24 +28,27 @@ type InterviewListItem = {
     completedAt: string | null;
 };
 
-function getStatusLabel(status: InterviewStatus) {
+function getStatusLabel(
+    status: InterviewStatus,
+    labels: AppDictionary["interviews"]["status"]
+) {
     switch (status) {
         case "ready":
-            return "bereit";
+            return labels.ready;
         case "in_progress":
-            return "laufend";
+            return labels.inProgress;
         case "analyzing":
-            return "analyse";
+            return labels.analyzing;
         case "completed":
-            return "abgeschlossen";
+            return labels.completed;
         case "failed":
-            return "fehler";
+            return labels.failed;
         case "archived":
-            return "archiviert";
+            return labels.archived;
         case "cancelled":
-            return "abgebrochen";
+            return labels.cancelled;
         default:
-            return "entwurf";
+            return labels.draft;
     }
 }
 
@@ -65,12 +70,12 @@ function getStatusStyle(status: InterviewStatus) {
     }
 }
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null, emptyLabel: string, language: string) {
     if (!value) {
-        return "Noch nicht gestartet";
+        return emptyLabel;
     }
 
-    return new Intl.DateTimeFormat("de-DE", {
+    return new Intl.DateTimeFormat(language === "en" ? "en-US" : "de-DE", {
         dateStyle: "medium",
         timeStyle: "short",
     }).format(new Date(value));
@@ -81,6 +86,8 @@ export default function InterviewTable({
 }: {
     initialInterviews?: InterviewListItem[];
 }) {
+    const { dictionary, language } = useI18n();
+    const labels = dictionary.interviews;
     const [interviews, setInterviews] =
         useState<InterviewListItem[]>(initialInterviews ?? []);
     const [loading, setLoading] = useState(!initialInterviews);
@@ -110,7 +117,7 @@ export default function InterviewTable({
 
                 if (!response.ok || !data?.interviews) {
                     throw new Error(
-                        data?.error || "Interviews konnten nicht geladen werden."
+                        data?.error || labels.loadError
                     );
                 }
 
@@ -122,7 +129,7 @@ export default function InterviewTable({
                     setError(
                         loadError instanceof Error
                             ? loadError.message
-                            : "Interviews konnten nicht geladen werden."
+                            : labels.loadError
                     );
                 }
             } finally {
@@ -137,7 +144,7 @@ export default function InterviewTable({
         return () => {
             cancelled = true;
         };
-    }, [initialInterviews]);
+    }, [initialInterviews, labels.loadError]);
 
     async function handleDelete() {
         if (!selectedId) {
@@ -154,7 +161,7 @@ export default function InterviewTable({
 
             if (!response.ok || !data?.ok) {
                 throw new Error(
-                    data?.error || "Interview konnte nicht geloescht werden."
+                    data?.error || labels.deleteError
                 );
             }
 
@@ -167,7 +174,7 @@ export default function InterviewTable({
             setError(
                 deleteError instanceof Error
                     ? deleteError.message
-                    : "Interview konnte nicht geloescht werden."
+                    : labels.deleteError
             );
         }
     }
@@ -175,14 +182,14 @@ export default function InterviewTable({
     if (loading) {
         return (
             <div className="rounded-xl bg-gray-800/50 p-6 text-sm text-gray-400 outline outline-1 outline-white/10">
-                Interviews werden geladen...
+                {labels.loading}
             </div>
         );
     }
 
     return (
         <div className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
-            <h2 className="mb-4 text-lg font-semibold text-white">Interviews</h2>
+            <h2 className="mb-4 text-lg font-semibold text-white">{labels.tableTitle}</h2>
 
             {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
 
@@ -190,11 +197,11 @@ export default function InterviewTable({
                 <table className="min-w-full text-sm">
                     <thead className="border-b border-white/10 text-gray-400">
                         <tr>
-                            <th className="px-4 py-3 text-left">Titel</th>
-                            <th className="px-4 py-3 text-left">Rolle</th>
-                            <th className="px-4 py-3 text-left">Gestartet am</th>
-                            <th className="px-4 py-3 text-left">Status</th>
-                            <th className="px-4 py-3 text-right">Aktion</th>
+                            <th className="px-4 py-3 text-left">{labels.columnTitle}</th>
+                            <th className="px-4 py-3 text-left">{labels.columnRole}</th>
+                            <th className="px-4 py-3 text-left">{labels.columnStartedAt}</th>
+                            <th className="px-4 py-3 text-left">{labels.columnStatus}</th>
+                            <th className="px-4 py-3 text-right">{labels.columnAction}</th>
                         </tr>
                     </thead>
 
@@ -211,7 +218,11 @@ export default function InterviewTable({
                                     </td>
 
                                     <td className="px-4 py-3 text-gray-400">
-                                        {formatDate(item.startedAt ?? item.createdAt)}
+                                        {formatDate(
+                                            item.startedAt ?? item.createdAt,
+                                            labels.notStarted,
+                                            language
+                                        )}
                                     </td>
 
                                     <td className="px-4 py-3">
@@ -220,7 +231,7 @@ export default function InterviewTable({
                                                 item.status
                                             )}`}
                                         >
-                                            {getStatusLabel(item.status)}
+                                            {getStatusLabel(item.status, labels.status)}
                                         </span>
                                     </td>
 
@@ -229,7 +240,7 @@ export default function InterviewTable({
                                             href={`/interviews/${item.id}`}
                                             className="rounded-md bg-indigo-500/10 px-3 py-1 text-xs text-indigo-400 hover:bg-indigo-500/20"
                                         >
-                                            Öffnen
+                                            {labels.open}
                                         </Link>
 
                                         <button
@@ -239,7 +250,7 @@ export default function InterviewTable({
                                             }}
                                             className="rounded-md bg-red-500/10 px-3 py-1 text-xs text-red-400 hover:bg-red-500/20"
                                         >
-                                            Löschen
+                                            {labels.delete}
                                         </button>
                                     </td>
                                 </tr>
@@ -250,7 +261,7 @@ export default function InterviewTable({
                                     colSpan={5}
                                     className="px-4 py-8 text-center text-sm text-gray-400"
                                 >
-                                    Noch keine Interviews vorhanden.
+                                    {labels.empty}
                                 </td>
                             </tr>
                         )}

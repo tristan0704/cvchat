@@ -9,6 +9,7 @@ import { buildRoleProfile } from "@/lib/cv/server/job-profile";
 import { analyzeKeywordMatch } from "@/lib/cv/server/keyword-match";
 import { analyzeCvQualityWithLLM } from "@/lib/cv/server/llm-quality";
 import { pdfToText } from "@/lib/cv/server/pdf-to-text";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 export class CvFeedbackError extends Error {
   status: number;
@@ -23,18 +24,21 @@ export class CvFeedbackError extends Error {
 type AnalyzeCvFeedbackArgs = {
   file: File;
   config: InterviewCvConfig;
+  language?: string;
 };
 
 type AnalyzeCvFeedbackFromTextArgs = {
   cvText: string;
   fileName: string;
   config: InterviewCvConfig;
+  language?: string;
 };
 
 export async function analyzeCvFeedbackFromText({
   cvText,
   fileName,
   config,
+  language = "de",
 }: AnalyzeCvFeedbackFromTextArgs): Promise<CvFeedbackResult> {
   if (!cvText.trim()) {
     throw new CvFeedbackError(
@@ -43,9 +47,10 @@ export async function analyzeCvFeedbackFromText({
     );
   }
 
+  const outputLanguage = normalizeLanguage(language);
   const roleProfile = buildRoleProfile(config);
-  const roleAnalysis = analyzeKeywordMatch(cvText, roleProfile);
-  const llmQuality = await analyzeCvQualityWithLLM(cvText, config);
+  const roleAnalysis = analyzeKeywordMatch(cvText, roleProfile, outputLanguage);
+  const llmQuality = await analyzeCvQualityWithLLM(cvText, config, outputLanguage);
   const blendedScore = Math.round(
     llmQuality.overallScore * LLM_WEIGHT + roleAnalysis.score * KEYWORD_WEIGHT
   );
@@ -72,6 +77,7 @@ export async function analyzeCvFeedbackFromText({
 export async function analyzeCvFeedback({
   file,
   config,
+  language = "de",
 }: AnalyzeCvFeedbackArgs): Promise<CvFeedbackResult> {
   const buffer = Buffer.from(await file.arrayBuffer());
   const cvText = await pdfToText(buffer);
@@ -80,5 +86,6 @@ export async function analyzeCvFeedback({
     cvText,
     fileName: file.name,
     config,
+    language,
   });
 }

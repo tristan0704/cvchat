@@ -64,6 +64,7 @@ export type CodingChallengeEvaluation = {
 export type CodingChallengeEvaluationRequest = {
   attemptId: string;
   code: string;
+  language?: string;
 };
 
 export type CodingChallengeRuntimeStatusSnapshot = {

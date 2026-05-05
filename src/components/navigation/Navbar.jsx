@@ -4,11 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
-  { href: "/home", label: "Dashboard" },
-  { href: "/interviews", label: "Interviews" },
-  { href: "/learn", label: "Lernen" },
-];
+import { useI18n } from "@/lib/i18n/context";
 
 function isActivePath(pathname, href) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -33,6 +29,12 @@ function NavLink({ href, label, pathname, onClick }) {
 }
 
 export default function Navbar({ initialProfile }) {
+  const { dictionary } = useI18n();
+  const navItems = [
+    { href: "/home", label: dictionary.nav.dashboard },
+    { href: "/interviews", label: dictionary.nav.interviews },
+    { href: "/learn", label: dictionary.nav.learn },
+  ];
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   // Die Shell bekommt Basisdaten direkt vom Server und spart so einen Extra-Request.
@@ -62,7 +64,11 @@ export default function Navbar({ initialProfile }) {
               type="button"
               onClick={() => setMobileOpen((currentValue) => !currentValue)}
               className="relative inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-white/5 hover:text-white focus:outline-2 focus:-outline-offset-1 focus:outline-indigo-500"
-              aria-label={mobileOpen ? "Navigation schließen" : "Navigation öffnen"}
+              aria-label={
+                mobileOpen
+                  ? dictionary.nav.closeNavigation
+                  : dictionary.nav.openNavigation
+              }
             >
               {!mobileOpen ? (
                 <svg
@@ -109,7 +115,7 @@ export default function Navbar({ initialProfile }) {
 
             <div className="hidden sm:ml-6 sm:block">
               <div className="flex space-x-4">
-                {NAV_ITEMS.map((item) => (
+                {navItems.map((item) => (
                   <NavLink
                     key={item.href}
                     href={item.href}
@@ -124,7 +130,7 @@ export default function Navbar({ initialProfile }) {
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
             <div className="hidden pr-3 text-right sm:block">
               <p className="text-sm font-medium text-white">
-                {profile.username || "Profil"}
+                {profile.username || dictionary.nav.profile}
               </p>
               <p className="text-xs text-gray-400">
                 {profile.email || "commit"}
@@ -136,14 +142,14 @@ export default function Navbar({ initialProfile }) {
                 type="button"
                 onClick={() => setProfileOpen((currentValue) => !currentValue)}
                 className="relative flex rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                aria-label="Profilmenü öffnen"
+                aria-label={dictionary.nav.openProfileMenu}
               >
                 {profile.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={profile.avatarUrl}
                     className="size-8 rounded-full bg-gray-800 object-cover outline -outline-offset-1 outline-white/10"
-                    alt={profile.username || "Profilbild"}
+                    alt={profile.username || dictionary.nav.profileImage}
                   />
                 ) : (
                   <span className="flex size-8 items-center justify-center rounded-full bg-indigo-500 text-xs font-semibold text-white outline -outline-offset-1 outline-white/10">
@@ -159,21 +165,21 @@ export default function Navbar({ initialProfile }) {
                     onClick={() => setProfileOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5"
                   >
-                    Profil
+                    {dictionary.nav.profile}
                   </Link>
                   <Link
                     href="/settings"
                     onClick={() => setProfileOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5"
                   >
-                    Einstellungen
+                    {dictionary.nav.settings}
                   </Link>
                   <form action="/auth/signout" method="post">
                     <button
                       type="submit"
                       className="block w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5"
                     >
-                      Abmelden
+                      {dictionary.nav.signOut}
                     </button>
                   </form>
                 </div>
@@ -186,7 +192,7 @@ export default function Navbar({ initialProfile }) {
       {mobileOpen && (
         <div className="block border-t border-white/10 sm:hidden">
           <div className="space-y-1 px-2 pb-3 pt-2">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.href}
                 href={item.href}
@@ -197,7 +203,7 @@ export default function Navbar({ initialProfile }) {
             ))}
             <NavLink
               href="/profile"
-              label="Profil"
+              label={dictionary.nav.profile}
               pathname={pathname}
               onClick={() => setMobileOpen(false)}
             />

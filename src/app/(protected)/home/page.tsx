@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
 import { getHomeDashboardSnapshot } from "@/db-backend/interviews/read/interview-read-service";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { getDictionary } from "@/lib/i18n/dictionaries";
 import { createServerTiming } from "@/lib/server-timing";
 
 function StatCard({
@@ -57,9 +59,15 @@ export default async function HomePage() {
   }
 
   // Vermeidet einen zusätzlichen Netzwerk-Umweg nach dem ersten Render.
-  const summary: HomeSummary = await timing.measure("db.homeSummary", () =>
-    getHomeDashboardSnapshot(currentUser.id),
-  );
+  const [summary, profile]: [
+    HomeSummary,
+    Awaited<ReturnType<typeof getProfileSnapshot>>,
+  ] = await Promise.all([
+    timing.measure("db.homeSummary", () => getHomeDashboardSnapshot(currentUser.id)),
+    getProfileSnapshot(currentUser.id),
+  ]);
+  const dictionary = getDictionary(profile.language);
+  const labels = dictionary.home;
 
   timing.log({
     status: 200,
@@ -69,20 +77,20 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <main className="mx-auto max-w-7xl px-4 py-10">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-3xl font-bold">{labels.title}</h1>
 
-        <p className="mt-4 text-gray-400">Willkommen bei CommIT.</p>
+        <p className="mt-4 text-gray-400">{labels.welcome}</p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Interviews gesamt"
+            title={labels.totalInterviews}
             value={String(summary.totalInterviews)}
-            trend={summary.totalInterviews ? "aktiv" : "neu"}
+            trend={summary.totalInterviews ? labels.active : labels.new}
             trendUp={true}
           />
 
           <StatCard
-            title="Abgeschlossen"
+            title={labels.completed}
             value={String(summary.completedInterviews)}
             trend={
               summary.totalInterviews
@@ -93,24 +101,24 @@ export default async function HomePage() {
           />
 
           <StatCard
-            title="CV Score"
+            title={labels.cvScore}
             value={
               summary.cvScore === null || summary.cvScore === undefined
                 ? "--"
                 : `${summary.cvScore}%`
             }
-            trend="letzte Analyse"
+            trend={labels.latestAnalysis}
             trendUp={true}
           />
 
           <StatCard
-            title="Erfolgsquote"
+            title={labels.successRate}
             value={
               summary.successRate === null || summary.successRate === undefined
                 ? "--"
                 : `${summary.successRate}%`
             }
-            trend="abgeschlossen"
+            trend={labels.completedTrend}
             trendUp={true}
           />
         </div>
@@ -120,9 +128,9 @@ export default async function HomePage() {
             href="/interviews/new"
             className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10 transition hover:bg-gray-800/70"
           >
-            <p className="text-lg font-semibold">Simulation starten</p>
+            <p className="text-lg font-semibold">{labels.startSimulation}</p>
             <p className="mt-2 text-sm text-gray-400">
-              Starte ein neues Interview
+              {labels.startSimulationDescription}
             </p>
           </Link>
 
@@ -130,9 +138,9 @@ export default async function HomePage() {
             href="/interviews"
             className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10 transition hover:bg-gray-800/70"
           >
-            <p className="text-lg font-semibold">Ergebnisse ansehen</p>
+            <p className="text-lg font-semibold">{labels.viewResults}</p>
             <p className="mt-2 text-sm text-gray-400">
-              Analysiere deine Leistung
+              {labels.viewResultsDescription}
             </p>
           </Link>
 
@@ -140,9 +148,9 @@ export default async function HomePage() {
             href="/profile"
             className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10 transition hover:bg-gray-800/70"
           >
-            <p className="text-lg font-semibold">Profil bearbeiten</p>
+            <p className="text-lg font-semibold">{labels.editProfile}</p>
             <p className="mt-2 text-sm text-gray-400">
-              Aktualisiere deinen Lebenslauf
+              {labels.editProfileDescription}
             </p>
           </Link>
         </div>
@@ -150,7 +158,7 @@ export default async function HomePage() {
         {summary.recentInterviews.length ? (
           <div className="mt-10 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
             <h2 className="text-lg font-semibold text-white">
-              Letzte Interviews
+              {labels.recentInterviews}
             </h2>
 
             <div className="mt-4 space-y-3">

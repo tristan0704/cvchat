@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FaceAnalysisParameterReport, FaceAnalysisReport } from "@/lib/face-analysis";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback-fetch/fingerprint";
 import { useInterviewFeedbackAnalysis } from "@/lib/interview-feedback-fetch/use-interview-feedback-analysis";
+import { useI18n } from "@/lib/i18n/context";
+import type { AppDictionary } from "@/lib/i18n/dictionaries";
 import { formatCountdown } from "@/lib/questionpool";
 import type {
     InterviewFeedbackEvaluation,
@@ -30,12 +32,18 @@ const NUMBER_FORMATTER = new Intl.NumberFormat("de-DE", {
     maximumFractionDigits: 1,
 });
 
-function getScoreTone(score: number) {
+type ScoreToneLabels = {
+    scoreStrong: string;
+    scoreSolid: string;
+    scoreWeak: string;
+};
+
+function getScoreTone(score: number, labels: ScoreToneLabels) {
     if (score >= 75) {
         return {
             badge: "bg-green-500/20 text-green-300",
             bar: "bg-green-400",
-            label: "Stark",
+            label: labels.scoreStrong,
         };
     }
 
@@ -43,14 +51,14 @@ function getScoreTone(score: number) {
         return {
             badge: "bg-yellow-500/20 text-yellow-300",
             bar: "bg-yellow-400",
-            label: "Solide",
+            label: labels.scoreSolid,
         };
     }
 
     return {
         badge: "bg-red-500/20 text-red-300",
         bar: "bg-red-400",
-        label: "Schwach",
+        label: labels.scoreWeak,
     };
 }
 
@@ -138,12 +146,14 @@ function ScoreCard({
     title,
     value,
     feedback,
+    toneLabels,
 }: {
     title: string;
     value: InterviewFeedbackEvaluationDimension["score"];
     feedback: InterviewFeedbackEvaluationDimension["feedback"];
+    toneLabels: ScoreToneLabels;
 }) {
-    const tone = getScoreTone(value);
+    const tone = getScoreTone(value, toneLabels);
 
     return (
         <SurfaceCard>
@@ -266,9 +276,11 @@ function AnalysisStateCard(args: {
     summary: string;
     passedLikely: boolean | null;
     showFaceAnalysis: boolean;
+    toneLabels: ScoreToneLabels;
+    labels: AppDictionary["interviewFeedback"];
 }) {
     if (args.analysisStatus === "ready" && args.overallScore !== null) {
-        const tone = getScoreTone(args.overallScore);
+        const tone = getScoreTone(args.overallScore, args.toneLabels);
 
         return (
             <SurfaceCard>
@@ -280,13 +292,13 @@ function AnalysisStateCard(args: {
                             {args.companySize ? <span>{args.companySize}</span> : null}
                             <span>
                                 {args.passedLikely
-                                    ? "Wahrscheinlich passend"
-                                    : "Noch unsicher"}
+                                    ? args.labels.likelyMatch
+                                    : args.labels.uncertain}
                             </span>
                         </div>
 
                         <h2 className="text-xl font-semibold text-white">
-                            Interview-Feedback
+                            {args.labels.feedbackTitle}
                         </h2>
                         <p className="max-w-3xl text-sm text-gray-300">
                             {args.summary}
@@ -295,7 +307,9 @@ function AnalysisStateCard(args: {
 
                     <SubtlePanel className="min-w-[220px]">
                         <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm text-gray-400">Gesamtscore</p>
+                            <p className="text-sm text-gray-400">
+                                {args.labels.overallScore}
+                            </p>
                             <span
                                 className={`rounded-full px-3 py-1 text-xs font-medium ${tone.badge}`}
                             >
@@ -321,12 +335,12 @@ function AnalysisStateCard(args: {
         return (
             <SurfaceCard>
                 <SectionHeading
-                    eyebrow="Interview Analyse"
-                    title="Interview wird ausgewertet"
-                    description="Das komplette Interview-Transkript wird gerade mit dem neuen Bewertungs-Prompt analysiert."
+                    eyebrow={args.labels.analysisEyebrow}
+                    title={args.labels.analyzingTitle}
+                    description={args.labels.analyzingDescription}
                     badge={
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                            GPT läuft
+                            {args.labels.gptRunning}
                         </span>
                     }
                 />
@@ -338,15 +352,15 @@ function AnalysisStateCard(args: {
         return (
             <SurfaceCard>
                 <SectionHeading
-                    eyebrow="Interview Analyse"
-                    title="Analyse fehlgeschlagen"
+                    eyebrow={args.labels.analysisEyebrow}
+                    title={args.labels.analysisFailedTitle}
                     description={
                         args.analysisError ||
-                        "Die Interview-Auswertung konnte nicht geladen werden."
+                        args.labels.analysisFailedDescription
                     }
                     badge={
                         <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs text-red-300">
-                            Fehler
+                            {args.labels.analysisFailedTitle}
                         </span>
                     }
                 />
@@ -358,12 +372,12 @@ function AnalysisStateCard(args: {
         return (
             <SurfaceCard>
                 <SectionHeading
-                    eyebrow="Interview Analyse"
-                    title="Transkript wird vorbereitet"
-                    description="Sobald das Aufnahme-Transkript fertig ist, startet die strukturierte GPT-Auswertung automatisch."
+                    eyebrow={args.labels.analysisEyebrow}
+                    title={args.labels.transcriptPreparingTitle}
+                    description={args.labels.transcriptPreparingDescription}
                     badge={
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                            Transkription
+                            {args.labels.transcription}
                         </span>
                     }
                 />
@@ -375,15 +389,15 @@ function AnalysisStateCard(args: {
         return (
             <SurfaceCard>
                 <SectionHeading
-                    eyebrow="Interview Analyse"
-                    title="Transkript nicht verfügbar"
+                    eyebrow={args.labels.analysisEyebrow}
+                    title={args.labels.transcriptUnavailableTitle}
                     description={
                         args.transcriptError ||
-                        "Das Interview konnte nicht in Text umgewandelt werden."
+                        args.labels.transcriptUnavailableDescription
                     }
                     badge={
                         <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs text-red-300">
-                            Fehler
+                            {args.labels.analysisFailedTitle}
                         </span>
                     }
                 />
@@ -394,12 +408,12 @@ function AnalysisStateCard(args: {
     return (
         <SurfaceCard>
             <SectionHeading
-                eyebrow="Interview Analyse"
-                title="Feedback wird nach dem Call erstellt"
+                eyebrow={args.labels.analysisEyebrow}
+                title={args.labels.pendingTitle}
                 description={
                     args.showFaceAnalysis
-                        ? "Beende zuerst das Interview. Anschließend werden Wiedergabe, Timing, Face-Metriken und die neue GPT-Auswertung angezeigt."
-                        : "Beende zuerst das Interview. Anschließend werden Wiedergabe, Timing und die neue GPT-Auswertung angezeigt."
+                        ? args.labels.pendingDescriptionWithFace
+                        : args.labels.pendingDescription
                 }
                 badge={
                     <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
@@ -439,6 +453,7 @@ export default function InterviewFeedback({
     onEvaluationReady?: () => void;
     onNavigationStateChange?: (message: string | null) => void;
 }) {
+    const { dictionary, language } = useI18n();
     const session = useInterviewSession();
     const interviewId = session.interviewId;
     const controller = session.voiceInterview;
@@ -616,6 +631,7 @@ export default function InterviewFeedback({
         companySize,
         transcript: transcriptExport,
         transcriptFingerprint,
+        language,
         existingEvaluation: persistedState?.feedback ?? null,
     });
 
@@ -626,9 +642,9 @@ export default function InterviewFeedback({
 
         const navigationLockMessage =
             transcriptStatus === "recording" || transcriptStatus === "transcribing"
-                ? "Der Step-Wechsel bleibt gesperrt, während das Transkript verarbeitet wird."
+                ? dictionary.interviewFeedback.transcriptLock
                 : analysis.status === "loading"
-                  ? "Der Step-Wechsel bleibt gesperrt, während das Interview-Feedback gespeichert und geladen wird."
+                  ? dictionary.interviewFeedback.feedbackLock
                   : null;
 
         onNavigationStateChange(navigationLockMessage);
@@ -636,7 +652,7 @@ export default function InterviewFeedback({
         return () => {
             onNavigationStateChange(null);
         };
-    }, [analysis.status, onNavigationStateChange, transcriptStatus]);
+    }, [analysis.status, dictionary.interviewFeedback, onNavigationStateChange, transcriptStatus]);
 
     useEffect(() => {
         if (!analysis.evaluation) {
@@ -671,43 +687,48 @@ export default function InterviewFeedback({
                 summary={evaluation?.summary ?? ""}
                 passedLikely={evaluation?.passedLikely ?? null}
                 showFaceAnalysis={showFaceAnalysis}
+                toneLabels={dictionary.common}
+                labels={dictionary.interviewFeedback}
             />
 
             {evaluation ? (
                 <>
                     <div className="grid gap-4 lg:grid-cols-3">
                         <ScoreCard
-                            title="Kommunikation"
+                            title={dictionary.interviewFeedback.communication}
                             value={evaluation.communication.score}
                             feedback={evaluation.communication.feedback}
+                            toneLabels={dictionary.common}
                         />
                         <ScoreCard
-                            title="Antwortqualitaet"
+                            title={dictionary.interviewFeedback.answerQuality}
                             value={evaluation.answerQuality.score}
                             feedback={evaluation.answerQuality.feedback}
+                            toneLabels={dictionary.common}
                         />
                         <ScoreCard
-                            title="Rollenfit"
+                            title={dictionary.interviewFeedback.roleFit}
                             value={evaluation.roleFit.score}
                             feedback={evaluation.roleFit.feedback}
+                            toneLabels={dictionary.common}
                         />
                     </div>
 
                     <div className="grid gap-4 lg:grid-cols-3">
                         <ListCard
-                            title="Stärken"
+                            title={dictionary.interviewFeedback.strengths}
                             items={evaluation.strengths}
-                            emptyLabel="Noch keine Stärken erkannt."
+                            emptyLabel={dictionary.interviewFeedback.noStrengths}
                         />
                         <ListCard
-                            title="Risiken"
+                            title={dictionary.interviewFeedback.risks}
                             items={evaluation.issues}
-                            emptyLabel="Keine akuten Schwachstellen erkannt."
+                            emptyLabel={dictionary.interviewFeedback.noRisks}
                         />
                         <ListCard
-                            title="Verbesserungen"
+                            title={dictionary.interviewFeedback.improvements}
                             items={evaluation.improvements}
-                            emptyLabel="Keine konkreten Verbesserungen vorhanden."
+                            emptyLabel={dictionary.interviewFeedback.noImprovements}
                         />
                     </div>
                 </>
@@ -716,9 +737,9 @@ export default function InterviewFeedback({
             <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
                 <SurfaceCard>
                     <SectionHeading
-                        eyebrow="Wiedergabe"
-                        title="Interview-Wiedergabe"
-                        description="Wiedergabe der gemeinsamen Aufnahme mit Interviewer- und Kandidatenstimme."
+                        eyebrow={dictionary.interviewFeedback.replayEyebrow}
+                        title={dictionary.interviewFeedback.replayTitle}
+                        description={dictionary.interviewFeedback.replayDescription}
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
                                 {recapStatus}
@@ -735,28 +756,24 @@ export default function InterviewFeedback({
                                     src={controller.interviewRecapUrl}
                                     className="w-full accent-indigo-500"
                                 >
-                                    Dein Browser unterstützt das Audio-Element
-                                    nicht.
+                                    {dictionary.interviewFeedback.audioUnsupported}
                                 </audio>
                                 <p className="text-sm text-gray-400">
-                                    Die Wiedergabe mischt beide Stimmen in einer
-                                    gemeinsamen Aufnahme.
+                                    {dictionary.interviewFeedback.replayReadyDescription}
                                 </p>
                             </div>
                         ) : recapStatus === "recording" ? (
                             <p className="text-sm text-gray-400">
-                                Die Wiedergabe wird gerade noch verarbeitet.
+                                {dictionary.interviewFeedback.replayRecording}
                             </p>
                         ) : recapStatus === "error" ? (
                             <p className="text-sm text-red-300">
                                 {recapError ||
-                                    "Die Wiedergabe konnte nicht erstellt werden."}
+                                    dictionary.interviewFeedback.replayError}
                             </p>
                         ) : (
                             <p className="text-sm text-gray-400">
-                                Nach dem Interview erscheint hier die gemeinsame
-                                Wiedergabe-Aufnahme. Ohne gespeichertes Audio bleibt
-                                dieser Bereich nur in der Live-Session verfügbar.
+                                {dictionary.interviewFeedback.replayEmpty}
                             </p>
                         )}
 
@@ -770,9 +787,9 @@ export default function InterviewFeedback({
 
                 <SurfaceCard>
                     <SectionHeading
-                        eyebrow="Transkript"
-                        title="Interview-Transkript"
-                        description="Dieselbe strukturierte Export-Basis wird für die GPT-Auswertung verwendet."
+                        eyebrow={dictionary.interviewFeedback.transcriptEyebrow}
+                        title={dictionary.interviewFeedback.transcriptTitle}
+                        description={dictionary.interviewFeedback.transcriptDescription}
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
                                 {transcriptStatus}
@@ -789,17 +806,16 @@ export default function InterviewFeedback({
                             </SubtlePanel>
                         ) : transcriptStatus === "transcribing" ? (
                             <p className="text-sm text-gray-400">
-                                Das Interview-Transkript wird gerade erzeugt.
+                                {dictionary.interviewFeedback.transcriptCreating}
                             </p>
                         ) : transcriptStatus === "error" ? (
                             <p className="text-sm text-red-300">
                                 {transcriptError ||
-                                    "Das Interview-Transkript konnte nicht erstellt werden."}
+                                    dictionary.interviewFeedback.transcriptCreateError}
                             </p>
                         ) : (
                             <p className="text-sm text-gray-400">
-                                Nach dem Interview erscheint hier der komplette
-                                strukturierte Transkript-Export.
+                                {dictionary.interviewFeedback.transcriptEmpty}
                             </p>
                         )}
                     </div>
@@ -808,14 +824,14 @@ export default function InterviewFeedback({
 
             <SurfaceCard>
                 <SectionHeading
-                    eyebrow="Timing"
-                    title="Timing-Metriken"
-                    description="WPM und Antwort-Timing bleiben als eigene Signale neben der GPT-Auswertung sichtbar."
+                    eyebrow={dictionary.interviewFeedback.timingEyebrow}
+                    title={dictionary.interviewFeedback.timingTitle}
+                    description={dictionary.interviewFeedback.timingDescription}
                     badge={
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
                             {hasTimingMetrics && timingMetrics
-                                ? `${timingMetrics.answerCount} Antworten`
-                                : "noch leer"}
+                                ? `${timingMetrics.answerCount} ${dictionary.interviewFeedback.answerCount}`
+                                : dictionary.interviewFeedback.emptyTiming}
                         </span>
                     }
                 />
@@ -824,7 +840,7 @@ export default function InterviewFeedback({
                     {hasTimingMetrics && timingMetrics ? (
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <MetricCard
-                                label="Gesamte Sprechzeit"
+                                label={dictionary.interviewFeedback.totalSpeechTime}
                                 value={formatCountdown(
                                     Math.max(
                                         0,
@@ -836,50 +852,49 @@ export default function InterviewFeedback({
                                 )}
                             />
                             <MetricCard
-                                label="Wörter pro Minute"
+                                label={dictionary.interviewFeedback.wordsPerMinute}
                                 value={formatMetricWordsPerMinute(
                                     timingMetrics.candidateWordsPerMinute
                                 )}
                             />
                             <MetricCard
-                                label="Durchschn. Antwort"
+                                label={dictionary.interviewFeedback.averageAnswer}
                                 value={formatMetricSeconds(
                                     timingMetrics.averageAnswerDurationMs
                                 )}
                             />
                             <MetricCard
-                                label="Längste Antwort"
+                                label={dictionary.interviewFeedback.longestAnswer}
                                 value={formatMetricSeconds(
                                     timingMetrics.longestAnswerDurationMs
                                 )}
                             />
                             <MetricCard
-                                label="Kürzeste Antwort"
+                                label={dictionary.interviewFeedback.shortestAnswer}
                                 value={formatMetricSeconds(
                                     timingMetrics.shortestAnswerDurationMs
                                 )}
                             />
                             <MetricCard
-                                label="Durchschn. Reaktionszeit"
+                                label={dictionary.interviewFeedback.averageLatency}
                                 value={formatMetricSeconds(
                                     timingMetrics.averageResponseLatencyMs
                                 )}
                             />
                             <MetricCard
-                                label="Längste Denkpause"
+                                label={dictionary.interviewFeedback.longestPause}
                                 value={formatMetricSeconds(
                                     timingMetrics.longestResponseLatencyMs
                                 )}
                             />
                             <MetricCard
-                                label="Antworten"
+                                label={dictionary.interviewFeedback.answerCount}
                                 value={String(timingMetrics.answerCount)}
                             />
                         </div>
                     ) : (
                         <p className="text-sm text-gray-400">
-                            Nach dem ersten beantworteten Interviewturn erscheinen
-                            hier Sprechzeit, Reaktionszeit und WPM.
+                            {dictionary.interviewFeedback.timingEmpty}
                         </p>
                     )}
                 </div>
@@ -888,9 +903,9 @@ export default function InterviewFeedback({
             {showFaceAnalysis ? (
                 <SurfaceCard>
                     <SectionHeading
-                    eyebrow="Face"
-                    title="Face-Metriken"
-                    description="Video-Metriken bleiben erhalten und werden im selben dunklen Feedback-System dargestellt."
+                    eyebrow={dictionary.interviewFeedback.faceEyebrow}
+                    title={dictionary.interviewFeedback.faceTitle}
+                    description={dictionary.interviewFeedback.faceDescription}
                     badge={
                         faceAnalysisReport ? (
                             <span
@@ -902,7 +917,7 @@ export default function InterviewFeedback({
                             </span>
                         ) : (
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                                keine Daten
+                                {dictionary.interviewFeedback.noData}
                             </span>
                         )
                     }
@@ -912,24 +927,24 @@ export default function InterviewFeedback({
                     <div className="mt-4 space-y-4">
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <MetricCard
-                                label="Kurzfazit"
+                                label={dictionary.interviewFeedback.headline}
                                 value={faceAnalysisReport.summary.headline}
                             />
                             <MetricCard
-                                label="Gesicht im Bild"
+                                label={dictionary.interviewFeedback.faceInFrame}
                                 value={formatPercent(
                                     faceAnalysisReport.globalMetrics.faceDetectedPct
                                 )}
                             />
                             <MetricCard
-                                label="Sprechaktivitaet"
+                                label={dictionary.interviewFeedback.speakingActivity}
                                 value={formatPercent(
                                     faceAnalysisReport.globalMetrics
                                         .speakingActivityPct
                                 )}
                             />
                             <MetricCard
-                                label="Blinkrate"
+                                label={dictionary.interviewFeedback.blinkRate}
                                 value={`${NUMBER_FORMATTER.format(
                                     faceAnalysisReport.globalMetrics
                                         .blinkRatePerMin
@@ -948,19 +963,19 @@ export default function InterviewFeedback({
 
                         <div className="grid gap-4 lg:grid-cols-3">
                             <ListCard
-                                title="Stärken"
+                                title={dictionary.interviewFeedback.strengths}
                                 items={faceAnalysisReport.summary.strengths}
-                                emptyLabel="Keine besonderen Stärken erkannt."
+                                emptyLabel={dictionary.interviewFeedback.specialStrengths}
                             />
                             <ListCard
-                                title="Risiken"
+                                title={dictionary.interviewFeedback.risks}
                                 items={faceAnalysisReport.summary.risks}
-                                emptyLabel="Keine besonderen Risiken erkannt."
+                                emptyLabel={dictionary.interviewFeedback.specialRisks}
                             />
                             <ListCard
-                                title="Nächste Schritte"
+                                title={dictionary.interviewFeedback.nextSteps}
                                 items={faceAnalysisReport.summary.nextSteps}
-                                emptyLabel="Keine nächsten Schritte vorhanden."
+                                emptyLabel={dictionary.interviewFeedback.noNextSteps}
                             />
                         </div>
 

@@ -2,6 +2,8 @@
 
 import { useState, type ChangeEvent } from "react";
 
+import { useI18n } from "@/lib/i18n/context";
+
 const PROFILE_CV_MAX_FILE_BYTES = 20_000_000;
 const PROFILE_AVATAR_MAX_FILE_BYTES = 5_000_000;
 const PROFILE_AVATAR_MIME_TYPES = new Set([
@@ -28,8 +30,8 @@ type ProfileSnapshot = {
     activeCv: ActiveCvSummary | null;
 };
 
-function formatUploadDate(value: string) {
-    return new Intl.DateTimeFormat("de-DE", {
+function formatUploadDate(value: string, language: string) {
+    return new Intl.DateTimeFormat(language === "en" ? "en-US" : "de-DE", {
         dateStyle: "medium",
         timeStyle: "short",
     }).format(new Date(value));
@@ -37,7 +39,7 @@ function formatUploadDate(value: string) {
 
 function formatFileSize(bytes: number | null) {
     if (!bytes) {
-        return "Unbekannte Dateigröße";
+        return null;
     }
 
     const megabytes = bytes / 1_000_000;
@@ -55,6 +57,8 @@ type ProfilePageContentProps = {
 export default function ProfilePageContent({
     initialProfile,
 }: ProfilePageContentProps) {
+    const { dictionary, language } = useI18n();
+    const labels = dictionary.profile;
     const [username, setUsername] = useState(initialProfile.username);
     const [email, setEmail] = useState(initialProfile.email);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(
@@ -272,9 +276,9 @@ export default function ProfilePageContent({
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <main className="mx-auto max-w-7xl px-4 py-10">
-                <h1 className="text-3xl font-bold">Profil</h1>
+                <h1 className="text-3xl font-bold">{labels.title}</h1>
                 <p className="mt-2 text-gray-400">
-                    Verwalte deine persönlichen Daten
+                    {labels.description}
                 </p>
 
                 <div className="mt-8 space-y-6 rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
@@ -284,7 +288,7 @@ export default function ProfilePageContent({
                             <img
                                 src={avatarUrl}
                                 className="h-16 w-16 rounded-full object-cover"
-                                alt="Profilbild"
+                                alt={labels.avatarAlt}
                             />
                         ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500 text-lg font-semibold text-white">
@@ -293,7 +297,7 @@ export default function ProfilePageContent({
                         )}
                         <div>
                             <label className="mb-1 block text-sm text-gray-400">
-                                Profilbild
+                                {labels.avatar}
                             </label>
                             <input
                                 type="file"
@@ -303,21 +307,21 @@ export default function ProfilePageContent({
                             />
                             <p className="mt-1 text-xs text-gray-500">
                                 {savingAvatar
-                                    ? "Profilbild wird gespeichert..."
-                                    : "PNG, JPG, WEBP oder GIF bis 5 MB"}
+                                    ? labels.avatarSaving
+                                    : labels.avatarHint}
                             </p>
                         </div>
                     </div>
 
                     {loadingProfile ? (
                         <div className="rounded-lg bg-gray-900 px-4 py-3 text-sm text-gray-400 outline outline-1 outline-white/10">
-                            Profil wird geladen...
+                            {labels.loading}
                         </div>
                     ) : null}
 
                     <div>
                         <label className="mb-1 block text-sm text-gray-400">
-                            Benutzername
+                            {labels.username}
                         </label>
                         <input
                             value={username}
@@ -327,7 +331,7 @@ export default function ProfilePageContent({
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm text-gray-400">E-Mail</label>
+                        <label className="mb-1 block text-sm text-gray-400">{labels.email}</label>
                         <input
                             value={email}
                             onChange={(event) => setEmail(event.target.value)}
@@ -337,7 +341,7 @@ export default function ProfilePageContent({
 
                     <div>
                         <label className="mb-1 block text-sm text-gray-400">
-                            Neues Passwort
+                            {labels.newPassword}
                         </label>
                         <input
                             type="password"
@@ -350,7 +354,7 @@ export default function ProfilePageContent({
 
                     <div>
                         <label className="mb-1 block text-sm text-gray-400">
-                            Passwort wiederholen
+                            {labels.repeatPassword}
                         </label>
                         <input
                             type="password"
@@ -368,16 +372,15 @@ export default function ProfilePageContent({
                             disabled={loadingProfile || savingProfile}
                             className="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {savingProfile ? "Speichere..." : "Profil speichern"}
+                            {savingProfile ? labels.saving : labels.saveProfile}
                         </button>
                     </div>
 
                     <div className="space-y-4 border-t border-white/10 pt-6">
                         <div>
-                            <p className="text-sm text-gray-400">Lebenslauf</p>
+                            <p className="text-sm text-gray-400">{labels.cv}</p>
                             <p className="mt-1 text-xs text-gray-500">
-                                Dieser CV wird für jedes neue Interview-Feedback
-                                verwendet.
+                                {labels.cvHint}
                             </p>
                         </div>
 
@@ -388,21 +391,21 @@ export default function ProfilePageContent({
                                         {currentCv.fileName}
                                     </p>
                                     <p className="text-xs text-gray-400">
-                                        Gespeichert am {formatUploadDate(currentCv.uploadedAt)}
+                                        {labels.savedAt} {formatUploadDate(currentCv.uploadedAt, language)}
                                         {" | "}
-                                        {formatFileSize(currentCv.fileSizeBytes)}
+                                        {formatFileSize(currentCv.fileSizeBytes) ?? labels.unknownFileSize}
                                     </p>
                                 </div>
                             </div>
                         ) : (
                             <div className="rounded-lg bg-gray-900 px-4 py-3 text-sm text-gray-400 outline outline-1 outline-white/10">
-                                Noch kein Lebenslauf gespeichert.
+                                {labels.noCv}
                             </div>
                         )}
 
                         <div className="rounded-lg border border-dashed border-white/20 p-6 text-center">
                             <p className="mb-3 text-sm text-gray-400">
-                                Neuen Lebenslauf hochladen
+                                {labels.uploadNewCv}
                             </p>
 
                             <input
@@ -417,12 +420,12 @@ export default function ProfilePageContent({
                                 htmlFor="profile-cv-upload"
                                 className="cursor-pointer rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
                             >
-                                Datei auswählen
+                                {labels.chooseFile}
                             </label>
 
                             {selectedCv ? (
                                 <p className="mt-3 text-xs text-gray-300">
-                                    Ausgewählt: {selectedCv.name}
+                                    {labels.selected}: {selectedCv.name}
                                 </p>
                             ) : null}
                         </div>
@@ -434,7 +437,7 @@ export default function ProfilePageContent({
                                 disabled={!selectedCv || savingCv}
                                 className="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {savingCv ? "Speichere..." : "Lebenslauf speichern"}
+                                {savingCv ? labels.saving : labels.saveCv}
                             </button>
                         </div>
 

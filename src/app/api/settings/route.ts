@@ -3,6 +3,7 @@ import {
     getProfileSnapshot,
     updateUserSettingsForUser,
 } from "@/db-backend/profile/profile-service";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 export const runtime = "nodejs";
 
@@ -35,8 +36,7 @@ export async function PATCH(request: Request) {
           }
         | null;
 
-    const language =
-        body && typeof body.language === "string" ? body.language.trim() : "de";
+    const language = normalizeLanguage(body?.language);
     const emailNotifications =
         body && typeof body.emailNotifications === "boolean"
             ? body.emailNotifications
