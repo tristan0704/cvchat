@@ -17,11 +17,11 @@ export async function signup(formData: FormData) {
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
     if (!email || !password || !confirmPassword) {
-        redirectWithError("Bitte alle Felder ausfuellen.");
+        redirectWithError("Bitte alle Felder ausfüllen.");
     }
 
     if (password !== confirmPassword) {
-        redirectWithError("Die Passwoerter stimmen nicht ueberein.");
+        redirectWithError("Die Passwörter stimmen nicht überein.");
     }
 
     const { data, error } = await supabase.auth.signUp({
@@ -42,6 +42,6 @@ export async function signup(formData: FormData) {
 
     redirect(
         "/auth/login?message=" +
-            encodeURIComponent("Bitte bestaetige zuerst deine E-Mail-Adresse."),
+            encodeURIComponent("Bitte bestätige zuerst deine E-Mail-Adresse."),
     );
 }

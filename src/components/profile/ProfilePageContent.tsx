@@ -327,7 +327,7 @@ export default function ProfilePageContent({
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm text-gray-400">Email</label>
+                        <label className="mb-1 block text-sm text-gray-400">E-Mail</label>
                         <input
                             value={email}
                             onChange={(event) => setEmail(event.target.value)}

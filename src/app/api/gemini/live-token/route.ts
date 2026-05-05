@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json().catch(() => ({}))) as LiveTokenBody
-    const role = body.role?.trim() || "Backend Developer"
+    const role = body.role?.trim() || "Backend-Entwickler"
 
     try {
         const token = await createLiveInterviewToken({ apiKey, role })

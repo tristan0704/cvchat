@@ -23,7 +23,7 @@ export async function GET(request: Request, context: RouteContext) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const { id } = await context.params;
@@ -34,7 +34,7 @@ export async function GET(request: Request, context: RouteContext) {
         const snapshot = await getInterviewRuntimeSnapshotForUser(currentUser.id, id);
 
         if (!snapshot) {
-            return Response.json({ error: "Interview not found" }, { status: 404 });
+            return Response.json({ error: "Interview wurde nicht gefunden." }, { status: 404 });
         }
 
         return Response.json(snapshot);
@@ -48,7 +48,7 @@ export async function GET(request: Request, context: RouteContext) {
             : await getInterviewDetailForUser(currentUser.id, id);
 
     if (!interview) {
-        return Response.json({ error: "Interview not found" }, { status: 404 });
+        return Response.json({ error: "Interview wurde nicht gefunden." }, { status: 404 });
     }
 
     return Response.json({ interview });
@@ -58,7 +58,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const { id } = await context.params;
@@ -89,8 +89,12 @@ export async function PATCH(request: Request, context: RouteContext) {
                     ? error.message
                     : "Interview-Modus konnte nicht gespeichert werden.";
             const status = message === "Interview not found" ? 404 : 400;
+            const userMessage =
+                message === "Interview not found"
+                    ? "Interview wurde nicht gefunden."
+                    : message;
 
-            return Response.json({ error: message }, { status });
+            return Response.json({ error: userMessage }, { status });
         }
     }
 
@@ -117,14 +121,14 @@ export async function DELETE(_: Request, context: RouteContext) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const { id } = await context.params;
     const deleted = await deleteInterviewForUser(currentUser.id, id);
 
     if (!deleted) {
-        return Response.json({ error: "Interview not found" }, { status: 404 });
+        return Response.json({ error: "Interview wurde nicht gefunden." }, { status: 404 });
     }
 
     return Response.json({ ok: true });

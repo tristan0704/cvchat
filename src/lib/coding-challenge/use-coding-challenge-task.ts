@@ -23,7 +23,7 @@ type CodingChallengeTaskResponse = {
     status?: CodingChallengeRuntimeStatusSnapshot | null;
 };
 
-const FALLBACK_ERROR = "Unable to load coding challenge";
+const FALLBACK_ERROR = "Coding-Challenge konnte nicht geladen werden.";
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : FALLBACK_ERROR;
@@ -134,7 +134,7 @@ export function useCodingChallengeTask({
             void loadTask();
         } else {
             setIsLoading(false);
-            setError("Coding challenge requires a persisted interview.");
+            setError("Die Coding-Challenge benötigt ein gespeichertes Interview.");
         }
 
         return () => {

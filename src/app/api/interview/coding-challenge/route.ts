@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
     if (!interviewId) {
         return Response.json(
-            { error: "Interview id is required" },
+            { error: "Interview-ID ist erforderlich." },
             { status: 400 }
         );
     }
@@ -48,16 +48,22 @@ export async function GET(request: Request) {
         const message =
             error instanceof Error
                 ? error.message
-                : "Unable to load coding challenge";
+                : "Coding-Challenge konnte nicht geladen werden.";
         const status =
             message === "Interview not found"
                 ? 404
                 : message === "Interview feedback must be completed first"
                   ? 409
                   : 500;
+        const userMessage =
+            message === "Interview not found"
+                ? "Interview wurde nicht gefunden."
+                : message === "Interview feedback must be completed first"
+                  ? "Interview-Feedback muss zuerst abgeschlossen werden."
+                  : message;
 
         return Response.json(
-            { error: message },
+            { error: userMessage },
             { status }
         );
     }
@@ -67,7 +73,7 @@ export async function PATCH(request: Request) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     try {
@@ -91,7 +97,7 @@ export async function PATCH(request: Request) {
 
         if (!interviewId || !attemptId) {
             return Response.json(
-                { error: "Interview id and attempt id are required" },
+                { error: "Interview-ID und Versuch-ID sind erforderlich." },
                 { status: 400 }
             );
         }
@@ -107,7 +113,7 @@ export async function PATCH(request: Request) {
     } catch (error) {
         console.error("[api/interview/coding-challenge]", error);
         return Response.json(
-            { error: "Unable to save coding challenge draft" },
+            { error: "Coding-Challenge-Entwurf konnte nicht gespeichert werden." },
             { status: 500 }
         );
     }
@@ -117,7 +123,7 @@ export async function POST(request: Request) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     try {
@@ -139,14 +145,14 @@ export async function POST(request: Request) {
 
         if (!interviewId || !attemptId) {
             return Response.json(
-                { error: "Interview id and attempt id are required" },
+                { error: "Interview-ID und Versuch-ID sind erforderlich." },
                 { status: 400 }
             );
         }
 
         if (!code.trim()) {
             return Response.json(
-                { error: "Code submission is required" },
+                { error: "Code-Einreichung ist erforderlich." },
                 { status: 400 }
             );
         }
@@ -170,7 +176,7 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error("[api/interview/coding-challenge]", error);
         return Response.json(
-            { error: "Unable to evaluate coding challenge" },
+            { error: "Coding-Challenge konnte nicht bewertet werden." },
             { status: 500 }
         );
     }

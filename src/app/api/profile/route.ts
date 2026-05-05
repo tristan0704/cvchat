@@ -29,7 +29,7 @@ export async function GET() {
     const currentUser = await getCurrentAppUser();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const profile = await buildProfileResponse({
@@ -43,7 +43,7 @@ export async function PATCH(request: Request) {
     const currentUser = await getCurrentAppUser();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const body = (await request.json().catch(() => null)) as

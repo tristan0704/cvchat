@@ -18,7 +18,7 @@ export async function GET(_: Request, context: RouteContext) {
 
     if (!currentUser) {
         timing.log({ status: 401 });
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const { id } = await context.params;
@@ -28,7 +28,7 @@ export async function GET(_: Request, context: RouteContext) {
 
     if (!detail) {
         timing.log({ status: 404 });
-        return Response.json({ error: "Interview not found" }, { status: 404 });
+        return Response.json({ error: "Interview wurde nicht gefunden." }, { status: 404 });
     }
 
     timing.log({

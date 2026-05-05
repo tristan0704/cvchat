@@ -33,7 +33,7 @@ export async function GET(_: Request, context: RouteContext) {
         timing.log({
             status: 404,
         });
-        return notFound("Interview not found");
+        return notFound("Interview wurde nicht gefunden.");
     }
 
     const response = {

@@ -7,7 +7,7 @@ export async function GET() {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const catalog = await listInterviewTemplateCatalog();

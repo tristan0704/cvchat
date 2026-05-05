@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     try {
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
         if (!interviewId) {
             return Response.json(
-                { error: "Interview id is required" },
+                { error: "Interview-ID ist erforderlich." },
                 { status: 400 }
             );
         }
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     try {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
         if (!interviewId) {
             return Response.json(
-                { error: "Interview id is required" },
+                { error: "Interview-ID ist erforderlich." },
                 { status: 400 }
             );
         }

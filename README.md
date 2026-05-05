@@ -1,12 +1,12 @@
-# CareerPitch
+# CommIT
 
-CareerPitch ist eine KI-gestuetzte Interview- und Assessment-Plattform auf Basis von Next.js 16. Die Anwendung fuehrt Kandidat:innen durch einen zusammenhaengenden Bewerbungs-Flow aus Profilpflege, CV-Analyse, Voice-Interview, Coding Challenge und einer aggregierten Gesamtbewertung.
+CommIT ist eine KI-gestuetzte Interview- und Assessment-Plattform auf Basis von Next.js 16. Die Anwendung fuehrt Kandidat:innen durch einen zusammenhaengenden Bewerbungs-Flow aus Profilpflege, CV-Analyse, Voice-Interview, Coding Challenge und einer aggregierten Gesamtbewertung.
 
 Diese README ist als Entwicklerdokumentation gedacht. Sie beschreibt nicht nur, was das Produkt macht, sondern wie die Anwendung auf Low Level aufgebaut ist, welche Daten wo liegen, wie Requests durch das System laufen und welche Architekturgrenzen im Code gelten.
 
 ## 1. Produktbild in einem Satz
 
-CareerPitch simuliert technische Interview-Situationen fuer registrierte Nutzer:innen und speichert dabei strukturierte Ergebnisse aus mehreren Stufen:
+CommIT simuliert technische Interview-Situationen fuer registrierte Nutzer:innen und speichert dabei strukturierte Ergebnisse aus mehreren Stufen:
 
 - CV-Feedback
 - Live-Interview mit Audio, Transcript, Timing und Face-Analyse
@@ -25,7 +25,7 @@ CareerPitch simuliert technische Interview-Situationen fuer registrierte Nutzer:
 
 ## 3. Architektur auf einen Blick
 
-CareerPitch ist in vier technische Schichten getrennt:
+CommIT ist in vier technische Schichten getrennt:
 
 1. UI und Routing in `src/app` und `src/components`
 2. browserseitige Orchestrierung und zustandsnahe Hooks in `src/lib`
@@ -578,4 +578,4 @@ Das Projekt ist kein einfacher MVP mehr. Die zentrale technische Herausforderung
 - persistierten Analyseergebnissen
 - mehrfachen KI-Providern
 
-Wer an CareerPitch arbeitet, sollte deshalb Aenderungen bevorzugt entlang bestehender Schichtgrenzen vornehmen und besonders vorsichtig mit Realtime-, Lifecycle- und Persistenzlogik umgehen.
+Wer an CommIT arbeitet, sollte deshalb Aenderungen bevorzugt entlang bestehender Schichtgrenzen vornehmen und besonders vorsichtig mit Realtime-, Lifecycle- und Persistenzlogik umgehen.

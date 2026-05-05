@@ -23,7 +23,7 @@ export default function Hero() {
 
           <div className="mb-8 hidden justify-center sm:flex">
             <div className="relative rounded-full px-3 py-1 text-sm text-gray-400 ring-1 ring-white/10 hover:ring-white/20">
-             trusted by students of fh upper austria
+             Vertraut von Studierenden der FH Oberösterreich
             </div>
           </div>
 
@@ -38,11 +38,11 @@ export default function Hero() {
           </div>
 
           <h1 className="text-5xl font-semibold text-white sm:text-5xl">
-            Get better at tech interviews. Fast.
+            Werde besser in technischen Interviews. Schnell.
           </h1>
 
           <p className="mt-8 text-lg text-gray-400 sm:text-xl">
-            Commit helps tech students improve communication, technical understanding, and real interview performance.
+            Commit hilft Tech-Studierenden, Kommunikation, technisches Verständnis und echte Interview-Leistung zu verbessern.
           </p>
 
           <div className="mt-10 flex justify-center gap-x-6">

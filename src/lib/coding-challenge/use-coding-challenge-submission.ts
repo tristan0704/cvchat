@@ -15,7 +15,7 @@ type UseCodingChallengeSubmissionArgs = {
     onStatusUpdate?: (status: CodingChallengeRuntimeStatusSnapshot) => void;
 };
 
-const FALLBACK_ERROR = "Unable to submit coding challenge";
+const FALLBACK_ERROR = "Coding-Challenge konnte nicht eingereicht werden.";
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : FALLBACK_ERROR;

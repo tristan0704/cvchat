@@ -111,7 +111,7 @@ export function CodingChallengeHeader({
           onClick={onResetCode}
           className="rounded-md bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-400"
         >
-          Code zuruecksetzen
+          Code zurücksetzen
         </button>
         <button
           type="button"
@@ -119,7 +119,7 @@ export function CodingChallengeHeader({
           disabled={isSubmitting}
           className="rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-400 disabled:opacity-50"
         >
-          {isSubmitting ? "Sende..." : "Loesung einreichen"}
+          {isSubmitting ? "Sende..." : "Lösung einreichen"}
         </button>
       </div>
     </div>
@@ -185,7 +185,7 @@ export function CodingChallengeWorkspace({
         </div>
 
         <div className="rounded-full border border-white/10 px-3 py-1">
-          Monaco Editor
+          Monaco-Editor
         </div>
       </div>
 

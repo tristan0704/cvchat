@@ -19,11 +19,11 @@ export function badRequest(message: string) {
     return errorResponse("VALIDATION_ERROR", message, 400, false);
 }
 
-export function unauthorized(message = "Unauthorized") {
+export function unauthorized(message = "Nicht autorisiert") {
     return errorResponse("UNAUTHORIZED", message, 401, false);
 }
 
-export function notFound(message = "Not found") {
+export function notFound(message = "Nicht gefunden") {
     return errorResponse("NOT_FOUND", message, 404, false);
 }
 
@@ -35,6 +35,6 @@ export function aiProviderError(message: string) {
     return errorResponse("AI_PROVIDER_ERROR", message, 502, true);
 }
 
-export function serverError(message = "Internal server error") {
+export function serverError(message = "Interner Serverfehler") {
     return errorResponse("INTERNAL_ERROR", message, 500, true);
 }

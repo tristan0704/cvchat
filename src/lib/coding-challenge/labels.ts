@@ -10,7 +10,7 @@ export const LANGUAGE_LABELS: Record<CodingChallengeLanguage, string> = {
 };
 
 export const DIFFICULTY_LABELS: Record<CodingChallengeDifficulty, string> = {
-  easy: "Easy",
-  medium: "Medium",
-  hard: "Hard",
+  easy: "Einfach",
+  medium: "Mittel",
+  hard: "Schwer",
 };

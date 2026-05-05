@@ -75,7 +75,7 @@ export default async function RegisterPage({ searchParams }) {
           {/* Confirm Password */}
           <div>
             <label className="block text-sm font-medium text-gray-100">
-              Passwort bestaetigen
+              Passwort bestätigen
             </label>
             <div className="mt-2">
               <input

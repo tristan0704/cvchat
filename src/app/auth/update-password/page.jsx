@@ -18,12 +18,12 @@ export default function UpdatePasswordPage() {
         event.preventDefault();
 
         if (!password || !confirmPassword) {
-            setError("Bitte beide Passwortfelder ausfuellen.");
+            setError("Bitte beide Passwortfelder ausfüllen.");
             return;
         }
 
         if (password !== confirmPassword) {
-            setError("Die Passwoerter stimmen nicht ueberein.");
+            setError("Die Passwörter stimmen nicht überein.");
             return;
         }
 
@@ -39,7 +39,7 @@ export default function UpdatePasswordPage() {
 
             if (userError || !user) {
                 throw new Error(
-                    "Die Reset-Session ist ungueltig oder bereits abgelaufen."
+                    "Die Reset-Session ist ungültig oder bereits abgelaufen."
                 );
             }
 
@@ -109,7 +109,7 @@ export default function UpdatePasswordPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-100">
-                            Passwort bestaetigen
+                            Passwort bestätigen
                         </label>
 
                         <div className="mt-2">

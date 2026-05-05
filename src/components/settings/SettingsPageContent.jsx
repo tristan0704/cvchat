@@ -91,7 +91,7 @@ export default function SettingsPageContent({ initialSettings }) {
             }
 
             setDeletePassword("");
-            router.push("/auth/login?message=Account%20geloescht.");
+            router.push("/auth/login?message=Account%20gel%C3%B6scht.");
             router.refresh();
         } catch (deleteError) {
             setError(
@@ -141,7 +141,7 @@ export default function SettingsPageContent({ initialSettings }) {
 
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-gray-300">
-                                Email Benachrichtigungen
+                                E-Mail-Benachrichtigungen
                             </p>
                             <button
                                 onClick={() => setNotifications(!notifications)}

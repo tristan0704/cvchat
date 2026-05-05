@@ -134,7 +134,7 @@ export default function CodingChallengeFeedback() {
                             throw new Error(
                                 readApiErrorMessage(
                                     data,
-                                    "Coding challenge konnte nicht geladen werden."
+                                    "Coding-Challenge konnte nicht geladen werden."
                                 )
                             );
                         }
@@ -154,7 +154,7 @@ export default function CodingChallengeFeedback() {
                     setError(
                         loadError instanceof Error
                             ? loadError.message
-                        : "Coding challenge konnte nicht geladen werden."
+                        : "Coding-Challenge konnte nicht geladen werden."
                     );
                 }
             } finally {
@@ -206,7 +206,7 @@ export default function CodingChallengeFeedback() {
                         </div>
 
                         <h2 className="text-xl font-semibold text-white">
-                            {task?.name ?? "Coding-Challenge Feedback"}
+                            {task?.name ?? "Coding-Challenge-Feedback"}
                         </h2>
                         <p className="max-w-3xl text-sm text-gray-300">
                             {evaluation.summary}

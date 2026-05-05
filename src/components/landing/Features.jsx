@@ -92,7 +92,7 @@ export default function Features() {
                 Detailliertes Feedback
               </dt>
               <dd className="mt-2 text-base text-gray-400">
-                Erhalte eine klare Analyse deiner Performance und konkrete Tipps
+                Erhalte eine klare Analyse deiner Leistung und konkrete Tipps
                 zur Verbesserung.
               </dd>
             </div>

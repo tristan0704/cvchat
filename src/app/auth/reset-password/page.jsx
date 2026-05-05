@@ -56,7 +56,7 @@ export default function ResetPasswordPage() {
                 />
 
                 <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-white">
-                    Passwort zuruecksetzen
+                    Passwort zurücksetzen
                 </h2>
             </div>
 

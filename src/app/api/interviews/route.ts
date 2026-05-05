@@ -13,7 +13,7 @@ export async function GET() {
 
     if (!currentUser) {
         timing.log({ status: 401 });
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const interviews = await timing.measure("db.list", () =>
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const body = (await request.json().catch(() => null)) as

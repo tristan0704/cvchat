@@ -62,7 +62,7 @@ export default function Navbar({ initialProfile }) {
               type="button"
               onClick={() => setMobileOpen((currentValue) => !currentValue)}
               className="relative inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-white/5 hover:text-white focus:outline-2 focus:-outline-offset-1 focus:outline-indigo-500"
-              aria-label={mobileOpen ? "Navigation schliessen" : "Navigation oeffnen"}
+              aria-label={mobileOpen ? "Navigation schließen" : "Navigation öffnen"}
             >
               {!mobileOpen ? (
                 <svg
@@ -136,7 +136,7 @@ export default function Navbar({ initialProfile }) {
                 type="button"
                 onClick={() => setProfileOpen((currentValue) => !currentValue)}
                 className="relative flex rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                aria-label="Profilmenü oeffnen"
+                aria-label="Profilmenü öffnen"
               >
                 {profile.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element

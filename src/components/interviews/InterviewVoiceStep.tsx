@@ -80,8 +80,8 @@ function resolveAssistantStatus(
     callLifecyclePhase: VoiceInterviewControllerState["callLifecyclePhase"],
     playbackActive: boolean
 ) {
-    if (playbackActive) return "AI spricht";
-    if (callLifecyclePhase === "interviewing") return "AI hört zu";
+    if (playbackActive) return "KI spricht";
+    if (callLifecyclePhase === "interviewing") return "KI hört zu";
     if (callLifecyclePhase === "opening") return "Verbindung läuft";
     if (callLifecyclePhase === "closing" || callLifecyclePhase === "stopping") {
         return "Call endet";
@@ -107,7 +107,7 @@ function resolveCallCopy(args: {
     if (callLifecyclePhase === "opening" || connectionStatus === "connecting") {
         return {
             title: "Verbindung wird aufgebaut",
-            description: "Mikrofon, Session und AI-Interviewer werden gerade vorbereitet.",
+            description: "Mikrofon, Session und KI-Interviewer werden gerade vorbereitet.",
         };
     }
 
@@ -246,10 +246,10 @@ function VoiceInterviewContent({
                     <section className="min-h-[360px] rounded-xl bg-gray-900 p-6 outline outline-1 outline-white/10">
                         <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
                             <div className="flex size-24 items-center justify-center rounded-full bg-indigo-500/15 text-3xl font-semibold text-indigo-200 outline outline-1 outline-indigo-400/30">
-                                AI
+                                KI
                             </div>
                             <h2 className="mt-6 text-xl font-semibold text-white">
-                                Voice-only Call
+                                Call nur mit Sprache
                             </h2>
                             <p className="mt-2 max-w-md text-sm leading-6 text-gray-400">
                                 Kamera und Face-Analyse sind für dieses Interview
@@ -293,7 +293,7 @@ function VoiceInterviewContent({
                                 {role}
                             </p>
                             <p className="mt-1 text-sm text-gray-400">
-                                Transcript, Recap und weitere Auswertung bleiben
+                                Transkript, Zusammenfassung und weitere Auswertung bleiben
                                 bewusst im separaten Feedback-Schritt.
                             </p>
                         </div>

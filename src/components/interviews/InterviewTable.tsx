@@ -239,7 +239,7 @@ export default function InterviewTable({
                                             }}
                                             className="rounded-md bg-red-500/10 px-3 py-1 text-xs text-red-400 hover:bg-red-500/20"
                                         >
-                                            Delete
+                                            Löschen
                                         </button>
                                     </td>
                                 </tr>

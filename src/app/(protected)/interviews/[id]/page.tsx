@@ -21,14 +21,14 @@ const INTERVIEW_MODE_OPTIONS: Array<{
 }> = [
     {
         id: "voice",
-        title: "Voice only",
+        title: "Nur Sprache",
         description:
             "Du führst den Call nur mit Mikrofon. Kamera und Face-Analyse bleiben vollständig aus.",
         badge: "Ohne Kamera",
     },
     {
         id: "face",
-        title: "Voice + Facecam",
+        title: "Sprache und Kamera",
         description:
             "Du übst im echten Call-Gefühl mit Kamera und optionaler Körpersprache-Auswertung.",
         badge: "Vollständiger Call",
@@ -315,8 +315,8 @@ function CallSetupStep({
                     Wie möchtest du das Interview führen?
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-                    Die Auswahl wird am Interview gespeichert. Voice only bleibt
-                    ohne Kamera-Permission und ohne Face-Analyse.
+                    Die Auswahl wird am Interview gespeichert. Nur Sprache bleibt
+                    ohne Kamerafreigabe und ohne Face-Analyse.
                 </p>
             </div>
 
@@ -368,7 +368,7 @@ function InterviewDetailStepContent({
     step: number;
     error: string;
     router: ReturnType<typeof useRouter>;
-    persistStep: (nextStep: number, extraData?: Record<string, any>) => Promise<void>;
+    persistStep: (nextStep: number, extraData?: Record<string, unknown>) => Promise<void>;
     setInterview: React.Dispatch<React.SetStateAction<InterviewDetail | null>>;
     onStatusUpdate: (status: InterviewStatusSnapshot) => void;
     onRefreshInterview: () => Promise<void>;
@@ -435,7 +435,7 @@ function InterviewDetailStepContent({
                 <p className="mt-2 text-gray-400">Schritt {step} von 6</p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                    {["CV", "Voice", "Interview", "Code", "Code Review", "Gesamt"].map((label, index) => (
+                    {["CV", "Sprache", "Interview", "Code", "Code-Bewertung", "Gesamt"].map((label, index) => (
                         <span
                             key={label}
                             className={`rounded-full px-3 py-1 text-xs ${
@@ -525,7 +525,7 @@ function InterviewDetailStepContent({
                                     onClick={() => router.push("/interviews")}
                                     className="rounded-md bg-indigo-500 px-4 py-2 text-sm hover:bg-indigo-400"
                                 >
-                                    Abschliessen
+                                    Abschließen
                                 </button>
                             </div>
                         )}
@@ -890,7 +890,7 @@ function OverallFeedbackBlock({
                 </div>
             ) : (
                 <div className="mt-4 rounded-lg bg-gray-900 p-4 text-sm text-gray-300">
-                    Schliesse zuerst CV, Interview und Coding-Challenge ab, damit
+                    Schließe zuerst CV, Interview und Coding-Challenge ab, damit
                     hier eine Gesamtbewertung erscheint.
                 </div>
             )}
@@ -1095,14 +1095,14 @@ function InterviewDetailPageContent() {
                       companySize: interview.companySize,
                   }
                 : {
-                      role: "Backend Developer",
+                      role: "Backend-Entwickler",
                       experience: "",
                       companySize: "",
                   },
         [interview]
     );
 
-    async function persistStep(nextStep: number, extraData?: Record<string, any>) {
+    async function persistStep(nextStep: number, extraData?: Record<string, unknown>) {
         const boundedStep = Math.max(1, Math.min(6, nextStep));
         setIsPersistingStep(true);
 

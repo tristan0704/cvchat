@@ -29,7 +29,7 @@ export async function GET(_: Request, context: RouteContext) {
 
     if (codingChallenge === null) {
         timing.log({ status: 404 });
-        return notFound("Coding challenge not found");
+        return notFound("Coding-Challenge wurde nicht gefunden.");
     }
 
     const response = {

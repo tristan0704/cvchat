@@ -155,7 +155,7 @@ export async function POST(req: Request) {
     const role =
         typeof formData?.get("role") === "string"
             ? String(formData.get("role")).trim()
-            : "Backend Developer";
+            : "Backend-Entwickler";
     const interviewId =
         typeof formData?.get("interviewId") === "string"
             ? String(formData.get("interviewId")).trim()
@@ -168,7 +168,7 @@ export async function POST(req: Request) {
     );
 
     if (!(audio instanceof File) || audio.size === 0) {
-        return Response.json({ error: "Missing audio file" }, { status: 400 });
+        return Response.json({ error: "Audiodatei fehlt." }, { status: 400 });
     }
 
     try {
@@ -300,7 +300,7 @@ export async function PATCH(request: Request) {
     const currentUser = await getCurrentApiIdentity();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     try {
@@ -322,13 +322,13 @@ export async function PATCH(request: Request) {
 
         if (!interviewId) {
             return Response.json(
-                { error: "Interview id is required" },
+                { error: "Interview-ID ist erforderlich." },
                 { status: 400 }
             );
         }
 
         if (!role) {
-            return Response.json({ error: "Role is required" }, { status: 400 });
+            return Response.json({ error: "Rolle ist erforderlich." }, { status: 400 });
         }
 
         const transcriptEntries = parseTranscriptEntriesFromJson(

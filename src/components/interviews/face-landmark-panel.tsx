@@ -293,7 +293,7 @@ function FaceAnalysisSummary(args: {
                         </div>
 
                         <div className="rounded-[18px] border border-slate-200 bg-slate-100/70 p-3">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Naechste Schritte</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nächste Schritte</p>
                             {renderSummaryList(report.summary.nextSteps)}
                         </div>
                     </div>

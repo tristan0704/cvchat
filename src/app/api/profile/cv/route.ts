@@ -11,7 +11,7 @@ export async function GET() {
     const currentUser = await getCurrentAppUser();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const cv = await getActiveCvSummaryForUser(currentUser.id);
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const currentUser = await getCurrentAppUser();
 
     if (!currentUser) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     try {

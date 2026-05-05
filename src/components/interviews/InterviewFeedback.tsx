@@ -363,7 +363,7 @@ function AnalysisStateCard(args: {
                     description="Sobald das Aufnahme-Transkript fertig ist, startet die strukturierte GPT-Auswertung automatisch."
                     badge={
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                            Transcribing
+                            Transkription
                         </span>
                     }
                 />
@@ -398,8 +398,8 @@ function AnalysisStateCard(args: {
                 title="Feedback wird nach dem Call erstellt"
                 description={
                     args.showFaceAnalysis
-                        ? "Beende zuerst das Interview. Anschließend werden Replay, Timing, Face-Metriken und die neue GPT-Auswertung angezeigt."
-                        : "Beende zuerst das Interview. Anschließend werden Replay, Timing und die neue GPT-Auswertung angezeigt."
+                        ? "Beende zuerst das Interview. Anschließend werden Wiedergabe, Timing, Face-Metriken und die neue GPT-Auswertung angezeigt."
+                        : "Beende zuerst das Interview. Anschließend werden Wiedergabe, Timing und die neue GPT-Auswertung angezeigt."
                 }
                 badge={
                     <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
@@ -716,9 +716,9 @@ export default function InterviewFeedback({
             <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
                 <SurfaceCard>
                     <SectionHeading
-                        eyebrow="Replay"
+                        eyebrow="Wiedergabe"
                         title="Interview-Wiedergabe"
-                        description="Replay der gemeinsamen Aufnahme mit Interviewer- und Kandidatenstimme."
+                        description="Wiedergabe der gemeinsamen Aufnahme mit Interviewer- und Kandidatenstimme."
                         badge={
                             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
                                 {recapStatus}
@@ -739,23 +739,23 @@ export default function InterviewFeedback({
                                     nicht.
                                 </audio>
                                 <p className="text-sm text-gray-400">
-                                    Der Replay-Track mischt beide Stimmen in einer
+                                    Die Wiedergabe mischt beide Stimmen in einer
                                     gemeinsamen Aufnahme.
                                 </p>
                             </div>
                         ) : recapStatus === "recording" ? (
                             <p className="text-sm text-gray-400">
-                                Der Replay-Track wird gerade noch verarbeitet.
+                                Die Wiedergabe wird gerade noch verarbeitet.
                             </p>
                         ) : recapStatus === "error" ? (
                             <p className="text-sm text-red-300">
                                 {recapError ||
-                                    "Das Replay konnte nicht erstellt werden."}
+                                    "Die Wiedergabe konnte nicht erstellt werden."}
                             </p>
                         ) : (
                             <p className="text-sm text-gray-400">
                                 Nach dem Interview erscheint hier die gemeinsame
-                                Replay-Aufnahme. Ohne gespeichertes Audio bleibt
+                                Wiedergabe-Aufnahme. Ohne gespeichertes Audio bleibt
                                 dieser Bereich nur in der Live-Session verfügbar.
                             </p>
                         )}
@@ -799,7 +799,7 @@ export default function InterviewFeedback({
                         ) : (
                             <p className="text-sm text-gray-400">
                                 Nach dem Interview erscheint hier der komplette
-                                strukturierte Transcript-Export.
+                                strukturierte Transkript-Export.
                             </p>
                         )}
                     </div>
@@ -836,7 +836,7 @@ export default function InterviewFeedback({
                                 )}
                             />
                             <MetricCard
-                                label="Words per Minute"
+                                label="Wörter pro Minute"
                                 value={formatMetricWordsPerMinute(
                                     timingMetrics.candidateWordsPerMinute
                                 )}
@@ -848,7 +848,7 @@ export default function InterviewFeedback({
                                 )}
                             />
                             <MetricCard
-                                label="Laengste Antwort"
+                                label="Längste Antwort"
                                 value={formatMetricSeconds(
                                     timingMetrics.longestAnswerDurationMs
                                 )}
@@ -866,7 +866,7 @@ export default function InterviewFeedback({
                                 )}
                             />
                             <MetricCard
-                                label="Laengste Denkpause"
+                                label="Längste Denkpause"
                                 value={formatMetricSeconds(
                                     timingMetrics.longestResponseLatencyMs
                                 )}
@@ -912,11 +912,11 @@ export default function InterviewFeedback({
                     <div className="mt-4 space-y-4">
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <MetricCard
-                                label="Headline"
+                                label="Kurzfazit"
                                 value={faceAnalysisReport.summary.headline}
                             />
                             <MetricCard
-                                label="Gesicht im Frame"
+                                label="Gesicht im Bild"
                                 value={formatPercent(
                                     faceAnalysisReport.globalMetrics.faceDetectedPct
                                 )}
@@ -958,9 +958,9 @@ export default function InterviewFeedback({
                                 emptyLabel="Keine besonderen Risiken erkannt."
                             />
                             <ListCard
-                                title="Naechste Schritte"
+                                title="Nächste Schritte"
                                 items={faceAnalysisReport.summary.nextSteps}
-                                emptyLabel="Keine naechsten Schritte vorhanden."
+                                emptyLabel="Keine nächsten Schritte vorhanden."
                             />
                         </div>
 
@@ -970,7 +970,7 @@ export default function InterviewFeedback({
                                 items={faceAnalysisReport.alerts.map(
                                     (alert) => alert.message
                                 )}
-                                emptyLabel="Keine Alerts vorhanden."
+                                emptyLabel="Keine Hinweise vorhanden."
                             />
                         ) : null}
                     </div>
