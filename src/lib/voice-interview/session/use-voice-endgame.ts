@@ -21,6 +21,7 @@ import type { CallLifecyclePhase, ConnectionStatus, StopReason } from "@/lib/voi
 type StopCallRef = MutableRefObject<((options?: { terminalStatus?: ConnectionStatus; closeSession?: boolean }) => Promise<void>) | null>
 
 type UseVoiceEndgameArgs = {
+    language: string
     callTimingRef: MutableRefObject<CallTiming | null>
     stopCallInFlightRef: MutableRefObject<boolean>
     stopCallRef: StopCallRef
@@ -43,6 +44,7 @@ type UseVoiceEndgameArgs = {
 }
 
 export function useVoiceEndgame({
+    language,
     callTimingRef,
     stopCallInFlightRef,
     stopCallRef,
@@ -215,10 +217,10 @@ export function useVoiceEndgame({
 
         detachForControlledEnding()
         updateEndgameState("asking-closing-question")
-        appendTranscript("system", "Letzte Minute: Es ist noch Zeit fuer genau eine kurze Abschlussfrage.")
+        appendTranscript("system", "Letzte Minute: Es ist noch Zeit für genau eine kurze Abschlussfrage.")
         updateTurnState("interviewer-speaking")
 
-        const questionPlayed = await playHostPhrase(getLastQuestionPhrase())
+        const questionPlayed = await playHostPhrase(getLastQuestionPhrase(language))
         if (!questionPlayed) {
             void requestGracefulStopRef.current?.("timer")
             return
@@ -231,6 +233,7 @@ export function useVoiceEndgame({
         candidateSpeechLiveRef,
         detachForControlledEnding,
         endgameStateRef,
+        language,
         playHostPhrase,
         stopCallInFlightRef,
         updateEndgameState,
@@ -293,7 +296,7 @@ export function useVoiceEndgame({
             flushPendingTranscript("interviewer")
             detachRealtimeSession()
 
-            const farewellPhrase = reason === "technicalError" ? getTechnicalErrorFarewellPhrase() : getFarewellPhrase()
+            const farewellPhrase = reason === "technicalError" ? getTechnicalErrorFarewellPhrase(language) : getFarewellPhrase(language)
             const terminalStatus: ConnectionStatus = reason === "technicalError" ? "error" : "idle"
 
             if (reason === "goAway") {
@@ -327,6 +330,7 @@ export function useVoiceEndgame({
             clearEndgameTimers,
             detachRealtimeSession,
             flushPendingTranscript,
+            language,
             playHostPhrase,
             stopCallInFlightRef,
             stopCallRef,

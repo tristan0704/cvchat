@@ -2,68 +2,138 @@
   "voiceName": "Zephyr",
   "assetLoadFallbackTimeoutMs": 3000,
   "closingHardStopTimeoutMs": 8000,
-  "greetings": [
-    {
-      "id": "backend-developer",
-      "roleLabel": "Backend Developer",
-      "matchers": ["backend developer", "backend"],
-      "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Backend Developer.",
-      "assetPath": "/audio/voice-host/zephyr/greeting-backend-developer.wav"
+  "languages": {
+    "de": {
+      "greetings": [
+        {
+          "id": "backend-developer",
+          "roleLabel": "Backend Developer",
+          "matchers": ["backend developer", "backend"],
+          "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Backend Developer.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-backend-developer.wav"
+        },
+        {
+          "id": "frontend-developer",
+          "roleLabel": "Frontend Developer",
+          "matchers": ["frontend developer", "frontend"],
+          "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Frontend Developer.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-frontend-developer.wav"
+        },
+        {
+          "id": "fullstack-developer",
+          "roleLabel": "Fullstack Developer",
+          "matchers": ["fullstack developer", "fullstack"],
+          "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Fullstack Developer.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-fullstack-developer.wav"
+        },
+        {
+          "id": "data-ai",
+          "roleLabel": "Data / AI",
+          "matchers": ["data / ai", "data ai", "data", "ai"],
+          "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Data und AI.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-data-ai.wav"
+        }
+      ],
+      "genericGreeting": {
+        "id": "generic-greeting",
+        "text": "Guten Tag und willkommen zum technischen Interview.",
+        "assetPath": "/audio/voice-host/zephyr/greeting-generic.wav"
+      },
+      "firstQuestions": [
+        {
+          "id": "fullstack-developer-first-question",
+          "roleLabel": "Fullstack Developer",
+          "matchers": ["fullstack developer", "fullstack"],
+          "text": "Wie gehst du bei einem Fullstack-Feature vor, damit Frontend, Backend und Datenmodell sauber zusammenspielen und am Ende ein stabiler Nutzerflow entsteht?",
+          "assetPath": "/audio/voice-host/zephyr/first-question-fullstack-developer.wav"
+        }
+      ],
+      "genericFirstQuestion": {
+        "id": "generic-first-question",
+        "text": "Warum passt diese Rolle aus deiner Sicht gut zu dir, und in welchem technischen Umfeld lieferst du erfahrungsgemäß den größten Wert?",
+        "assetPath": "/audio/voice-host/zephyr/first-question-generic.wav"
+      },
+      "lastQuestion": {
+        "id": "last-question",
+        "text": "Zum Abschluss noch eine letzte kurze Frage: Warum bist du für diese Rolle jetzt konkret die richtige Besetzung?",
+        "assetPath": "/audio/voice-host/zephyr/last-question.wav"
+      },
+      "farewell": {
+        "id": "farewell",
+        "text": "Vielen Dank für das Gespräch. Das Interview ist hiermit beendet.",
+        "assetPath": "/audio/voice-host/zephyr/farewell.wav"
+      },
+      "technicalErrorFarewell": {
+        "id": "technical-error-farewell",
+        "text": "Das Interview wird aus technischen Gründen beendet. Vielen Dank.",
+        "assetPath": "/audio/voice-host/zephyr/farewell-technical-error.wav"
+      }
     },
-    {
-      "id": "frontend-developer",
-      "roleLabel": "Frontend Developer",
-      "matchers": ["frontend developer", "frontend"],
-      "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Frontend Developer.",
-      "assetPath": "/audio/voice-host/zephyr/greeting-frontend-developer.wav"
-    },
-    {
-      "id": "fullstack-praktikant",
-      "roleLabel": "Fullstack-Praktikant",
-      "matchers": ["fullstack-praktikant", "fullstack praktikant", "fullstack intern", "fullstack internship", "fullstack"],
-      "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Fullstack-Praktikant.",
-      "assetPath": "/audio/voice-host/zephyr/greeting-fullstack-praktikant.wav"
-    },
-    {
-      "id": "data-ai",
-      "roleLabel": "Data / AI",
-      "matchers": ["data / ai", "data ai", "data", "ai"],
-      "text": "Guten Tag und willkommen zum technischen Interview für die Rolle Data und AI.",
-      "assetPath": "/audio/voice-host/zephyr/greeting-data-ai.wav"
+    "en": {
+      "greetings": [
+        {
+          "id": "backend-developer",
+          "roleLabel": "Backend Developer",
+          "matchers": ["backend developer", "backend"],
+          "text": "Hello and welcome to the technical interview for the Backend Developer role.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-backend-developer-en.wav"
+        },
+        {
+          "id": "frontend-developer",
+          "roleLabel": "Frontend Developer",
+          "matchers": ["frontend developer", "frontend"],
+          "text": "Hello and welcome to the technical interview for the Frontend Developer role.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-frontend-developer-en.wav"
+        },
+        {
+          "id": "fullstack-developer",
+          "roleLabel": "Fullstack Developer",
+          "matchers": ["fullstack developer", "fullstack"],
+          "text": "Hello and welcome to the technical interview for the Fullstack Developer role.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-fullstack-developer-en.wav"
+        },
+        {
+          "id": "data-ai",
+          "roleLabel": "Data / AI",
+          "matchers": ["data / ai", "data ai", "data", "ai"],
+          "text": "Hello and welcome to the technical interview for the Data and AI role.",
+          "assetPath": "/audio/voice-host/zephyr/greeting-data-ai-en.wav"
+        }
+      ],
+      "genericGreeting": {
+        "id": "generic-greeting",
+        "text": "Hello and welcome to the technical interview.",
+        "assetPath": "/audio/voice-host/zephyr/greeting-generic-en.wav"
+      },
+      "firstQuestions": [
+        {
+          "id": "fullstack-developer-first-question",
+          "roleLabel": "Fullstack Developer",
+          "matchers": ["fullstack developer", "fullstack"],
+          "text": "How do you approach a fullstack feature so that the frontend, backend, and data model work together cleanly and result in a stable user flow?",
+          "assetPath": "/audio/voice-host/zephyr/first-question-fullstack-developer-en.wav"
+        }
+      ],
+      "genericFirstQuestion": {
+        "id": "generic-first-question",
+        "text": "Why do you think this role is a good fit for you, and in what kind of technical environment do you usually create the most value?",
+        "assetPath": "/audio/voice-host/zephyr/first-question-generic-en.wav"
+      },
+      "lastQuestion": {
+        "id": "last-question",
+        "text": "One final short question to close: why are you the right person for this role right now?",
+        "assetPath": "/audio/voice-host/zephyr/last-question-en.wav"
+      },
+      "farewell": {
+        "id": "farewell",
+        "text": "Thank you for the conversation. The interview is now complete.",
+        "assetPath": "/audio/voice-host/zephyr/farewell-en.wav"
+      },
+      "technicalErrorFarewell": {
+        "id": "technical-error-farewell",
+        "text": "The interview is ending for technical reasons. Thank you.",
+        "assetPath": "/audio/voice-host/zephyr/farewell-technical-error-en.wav"
+      }
     }
-  ],
-  "genericGreeting": {
-    "id": "generic-greeting",
-    "text": "Guten Tag und willkommen zum technischen Interview.",
-    "assetPath": "/audio/voice-host/zephyr/greeting-generic.wav"
-  },
-  "firstQuestions": [
-    {
-      "id": "fullstack-praktikant-first-question",
-      "roleLabel": "Fullstack-Praktikant",
-      "matchers": ["fullstack-praktikant", "fullstack praktikant", "fullstack intern", "fullstack internship", "fullstack"],
-      "text": "Warum interessiert dich gerade ein Fullstack-Praktikum, und was willst du in so einer Rolle in den nächsten Monaten konkret lernen?",
-      "assetPath": "/audio/voice-host/zephyr/first-question-fullstack-praktikant.wav"
-    }
-  ],
-  "genericFirstQuestion": {
-    "id": "generic-first-question",
-    "text": "Warum passt diese Rolle aus deiner Sicht gut zu dir, und in welchem technischen Umfeld lieferst du erfahrungsgemäß den größten Wert?",
-    "assetPath": "/audio/voice-host/zephyr/first-question-generic.wav"
-  },
-  "lastQuestion": {
-    "id": "last-question",
-    "text": "Zum Abschluss noch eine letzte kurze Frage: Warum bist du für diese Rolle jetzt konkret die richtige Besetzung?",
-    "assetPath": "/audio/voice-host/zephyr/last-question.wav"
-  },
-  "farewell": {
-    "id": "farewell",
-    "text": "Vielen Dank für das Gespräch. Das Interview ist hiermit beendet.",
-    "assetPath": "/audio/voice-host/zephyr/farewell.wav"
-  },
-  "technicalErrorFarewell": {
-    "id": "technical-error-farewell",
-    "text": "Das Interview wird aus technischen Gründen beendet. Vielen Dank.",
-    "assetPath": "/audio/voice-host/zephyr/farewell-technical-error.wav"
   }
 }

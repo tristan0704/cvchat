@@ -27,6 +27,7 @@ import type { UseVoiceSessionLifecycleArgs } from "@/lib/voice-interview/session
 
 export function useVoiceSessionLifecycle({
                                              role,
+                                             language,
                                              questionPlan,
                                              faceAnalysisEnabled,
                                              faceLandmarkPanelRef,
@@ -727,11 +728,11 @@ export function useVoiceSessionLifecycle({
      */
     const runInterviewOpening = useCallback(async () => {
         const plannedQuestionContext = buildPlannedQuestionContext()
-        const openingQuestionPhrase = resolveOpeningQuestionPhrase(role)
+        const openingQuestionPhrase = resolveOpeningQuestionPhrase(role, language)
 
         appendTranscript("system", `Interviewrahmen fuer ${role}: ${plannedQuestionContext}`)
 
-        const greetingPlayed = await playHostPhrase(resolveGreetingPhrase(role), {
+        const greetingPlayed = await playHostPhrase(resolveGreetingPhrase(role, language), {
             appendTranscriptSpeaker: "system",
         })
 
@@ -760,6 +761,7 @@ export function useVoiceSessionLifecycle({
     }, [
         appendTranscript,
         buildPlannedQuestionContext,
+        language,
         playHostPhrase,
         role,
         updateTurnState,

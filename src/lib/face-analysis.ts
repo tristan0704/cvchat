@@ -282,13 +282,13 @@ function countBlinks(samples: FaceLandmarkExportSnapshot[]) {
 
 function normalizeSnapshot(input: unknown, index: number): FaceLandmarkExportSnapshot {
     if (!input || typeof input !== "object") {
-        throw new Error(`Snapshot ${index + 1} ist kein gueltiges Objekt.`)
+        throw new Error(`Snapshot ${index + 1} ist kein gültiges Objekt.`)
     }
 
     const value = input as Record<string, unknown>
     const ts = Number(value.ts)
     if (!Number.isFinite(ts)) {
-        throw new Error(`Snapshot ${index + 1} enthaelt keinen gueltigen Timestamp.`)
+        throw new Error(`Snapshot ${index + 1} enthält keinen gültigen Timestamp.`)
     }
 
     const snapshot = Number(value.snapshot)
@@ -314,7 +314,7 @@ function normalizeSnapshot(input: unknown, index: number): FaceLandmarkExportSna
 
 export function parseFaceLandmarkSnapshots(input: unknown) {
     if (!Array.isArray(input)) {
-        throw new Error("Es wurde kein Snapshot-Array uebergeben.")
+        throw new Error("Es wurde kein Snapshot-Array übergeben.")
     }
 
     if (input.length === 0) {
@@ -446,7 +446,7 @@ function createParameterReports(metrics: GlobalMetrics, config: FaceAnalysisConf
     const cameraPresenceScore = scoreHigherBetter(metrics.faceDetectedPct, config.scoring.cameraPresence)
     reports.push({
         key: "cameraPresence",
-        label: "Kamera-Praesenz",
+        label: "Kamera-Präsenz",
         score: cameraPresenceScore,
         weight: config.scoring.cameraPresence.weight,
         status: toStatus(cameraPresenceScore),
@@ -470,7 +470,7 @@ function createParameterReports(metrics: GlobalMetrics, config: FaceAnalysisConf
     const headStabilityScore = scoreLowerBetter(metrics.avgHeadMovement, config.scoring.headStability)
     reports.push({
         key: "headStability",
-        label: "Kopfstabilitaet",
+        label: "Kopfstabilität",
         score: headStabilityScore,
         weight: config.scoring.headStability.weight,
         status: toStatus(headStabilityScore),
@@ -482,7 +482,7 @@ function createParameterReports(metrics: GlobalMetrics, config: FaceAnalysisConf
     const speakingPresenceScore = scoreRangeOptimal(metrics.speakingActivityPct, config.scoring.speakingPresence)
     reports.push({
         key: "speakingPresence",
-        label: "Sprechaktivitaet",
+        label: "Sprechaktivität",
         score: speakingPresenceScore,
         weight: config.scoring.speakingPresence.weight,
         status: toStatus(speakingPresenceScore),
@@ -523,13 +523,13 @@ function buildAlertMessage(type: FaceAnalysisAlertType, windowCount: number) {
 
     switch (type) {
         case "face-missing":
-            return `Das Gesicht war in ${spanLabel} zu oft nicht sauber erfasst. Kamera, Licht und Framing pruefen.`
+            return `Das Gesicht war in ${spanLabel} zu oft nicht sauber erfasst. Kamera, Licht und Framing prüfen.`
         case "off-center":
             return `Der Blick oder Kopf war in ${spanLabel} zu oft weg von der Kamera.`
         case "high-movement":
             return `Die Kopfbewegung war in ${spanLabel} deutlich zu hoch.`
         case "low-speaking":
-            return `In ${spanLabel} wurde kaum aktive Sprechbewegung erkannt. Antworten oder Pausen dort gegenpruefen.`
+            return `In ${spanLabel} wurde kaum aktive Sprechbewegung erkannt. Antworten oder Pausen dort gegenprüfen.`
     }
 }
 
@@ -604,9 +604,9 @@ function buildAlerts(windows: FaceAnalysisWindow[], config: FaceAnalysisConfig) 
 }
 
 function buildHeadline(score: number) {
-    if (score >= 80) return "Solide Kamerapraesenz mit insgesamt ruhiger und konsistenter Delivery."
+    if (score >= 80) return "Solide Kamerapräsenz mit insgesamt ruhiger und konsistenter Delivery."
     if (score >= 60) return "In Summe stabil, aber mit einigen klaren Optimierungspunkten in der Delivery."
-    if (score >= 40) return "Mehrere Signale sind inkonsistent und sollten vor dem naechsten Uebungsinterview gezielt verbessert werden."
+    if (score >= 40) return "Mehrere Signale sind inkonsistent und sollten vor dem nächsten Übungsinterview gezielt verbessert werden."
     return "Die Session zeigt deutliche Tracking- oder Delivery-Probleme und braucht eine saubere Nachbearbeitung."
 }
 
@@ -631,19 +631,19 @@ function buildNextSteps(parameters: FaceAnalysisParameterReport[]) {
     const nextSteps: string[] = []
 
     if (lowKeys.has("cameraPresence")) {
-        nextSteps.push("Kamerahoehe, Licht und Sitzposition fixieren, damit das Gesicht dauerhaft sauber im Frame bleibt.")
+        nextSteps.push("Kamerahöhe, Licht und Sitzposition fixieren, damit das Gesicht dauerhaft sauber im Frame bleibt.")
     }
     if (lowKeys.has("frontalFocus")) {
-        nextSteps.push("Antworten oefnen, waehrend der Blick stabiler zur Kamera gehalten wird und seitliche Kopfrotation sinkt.")
+        nextSteps.push("Antworten öffnen, während der Blick stabiler zur Kamera gehalten wird und seitliche Kopfrotation sinkt.")
     }
     if (lowKeys.has("headStability")) {
-        nextSteps.push("Bei laengeren Antworten ruhiger sitzen und Bewegungsdrang ueber Tisch, Stuhl und Haltung reduzieren.")
+        nextSteps.push("Bei längeren Antworten ruhiger sitzen und Bewegungsdrang über Tisch, Stuhl und Haltung reduzieren.")
     }
     if (lowKeys.has("speakingPresence")) {
-        nextSteps.push("Abschnitte mit wenig Sprechaktivitaet gegen das Transkript legen: zu lange Pausen, zu leise Stellen oder Tracking-Aussetzer pruefen.")
+        nextSteps.push("Abschnitte mit wenig Sprechaktivität gegen das Transkript legen: zu lange Pausen, zu leise Stellen oder Tracking-Aussetzer prüfen.")
     }
     if (lowKeys.has("blinkNaturalness")) {
-        nextSteps.push("Blinkmuster nur als schwaches Signal lesen und eher auf Stress, Trockenheit oder Setup-Probleme als auf Leistung schliessen.")
+        nextSteps.push("Blinkmuster nur als schwaches Signal lesen und eher auf Stress, Trockenheit oder Setup-Probleme als auf Leistung schließen.")
     }
     if (lowKeys.has("deliveryConsistency")) {
         nextSteps.push("Die markierten 10-Sekunden-Fenster isoliert wiederholen, statt nur auf den Gesamtscore zu schauen.")
@@ -661,7 +661,7 @@ export function analyzeFaceLandmarkSession(args: {
     const snapshots = [...args.snapshots].sort((left, right) => left.ts - right.ts || left.snapshot - right.snapshot)
 
     if (snapshots.length === 0) {
-        throw new Error("Es wurden keine Snapshots fuer die Analyse uebergeben.")
+        throw new Error("Es wurden keine Snapshots für die Analyse übergeben.")
     }
 
     const windows = buildWindows(snapshots, config)
@@ -704,9 +704,9 @@ export function analyzeFaceLandmarkSession(args: {
             nextSteps: nextSteps.length > 0 ? nextSteps : ["Die Session mit dem Transkript koppeln und nur die markierten Zeitfenster manuell reviewen."],
         },
         limitations: [
-            "Die Auswertung ist regelbasiert und dient nur als Coaching-Feedback fuer Uebungsinterviews.",
-            "Face-Landmarks sind kein belastbarer Ersatz fuer menschliche Beurteilung und sollten nicht fuer automatische Hiring-Entscheidungen genutzt werden.",
-            "Auffaelligkeiten koennen durch Licht, Kamera, Framing, Brille, Netzwerk oder Tracking-Artefakte entstehen.",
+            "Die Auswertung ist regelbasiert und dient nur als Coaching-Feedback für Übungsinterviews.",
+            "Face-Landmarks sind kein belastbarer Ersatz für menschliche Beurteilung und sollten nicht für automatische Hiring-Entscheidungen genutzt werden.",
+            "Auffälligkeiten können durch Licht, Kamera, Framing, Brille, Netzwerk oder Tracking-Artefakte entstehen.",
         ],
     } satisfies FaceAnalysisReport
 }

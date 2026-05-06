@@ -202,7 +202,7 @@ export function useHostPlayback({
      * noch fälschlich State ändern.
      */
     const playSpeechFallback = useCallback(
-        (text: string, playbackSequence: number) =>
+        (phrase: HostVoicePhrase, playbackSequence: number) =>
             new Promise<boolean>((resolve) => {
                 if (typeof window === "undefined" || !("speechSynthesis" in window)) {
                     resolve(false)
@@ -211,8 +211,8 @@ export function useHostPlayback({
 
                 window.speechSynthesis.cancel()
 
-                const utterance = new SpeechSynthesisUtterance(text)
-                utterance.lang = "de-DE"
+                const utterance = new SpeechSynthesisUtterance(phrase.text)
+                utterance.lang = phrase.speechSynthesisLang
                 utterance.rate = 1
                 utterance.pitch = 1
 
@@ -409,7 +409,7 @@ export function useHostPlayback({
                 return false
             }
 
-            return await playSpeechFallback(phrase.text, playbackSequence)
+            return await playSpeechFallback(phrase, playbackSequence)
         },
         [appendTranscript, playFixedPhraseAsset, playSpeechFallback]
     )

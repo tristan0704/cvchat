@@ -3,6 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 import type { InterviewCvConfig } from "@/lib/cv/types";
+import { useI18n } from "@/lib/i18n/context";
 import type { InterviewQuestion } from "@/lib/questionpool";
 import { useVoiceInterviewController } from "@/lib/voice-interview/session/use-voice-interview-controller";
 
@@ -50,13 +51,15 @@ function InterviewSessionScope({
     plannedQuestions: PlannedQuestion[];
     children: ReactNode;
 }) {
+    const { language } = useI18n();
     const voiceInterview = useVoiceInterviewController(
         role,
         plannedQuestions.length > 0
             ? mapPlannedQuestionsToQuestionPlan(plannedQuestions)
             : undefined,
         interviewId,
-        interviewMode
+        interviewMode,
+        language
     );
 
     return (

@@ -43,7 +43,7 @@ const LIVE_SESSION_TTL_MS = 6 * 60 * 1000
  * Gibt zusätzliche Interview-Anweisungen abhängig von Zielrolle und Seniorität zurück.
  *
  * Zweck:
- * Das Interview soll für Praktika, Internships, Trainee- und Junior-Rollen fair bleiben.
+ * Das Interview soll für Early-Career-, Trainee- und Junior-Rollen fair bleiben.
  * Bei Early-Career-Rollen wird stärker auf Lernkurve, Grundlagenverständnis,
  * Kommunikation und konkrete Projektbeispiele geachtet statt auf Senior-Level-Tiefe.
  */
@@ -66,7 +66,7 @@ function getRoleInterviewGuidance(role: string) {
 
   const seniorityGuidance = isEarlyCareerRole
       ? [
-        "Berücksichtige, dass es sich um eine Early-Career-, Praktikums-, Internship- oder Junior-Rolle handeln kann.",
+        "Berücksichtige, dass es sich um eine Early-Career-, Trainee-, Entry-Level- oder Junior-Rolle handeln kann.",
         "Bewerte deshalb nicht wie bei einem Senior-Interview, sondern achte stärker auf Lernkurve, Grundlagenverständnis, klare Kommunikation, Reflexionsfähigkeit, Umgang mit Feedback und nachvollziehbare Projektbeispiele.",
       ].join(" ")
       : [

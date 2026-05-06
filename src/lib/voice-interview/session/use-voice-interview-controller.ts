@@ -36,7 +36,8 @@ export function useVoiceInterviewController(
     role: string,
     questionPlanOverride?: ReturnType<typeof getInterviewQuestionPool>,
     interviewId?: string,
-    interviewMode: "voice" | "face" = "face"
+    interviewMode: "voice" | "face" = "face",
+    language: string = "de"
 ) {
     /**
      * Falls von außen ein fertiger Question Plan reinkommt, verwenden wir ihn.
@@ -320,6 +321,7 @@ export function useVoiceInterviewController(
      * - kontrolliertes Beenden
      */
     const endgame = useVoiceEndgame({
+        language,
         callTimingRef,
         stopCallInFlightRef,
         stopCallRef,
@@ -395,11 +397,12 @@ export function useVoiceInterviewController(
      * - Endgame
      *
      * Wichtig:
-     * Wir ändern hier NICHT die Struktur der Props,
-     * damit keine anderen Dateien angepasst werden müssen.
+     * Die Sprache wird bewusst mitgegeben, damit lokale Host-Phrasen
+     * zur Sprache der Live-Session passen.
      */
     const { startCall } = useVoiceSessionLifecycle({
         role,
+        language,
         questionPlan,
         faceAnalysisEnabled: interviewMode === "face",
         faceLandmarkPanelRef,

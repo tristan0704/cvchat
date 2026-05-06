@@ -19,33 +19,8 @@ const NUMBER_FORMATTER = new Intl.NumberFormat("de-DE", {
     maximumFractionDigits: 1,
 });
 
-const UMLAUT_REPLACEMENTS: Array<[string, string]> = [
-    ["Praesenz", "Präsenz"],
-    ["Kamerapraesenz", "Kamerapräsenz"],
-    ["Sprechaktivitaet", "Sprechaktivität"],
-    ["Kopfstabilitaet", "Kopfstabilität"],
-    ["Kamerahoehe", "Kamerahöhe"],
-    ["oefnen", "öffnen"],
-    ["waehrend", "während"],
-    ["laengeren", "längeren"],
-    ["pruefen", "prüfen"],
-    ["gegenpruefen", "gegenprüfen"],
-    ["fuer", "für"],
-    ["Auffaelligkeiten", "Auffälligkeiten"],
-    ["koennen", "können"],
-    ["naechsten", "nächsten"],
-];
-
 function formatPercent(value: number) {
     return `${PERCENT_FORMATTER.format(value * 100)}%`;
-}
-
-function formatDisplayText(value: string) {
-    return UMLAUT_REPLACEMENTS.reduce(
-        (currentValue, [search, replacement]) =>
-            currentValue.replaceAll(search, replacement),
-        value
-    );
 }
 
 function getFaceStatusLabel(
@@ -98,12 +73,12 @@ function FaceParameterCard({
             <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-100">
-                        {formatDisplayText(parameter.label)}
+                        {parameter.label}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-gray-400">
-                        {formatDisplayText(parameter.valueLabel)}
+                        {parameter.valueLabel}
                         <span className="mx-2 text-gray-600">/</span>
-                        {formatDisplayText(parameter.summary)}
+                        {parameter.summary}
                     </p>
                 </div>
                 <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${tone}`}>
@@ -132,7 +107,7 @@ function ListBlock({
                 <ul className="mt-3 space-y-2 text-sm text-gray-200">
                     {items.slice(0, 1).map((item) => (
                         <li key={item} className="rounded-lg bg-white/5 px-3 py-2">
-                            {formatDisplayText(item)}
+                            {item}
                         </li>
                     ))}
                 </ul>
@@ -189,7 +164,7 @@ export function FaceAnalysisSection({
                                     </span>
                                 </div>
                                 <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-white">
-                                    {formatDisplayText(report.summary.headline)}
+                                    {report.summary.headline}
                                 </p>
                             </div>
 

@@ -9,6 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "coding:seed": "node scripts/seed-coding-challenges.mjs",
+    "voice-host:generate": "node scripts/generate-voice-host-audio.mjs",
+    "voice-host:validate": "node scripts/generate-voice-host-audio.mjs --validate-only",
+    "interviews:migrate-fullstack-questions": "node scripts/migrate-fullstack-planned-questions.mjs",
     "prisma:generate": "prisma --config src/db-backend/prisma.config.ts generate",
     "prisma:validate": "prisma --config src/db-backend/prisma.config.ts validate",
     "prisma:studio": "prisma --config src/db-backend/prisma.config.ts studio"
