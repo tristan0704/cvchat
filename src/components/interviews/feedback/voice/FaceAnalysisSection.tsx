@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { FaceAnalysisParameterReport, FaceAnalysisReport } from "@/lib/face-analysis";
 import type { AppDictionary } from "@/lib/i18n/dictionaries";
 
@@ -65,26 +66,42 @@ function FaceParameterCard({
     parameter: FaceAnalysisParameterReport;
     labels: AppDictionary["interviewFeedback"];
 }) {
+    const [isExpanded, setIsExpanded] = useState(false);
     const tone = getFaceStatusTone(parameter.status);
     const statusLabel = getFaceStatusLabel(parameter.status, labels);
 
     return (
-        <div className="rounded-xl bg-gray-950/45 px-4 py-3 outline outline-1 outline-white/10">
+        <div className="rounded-xl bg-gray-950/45 px-4 py-3 outline outline-1 outline-white/10 transition-all duration-200">
             <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-100">
-                        {parameter.label}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-gray-400">
-                        {parameter.valueLabel}
-                        <span className="mx-2 text-gray-600">/</span>
-                        {parameter.summary}
-                    </p>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-100">
+                            {parameter.label}
+                        </p>
+                        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-medium ${tone}`}>
+                            {statusLabel}
+                        </span>
+                    </div>
+                    
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                        <p className="text-xs text-gray-400">
+                            {parameter.valueLabel}
+                        </p>
+                        <button
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="text-[10px] font-bold uppercase tracking-wider text-violet-400 hover:text-violet-300 transition-colors"
+                        >
+                            {isExpanded ? labels.hideDetails : labels.showDetails}
+                        </button>
+                    </div>
                 </div>
-                <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${tone}`}>
-                    {statusLabel}
-                </span>
             </div>
+
+            {isExpanded && (
+                <p className="mt-3 text-xs leading-5 text-gray-300 animate-in fade-in slide-in-from-top-1 duration-200 border-t border-white/5 pt-2">
+                    {parameter.summary}
+                </p>
+            )}
         </div>
     );
 }
@@ -126,70 +143,42 @@ export function FaceAnalysisSection({
     labels: AppDictionary["interviewFeedback"];
 }) {
     return (
-        <FeedbackSurface variant="compact" className="bg-gray-800/35">
+        <FeedbackSurface className="p-4">
             <SectionHeading
-                eyebrow={labels.faceEyebrow}
                 title={labels.facePresenceTitle}
-                description={labels.facePresenceDescription}
                 badge={
                     report ? (
-                        <span
-                            className={`rounded-full px-3 py-1 text-xs ${getFaceStatusTone(
-                                report.overallStatus
-                            )}`}
-                        >
+                        <StatusBadge className={`${getFaceStatusTone(report.overallStatus)} text-[10px] py-0.5 px-2`}>
                             {report.overallScore.toFixed(0)}%
-                        </span>
+                        </StatusBadge>
                     ) : (
-                        <StatusBadge>{labels.noData}</StatusBadge>
+                        <StatusBadge className="text-[10px] py-0.5 px-2">{labels.noData}</StatusBadge>
                     )
                 }
             />
 
             {report ? (
-                <div className="mt-5 space-y-3">
-                    <div className="rounded-xl bg-[linear-gradient(135deg,rgba(3,7,18,0.72),rgba(17,24,39,0.62)),radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_32%)] p-4 outline outline-1 outline-white/10">
-                        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span
-                                        className={`rounded-full px-3 py-1 text-xs font-semibold ${getFaceStatusTone(
-                                            report.overallStatus
-                                        )}`}
-                                    >
-                                        {report.overallScore.toFixed(0)}%
-                                    </span>
-                                    <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-300 outline outline-1 outline-white/10">
-                                        {labels.facePresenceTitle}
-                                    </span>
-                                </div>
-                                <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-white">
-                                    {report.summary.headline}
-                                </p>
-                            </div>
-
-                            <div className="grid gap-2 sm:grid-cols-3 xl:w-[520px]">
-                                <TopMetricCard
-                                    label={labels.faceInFrame}
-                                    value={formatPercent(report.globalMetrics.faceDetectedPct)}
-                                />
-                                <TopMetricCard
-                                    label={labels.speakingActivity}
-                                    value={formatPercent(
-                                        report.globalMetrics.speakingActivityPct
-                                    )}
-                                />
-                                <TopMetricCard
-                                    label={labels.blinkRate}
-                                    value={`${NUMBER_FORMATTER.format(
-                                        report.globalMetrics.blinkRatePerMin
-                                    )}/min`}
-                                />
-                            </div>
+                <div className="mt-6 space-y-4">
+                    <div className="rounded-xl bg-white/[0.02] p-4 outline outline-1 outline-white/5">
+                        <p className="text-sm font-semibold leading-relaxed text-white">
+                            {report.summary.headline}
+                        </p>
+                        
+                        <div className="mt-4 grid gap-2 grid-cols-2">
+                            <TopMetricCard
+                                label={labels.faceInFrame}
+                                value={formatPercent(report.globalMetrics.faceDetectedPct)}
+                            />
+                            <TopMetricCard
+                                label={labels.speakingActivity}
+                                value={formatPercent(
+                                    report.globalMetrics.speakingActivityPct
+                                )}
+                            />
                         </div>
                     </div>
 
-                    <div className="grid gap-2 lg:grid-cols-2">
+                    <div className="space-y-2">
                         {report.parameters.map((parameter) => (
                             <FaceParameterCard
                                 key={parameter.key}
@@ -199,7 +188,7 @@ export function FaceAnalysisSection({
                         ))}
                     </div>
 
-                    <div className="grid gap-3 lg:grid-cols-3">
+                    <div className="space-y-3 pt-2">
                         <ListBlock
                             title={labels.strengths}
                             items={report.summary.strengths}
@@ -216,17 +205,9 @@ export function FaceAnalysisSection({
                             emptyLabel={labels.noNextSteps}
                         />
                     </div>
-
-                    {report.alerts.length > 0 ? (
-                        <ListBlock
-                            title={labels.faceAlerts}
-                            items={report.alerts.map((alert) => alert.message)}
-                            emptyLabel={labels.faceNoAlerts}
-                        />
-                    ) : null}
                 </div>
             ) : (
-                <p className="mt-5 text-sm text-gray-400">{labels.faceEmpty}</p>
+                <p className="mt-6 text-xs text-gray-500 text-center py-6">{labels.faceEmpty}</p>
             )}
         </FeedbackSurface>
     );

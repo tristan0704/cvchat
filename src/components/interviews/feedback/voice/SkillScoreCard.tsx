@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { AppDictionary } from "@/lib/i18n/dictionaries";
 import type { InterviewFeedbackEvaluationDimension } from "@/lib/interview-feedback-fetch/types";
 
@@ -19,6 +20,7 @@ export function SkillScoreCard({
     labels: AppDictionary["interviewFeedback"];
     commonLabels: AppDictionary["common"];
 }) {
+    const [isExpanded, setIsExpanded] = useState(false);
     const tone = getScoreTone(dimension.score, commonLabels);
     const interpretation =
         dimension.score >= 75
@@ -28,12 +30,12 @@ export function SkillScoreCard({
               : labels.skillInterpretationWeak;
 
     return (
-        <article className="flex h-full min-h-[168px] flex-col justify-between rounded-xl bg-gray-950/45 p-4 outline outline-1 outline-white/10">
+        <article className="flex flex-col rounded-xl bg-white/[0.02] p-4 outline outline-1 outline-white/5">
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-4">
                     <p className="min-w-0 text-sm font-semibold text-white">{title}</p>
                     <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${tone.badge}`}
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${tone.badge}`}
                     >
                         {Math.round(dimension.score)}%
                     </span>
@@ -42,13 +44,25 @@ export function SkillScoreCard({
                 <ProgressBar
                     value={dimension.score}
                     className={tone.bar}
-                    trackClassName="bg-white/10"
+                    trackClassName="bg-white/5"
                 />
-                <p className="text-xs leading-5 text-gray-500">{interpretation}</p>
+                
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-medium text-gray-500">{interpretation}</p>
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                        {isExpanded ? labels.hideDetails : labels.showDetails}
+                    </button>
+                </div>
             </div>
-            <p className="mt-4 line-clamp-3 text-sm leading-6 text-gray-300">
-                {dimension.feedback}
-            </p>
+            
+            {isExpanded && (
+                <p className="mt-4 text-xs leading-relaxed text-gray-400 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {dimension.feedback}
+                </p>
+            )}
         </article>
     );
 }

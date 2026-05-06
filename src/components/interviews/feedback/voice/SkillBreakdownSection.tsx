@@ -16,14 +16,14 @@ export function SkillBreakdownSection({
     commonLabels: AppDictionary["common"];
 }) {
     return (
-        <FeedbackSurface variant="compact" className="bg-gray-800/35">
-            <SectionHeading
-                eyebrow={labels.skillBreakdownEyebrow}
-                title={labels.skillBreakdownTitle}
-                description={labels.skillBreakdownDescription}
-            />
+        <section className="space-y-4">
+            <div className="flex items-end justify-between px-1">
+                <SectionHeading
+                    title={labels.skillBreakdownTitle}
+                />
+            </div>
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-3">
                 <SkillScoreCard
                     title={labels.communication}
                     dimension={evaluation.communication}
@@ -43,6 +43,6 @@ export function SkillBreakdownSection({
                     commonLabels={commonLabels}
                 />
             </div>
-        </FeedbackSurface>
+        </section>
     );
 }

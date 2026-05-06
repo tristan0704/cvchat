@@ -19,7 +19,6 @@ export function getScoreTone(score: number, labels: ScoreToneLabels) {
         return {
             badge: "bg-green-500/20 text-green-300",
             bar: "bg-green-400",
-            glow: "shadow-[0_0_28px_rgba(74,222,128,0.18)]",
             label: labels.scoreStrong,
         };
     }
@@ -28,7 +27,6 @@ export function getScoreTone(score: number, labels: ScoreToneLabels) {
         return {
             badge: "bg-yellow-500/20 text-yellow-300",
             bar: "bg-yellow-400",
-            glow: "shadow-[0_0_28px_rgba(250,204,21,0.14)]",
             label: labels.scoreSolid,
         };
     }
@@ -36,7 +34,6 @@ export function getScoreTone(score: number, labels: ScoreToneLabels) {
     return {
         badge: "bg-red-500/20 text-red-300",
         bar: "bg-red-400",
-        glow: "shadow-[0_0_28px_rgba(248,113,113,0.14)]",
         label: labels.scoreWeak,
     };
 }
@@ -61,15 +58,10 @@ export function FeedbackSurface({
 }: {
     children: ReactNode;
     className?: string;
-    variant?: "default" | "highlight" | "dark" | "compact";
+    variant?: "default" | "highlight" | "dark" | "compact" | "glass";
 }) {
-    const variantClass =
-        variant === "highlight"
-            ? "bg-[linear-gradient(135deg,rgba(31,41,55,0.72),rgba(17,24,39,0.88)),radial-gradient(circle_at_top_right,rgba(139,92,246,0.22),transparent_34%)]"
-            : variant === "dark"
-              ? "bg-gray-950/55"
-              : "bg-gray-800/45";
-    const paddingClass = variant === "compact" ? "p-4" : "p-5";
+    const variantClass = "bg-gray-900/50";
+    const paddingClass = variant === "compact" ? "p-4" : "p-6";
 
     return (
         <section
@@ -113,33 +105,17 @@ export function StatusBadge({
 }
 
 export function SectionHeading({
-    eyebrow,
     title,
-    description,
     badge,
 }: {
-    eyebrow?: string;
     title: string;
-    description?: string;
     badge?: ReactNode;
 }) {
     return (
-        <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                {eyebrow ? (
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
-                        {eyebrow}
-                    </p>
-                ) : null}
-                <h2 className="mt-1 text-lg font-semibold tracking-tight text-white md:text-xl">
-                    {title}
-                </h2>
-                {description ? (
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-300">
-                        {description}
-                    </p>
-                ) : null}
-            </div>
+        <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold tracking-tight text-white md:text-xl">
+                {title}
+            </h2>
             {badge}
         </div>
     );

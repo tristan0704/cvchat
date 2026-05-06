@@ -19,9 +19,11 @@ function formatAudioTime(seconds: number) {
 export function CustomAudioPlayer({
     src,
     labels,
+    variant = "default",
 }: {
     src: string;
     labels: AppDictionary["interviewFeedback"];
+    variant?: "default" | "minimal";
 }) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -85,23 +87,30 @@ export function CustomAudioPlayer({
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+    const containerClasses =
+        variant === "minimal"
+            ? "bg-transparent p-0 outline-none"
+            : "rounded-xl bg-gray-950/70 p-4 outline outline-1 outline-violet-300/20";
+
+    const buttonSize = variant === "minimal" ? "size-9" : "size-11";
+
     return (
-        <div className="rounded-xl bg-gray-950/70 p-4 outline outline-1 outline-violet-300/20">
+        <div className={containerClasses}>
             <audio ref={audioRef} preload="metadata" src={src}>
                 {labels.audioUnsupported}
             </audio>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
                 <button
                     type="button"
                     onClick={() => void togglePlayback()}
-                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm font-semibold text-white outline outline-1 outline-violet-300/30 transition hover:bg-violet-500/30 focus:outline-2 focus:outline-violet-300"
+                    className={`flex ${buttonSize} shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm font-semibold text-white outline outline-1 outline-violet-300/30 transition hover:bg-violet-500/30 focus:outline-2 focus:outline-violet-300`}
                     aria-label={isPlaying ? labels.audioPause : labels.audioPlay}
                 >
                     {isPlaying ? (
                         "II"
                     ) : (
-                        <span className="ml-0.5 h-0 w-0 border-y-[6px] border-l-[9px] border-y-transparent border-l-white" />
+                        <span className="ml-0.5 h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-white" />
                     )}
                 </button>
 
@@ -109,21 +118,21 @@ export function CustomAudioPlayer({
                     <button
                         type="button"
                         onClick={handleSeek}
-                        className="group relative h-5 w-full rounded-full focus:outline-none focus:ring-2 focus:ring-violet-300"
+                        className="group relative h-4 w-full rounded-full focus:outline-none focus:ring-2 focus:ring-violet-300"
                         aria-label={labels.audioSeek}
                     >
-                        <span className="absolute left-0 top-1/2 h-2 w-full -translate-y-1/2 rounded-full bg-white/10" />
+                        <span className="absolute left-0 top-1/2 h-1.5 w-full -translate-y-1/2 rounded-full bg-white/10" />
                         <span
-                            className="absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 shadow-[0_0_16px_rgba(167,139,250,0.35)]"
+                            className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 shadow-[0_0_16px_rgba(167,139,250,0.35)]"
                             style={{ width: `${progress}%` }}
                         />
                         <span
-                            className="absolute top-1/2 size-3.5 -translate-y-1/2 rounded-full bg-white shadow-lg transition group-hover:scale-110"
+                            className="absolute top-1/2 size-3 -translate-y-1/2 rounded-full bg-white shadow-lg transition group-hover:scale-110"
                             style={{ left: `calc(${progress}% - 0.5rem)` }}
                         />
                     </button>
 
-                    <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+                    <div className="mt-1 flex items-center justify-between text-[10px] text-gray-500 font-medium">
                         <span>{formatAudioTime(currentTime)}</span>
                         <span>{formatAudioTime(duration)}</span>
                     </div>

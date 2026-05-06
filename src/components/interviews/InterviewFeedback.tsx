@@ -9,6 +9,7 @@ import { InterviewReplayCard } from "@/components/interviews/feedback/voice/Inte
 import { PracticePlanSection } from "@/components/interviews/feedback/voice/PracticePlanSection";
 import { SkillBreakdownSection } from "@/components/interviews/feedback/voice/SkillBreakdownSection";
 import { SpeakingAnalyticsSection } from "@/components/interviews/feedback/voice/SpeakingAnalyticsSection";
+import { PerformanceTimelineChart } from "@/components/interviews/feedback/voice/PerformanceTimelineChart";
 import type { FaceAnalysisReport } from "@/lib/face-analysis";
 import { buildInterviewTranscriptFingerprint } from "@/lib/interview-feedback-fetch/fingerprint";
 import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback-fetch/types";
@@ -270,32 +271,66 @@ export default function InterviewFeedback({
     const evaluation = analysis.evaluation ?? persistedState?.feedback ?? null;
 
     return (
-        <div className="space-y-6">
+        <div className="relative">
             {loadError ? (
-                <div className="rounded-xl bg-red-500/10 p-4 text-sm text-red-300 outline outline-1 outline-red-500/20">
+                <div className="mb-6 rounded-xl bg-red-500/10 p-4 text-sm text-red-300 outline outline-1 outline-red-500/20">
                     {loadError}
                 </div>
             ) : null}
 
             {evaluation ? (
-                <>
-                    <FeedbackSummaryHero
-                        role={role}
-                        experience={experience}
-                        companySize={companySize}
-                        evaluation={evaluation}
-                        labels={labels}
-                        commonLabels={dictionary.common}
-                    />
+                <div className="space-y-6">
+                    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+                        {/* Main Column */}
+                        <div className="space-y-6">
+                            <FeedbackSummaryHero
+                                role={role}
+                                experience={experience}
+                                companySize={companySize}
+                                evaluation={evaluation}
+                                labels={labels}
+                                commonLabels={dictionary.common}
+                            />
 
-                    <SkillBreakdownSection
-                        evaluation={evaluation}
-                        labels={labels}
-                        commonLabels={dictionary.common}
-                    />
+                            <InterviewReplayCard
+                                audioUrl={controller?.interviewRecapUrl}
+                                recapStatus={recapStatus}
+                                recapError={recapError}
+                                recapCaptureNote={recapCaptureNote}
+                                labels={labels}
+                            />
 
-                    <PracticePlanSection evaluation={evaluation} labels={labels} />
-                </>
+                            <SkillBreakdownSection
+                                evaluation={evaluation}
+                                labels={labels}
+                                commonLabels={dictionary.common}
+                            />
+
+                            {faceAnalysisReport ? (
+                                <PerformanceTimelineChart
+                                    report={faceAnalysisReport}
+                                    labels={labels}
+                                />
+                            ) : null}
+
+                            <PracticePlanSection evaluation={evaluation} labels={labels} />
+
+                        </div>
+
+                        {/* Sidebar Column */}
+                        <div className="space-y-6">
+                            {showFaceAnalysis ? (
+                                <FaceAnalysisSection report={faceAnalysisReport} labels={labels} />
+                            ) : null}
+                        </div>
+                    </div>
+
+                    <SpeakingAnalyticsSection
+                        timingMetrics={timingMetrics}
+                        hasTimingMetrics={hasTimingMetrics}
+                        labels={labels}
+                    />
+                </div>
             ) : (
                 <FeedbackStateCard
                     transcriptStatus={transcriptStatus}
@@ -306,24 +341,6 @@ export default function InterviewFeedback({
                     labels={labels}
                 />
             )}
-
-            <InterviewReplayCard
-                audioUrl={controller?.interviewRecapUrl}
-                recapStatus={recapStatus}
-                recapError={recapError}
-                recapCaptureNote={recapCaptureNote}
-                labels={labels}
-            />
-
-            {showFaceAnalysis ? (
-                <FaceAnalysisSection report={faceAnalysisReport} labels={labels} />
-            ) : null}
-
-            <SpeakingAnalyticsSection
-                timingMetrics={timingMetrics}
-                hasTimingMetrics={hasTimingMetrics}
-                labels={labels}
-            />
         </div>
     );
 }

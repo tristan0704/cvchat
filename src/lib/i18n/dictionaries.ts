@@ -298,6 +298,10 @@ export const dictionaries = {
             skillBreakdownTitle: "Interview-Skills",
             skillBreakdownDescription:
                 "Die Bewertung trennt Gesprächsführung, fachliche Antwortqualität und Rollenfit.",
+            showDetails: "Details anzeigen",
+            hideDetails: "Details ausblenden",
+            showAdvancedMetrics: "Erweiterte Analyse anzeigen",
+            hideAdvancedMetrics: "Analyse einklappen",
             skillInterpretationStrong: "Sehr belastbarer Bereich für den nächsten Durchlauf.",
             skillInterpretationSolid: "Solide Basis mit klar erkennbarem Ausbaupotenzial.",
             skillInterpretationWeak: "Hier liegt der wichtigste Trainingshebel.",
@@ -395,6 +399,11 @@ export const dictionaries = {
             noNextSteps: "Keine nächsten Schritte vorhanden.",
             faceAlerts: "Hinweise",
             faceNoAlerts: "Keine Hinweise vorhanden.",
+            faceActivityTimeline: "Aktivitätsverlauf",
+            performanceTimelineTitle: "Performance Timeline",
+            avgConfidence: "Präsenz & Fokus",
+            deliveryStability: "Körperstabilität",
+            interviewDuration: "Dauer",
             faceEmpty:
                 "Für dieses Interview sind noch keine Kamera-Metriken verfügbar.",
             persistedLoadError:
@@ -763,6 +772,10 @@ export const dictionaries = {
             skillBreakdownTitle: "Interview skills",
             skillBreakdownDescription:
                 "The evaluation separates communication, answer quality, and role fit.",
+            showDetails: "Show details",
+            hideDetails: "Hide details",
+            showAdvancedMetrics: "Show advanced analysis",
+            hideAdvancedMetrics: "Hide advanced analysis",
             skillInterpretationStrong: "A reliable area for your next run.",
             skillInterpretationSolid: "A solid base with clear room to improve.",
             skillInterpretationWeak: "This is the most important training lever.",
@@ -860,6 +873,11 @@ export const dictionaries = {
             noNextSteps: "No next steps available.",
             faceAlerts: "Notes",
             faceNoAlerts: "No notes available.",
+            faceActivityTimeline: "Activity Timeline",
+            performanceTimelineTitle: "Performance Timeline",
+            avgConfidence: "Avg. Engagement",
+            deliveryStability: "Body Stability",
+            interviewDuration: "Duration",
             faceEmpty:
                 "No camera metrics are available for this interview yet.",
             persistedLoadError:

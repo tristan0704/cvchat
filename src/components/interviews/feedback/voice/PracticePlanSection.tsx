@@ -43,56 +43,51 @@ export function PracticePlanSection({
     const nextItems = items.slice(1);
 
     return (
-        <FeedbackSurface
-            variant="highlight"
-            className="relative overflow-hidden bg-[linear-gradient(135deg,rgba(17,24,39,0.88),rgba(31,41,55,0.72)),radial-gradient(circle_at_left,rgba(124,58,237,0.18),transparent_36%)]"
-        >
-            <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/60 to-transparent" />
+        <FeedbackSurface className="space-y-6">
             <SectionHeading
-                eyebrow={labels.practicePlanEyebrow}
                 title={labels.practicePlanTitle}
-                description={labels.practicePlanDescription}
-                badge={<StatusBadge className="bg-violet-500/15 text-violet-100 outline-violet-300/20">{labels.nextRun}</StatusBadge>}
+                badge={<StatusBadge className="bg-indigo-500/10 text-indigo-300 outline-indigo-300/20">{labels.nextRun}</StatusBadge>}
             />
 
-            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+            <div className="space-y-4">
                 {items.length > 0 ? (
                     <>
-                        <div className="rounded-xl bg-gray-950/60 p-4 outline outline-1 outline-violet-300/20">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-violet-200">
-                                {labels.primaryFocus}
-                            </p>
-                            <p className="mt-2 text-base font-semibold leading-7 text-white">
-                                {focusItem}
-                            </p>
+                        {/* Primary Focus */}
+                        <div className="relative rounded-xl bg-indigo-500/10 p-5 outline outline-1 outline-indigo-500/20">
+                            <div className="flex items-start gap-4">
+                                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white font-bold text-sm">
+                                    1
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-400 mb-1">
+                                        {labels.primaryFocus}
+                                    </p>
+                                    <p className="text-base font-semibold leading-relaxed text-white">
+                                        {focusItem}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="grid gap-2">
-                            {nextItems.length > 0 ? (
-                                nextItems.map((item, index) => (
-                                    <FeedbackPanel
-                                        key={item}
-                                        className="flex items-start gap-3 bg-gray-950/45 p-3"
-                                    >
-                                        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/5 text-xs font-semibold text-violet-100 outline outline-1 outline-violet-300/20">
-                                            {index + 2}
-                                        </span>
-                                        <p className="min-w-0 text-sm leading-6 text-gray-200">
-                                            {item}
-                                        </p>
-                                    </FeedbackPanel>
-                                ))
-                            ) : (
-                                <FeedbackPanel className="bg-gray-950/45 p-3">
-                                    <p className="text-sm leading-6 text-gray-300">
-                                        {labels.practicePlanSingleFocus}
+                        {/* Secondary Steps */}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {nextItems.map((item, index) => (
+                                <div
+                                    key={item}
+                                    className="flex items-start gap-3 rounded-xl bg-gray-950/20 p-4 outline outline-1 outline-white/5"
+                                >
+                                    <span className="flex size-6 shrink-0 items-center justify-center rounded bg-white/5 text-[10px] font-bold text-gray-400 outline outline-1 outline-white/10">
+                                        {index + 2}
+                                    </span>
+                                    <p className="text-sm leading-relaxed text-gray-300">
+                                        {item}
                                     </p>
-                                </FeedbackPanel>
-                            )}
+                                </div>
+                            ))}
                         </div>
                     </>
                 ) : (
-                    <p className="text-sm text-gray-400">{labels.practicePlanEmpty}</p>
+                    <p className="text-sm text-gray-400 text-center py-6">{labels.practicePlanEmpty}</p>
                 )}
             </div>
         </FeedbackSurface>
