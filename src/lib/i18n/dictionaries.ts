@@ -251,6 +251,17 @@ export const dictionaries = {
             likelyMatch: "Wahrscheinlich passend",
             uncertain: "Noch unsicher",
             overallScore: "Gesamtscore",
+            performanceReport: "Performance Report",
+            runSummaryEyebrow: "Run Summary",
+            runSummaryTitle: "Interview-Run abgeschlossen",
+            runScoreLabel: "Run Score",
+            summaryCurrentLevel: "Aktuelles Level",
+            summaryFocusArea: "Fokusbereich",
+            summaryNextGoal: "Nächstes Ziel",
+            summaryFocusFallback:
+                "Stabilisiere zuerst deine Antworten und halte die wichtigsten Beispiele griffbereit.",
+            summaryNextGoalFallback:
+                "Im nächsten Durchlauf eine Antwort gezielt strukturierter und präziser formulieren.",
             analyzingTitle: "Interview wird ausgewertet",
             analyzingDescription:
                 "Das komplette Interview-Transkript wird gerade mit dem neuen Bewertungs-Prompt analysiert.",
@@ -275,7 +286,7 @@ export const dictionaries = {
             feedbackLock:
                 "Der Step-Wechsel bleibt gesperrt, während das Interview-Feedback gespeichert und geladen wird.",
             communication: "Kommunikation",
-            answerQuality: "Antwortqualitaet",
+            answerQuality: "Antwortqualität",
             roleFit: "Rollenfit",
             strengths: "Stärken",
             risks: "Risiken",
@@ -283,17 +294,39 @@ export const dictionaries = {
             noStrengths: "Noch keine Stärken erkannt.",
             noRisks: "Keine akuten Schwachstellen erkannt.",
             noImprovements: "Keine konkreten Verbesserungen vorhanden.",
+            skillBreakdownEyebrow: "Skill Breakdown",
+            skillBreakdownTitle: "Interview-Skills",
+            skillBreakdownDescription:
+                "Die Bewertung trennt Gesprächsführung, fachliche Antwortqualität und Rollenfit.",
+            skillInterpretationStrong: "Sehr belastbarer Bereich für den nächsten Durchlauf.",
+            skillInterpretationSolid: "Solide Basis mit klar erkennbarem Ausbaupotenzial.",
+            skillInterpretationWeak: "Hier liegt der wichtigste Trainingshebel.",
+            practicePlanEyebrow: "Training",
+            practicePlanTitle: "Nächster Übungsplan",
+            practicePlanDescription:
+                "Konkrete nächste Schritte aus den wichtigsten Verbesserungen und Risiken.",
+            practicePlanEmpty:
+                "Für dieses Interview wurden keine konkreten Übungsschritte erkannt.",
+            practicePlanSingleFocus:
+                "Starte mit diesem einen Fokus und wiederhole danach denselben Interview-Typ.",
+            primaryFocus: "Primärer Fokus",
+            nextRun: "Nächster Run",
             replayEyebrow: "Wiedergabe",
             replayTitle: "Interview-Wiedergabe",
             replayDescription:
                 "Wiedergabe der gemeinsamen Aufnahme mit Interviewer- und Kandidatenstimme.",
             audioUnsupported: "Dein Browser unterstützt das Audio-Element nicht.",
+            audioPlay: "Wiedergabe starten",
+            audioPause: "Wiedergabe pausieren",
+            audioSeek: "Wiedergabe-Position setzen",
             replayReadyDescription:
                 "Die Wiedergabe mischt beide Stimmen in einer gemeinsamen Aufnahme.",
             replayRecording: "Die Wiedergabe wird gerade noch verarbeitet.",
             replayError: "Die Wiedergabe konnte nicht erstellt werden.",
             replayEmpty:
                 "Nach dem Interview erscheint hier die gemeinsame Wiedergabe-Aufnahme. Ohne gespeichertes Audio bleibt dieser Bereich nur in der Live-Session verfügbar.",
+            liveSessionOnly: "nur Live-Session",
+            reviewMode: "Review-Modus",
             transcriptEyebrow: "Transkript",
             transcriptTitle: "Interview-Transkript",
             transcriptDescription:
@@ -316,21 +349,58 @@ export const dictionaries = {
             shortestAnswer: "Kürzeste Antwort",
             averageLatency: "Durchschn. Reaktionszeit",
             longestPause: "Längste Denkpause",
+            speakingPace: "Pace",
+            speakingPaceHint:
+                "Ein ruhiger, gleichmäßiger Redefluss wirkt oft souveräner als maximale Geschwindigkeit.",
+            speakingAnswerLength: "Antwortlänge",
+            speakingResponseTiming: "Reaktionszeit",
+            speakingResponseHint:
+                "Kurze Denkpausen sind gut, solange sie bewusst und nicht blockierend wirken.",
+            speakingGraphTitle: "Performance-Bars",
+            speakingGraphDescription:
+                "Die hellen Bereiche markieren grobe Trainingszonen, nicht harte Bewertungskriterien.",
+            speakingMeterTitle: "Pacing-Meter",
+            speakingMeterDescription:
+                "Marker zeigen, ob Tempo, Antwortlänge und Denkpausen im nächsten Run mehr Fokus brauchen.",
+            pacingTooSlow: "zu ruhig",
+            pacingSteady: "stabil",
+            pacingTooFast: "zu schnell",
+            answerTooShort: "kurz",
+            answerBalanced: "passend",
+            answerTooLong: "lang",
+            pauseControlled: "kontrolliert",
+            pauseWatch: "beobachten",
+            pauseLong: "lang",
             timingEmpty:
                 "Nach dem ersten beantworteten Interviewturn erscheinen hier Sprechzeit, Reaktionszeit und WPM.",
             faceEyebrow: "Face",
             faceTitle: "Face-Metriken",
             faceDescription:
                 "Video-Metriken bleiben erhalten und werden im selben dunklen Feedback-System dargestellt.",
+            facePresenceTitle: "Kamera & Auftreten",
+            facePresenceDescription:
+                "Trainingsfeedback zu Framing, Präsenz und Sprechaktivität ohne automatische Hiring-Bewertung.",
             noData: "keine Daten",
             headline: "Kurzfazit",
             faceInFrame: "Gesicht im Bild",
-            speakingActivity: "Sprechaktivitaet",
+            speakingActivity: "Sprechaktivität",
             blinkRate: "Blinkrate",
+            faceStatusStrong: "Stabil",
+            faceStatusOkay: "Okay",
+            faceStatusWatch: "Beobachten",
+            faceStatusWeak: "Fokus",
             specialStrengths: "Keine besonderen Stärken erkannt.",
             specialRisks: "Keine besonderen Risiken erkannt.",
             nextSteps: "Nächste Schritte",
             noNextSteps: "Keine nächsten Schritte vorhanden.",
+            faceAlerts: "Hinweise",
+            faceNoAlerts: "Keine Hinweise vorhanden.",
+            faceEmpty:
+                "Für dieses Interview sind noch keine Kamera-Metriken verfügbar.",
+            persistedLoadError:
+                "Persistierte Interviewdaten konnten nicht geladen werden.",
+            persistedFeedbackLoadError:
+                "Persistierte Feedbackdaten konnten nicht geladen werden.",
         },
         voiceInterview: {
             liveInterview: "Live-Interview",
@@ -646,6 +716,17 @@ export const dictionaries = {
             likelyMatch: "Likely match",
             uncertain: "Still uncertain",
             overallScore: "Overall score",
+            performanceReport: "Performance report",
+            runSummaryEyebrow: "Run summary",
+            runSummaryTitle: "Interview run complete",
+            runScoreLabel: "Run score",
+            summaryCurrentLevel: "Current level",
+            summaryFocusArea: "Focus area",
+            summaryNextGoal: "Next goal",
+            summaryFocusFallback:
+                "Stabilize your answers first and keep your strongest examples ready.",
+            summaryNextGoalFallback:
+                "In the next run, make one answer more structured and precise.",
             analyzingTitle: "Interview is being evaluated",
             analyzingDescription:
                 "The full interview transcript is being analyzed with the new evaluation prompt.",
@@ -678,17 +759,39 @@ export const dictionaries = {
             noStrengths: "No strengths detected yet.",
             noRisks: "No acute weaknesses detected.",
             noImprovements: "No concrete improvements available.",
+            skillBreakdownEyebrow: "Skill breakdown",
+            skillBreakdownTitle: "Interview skills",
+            skillBreakdownDescription:
+                "The evaluation separates communication, answer quality, and role fit.",
+            skillInterpretationStrong: "A reliable area for your next run.",
+            skillInterpretationSolid: "A solid base with clear room to improve.",
+            skillInterpretationWeak: "This is the most important training lever.",
+            practicePlanEyebrow: "Training",
+            practicePlanTitle: "Your next practice plan",
+            practicePlanDescription:
+                "Concrete next steps based on the most important improvements and risks.",
+            practicePlanEmpty:
+                "No concrete practice steps were detected for this interview.",
+            practicePlanSingleFocus:
+                "Start with this single focus, then repeat the same interview type.",
+            primaryFocus: "Primary focus",
+            nextRun: "Next run",
             replayEyebrow: "Replay",
             replayTitle: "Interview replay",
             replayDescription:
                 "Replay of the shared recording with interviewer and candidate voice.",
             audioUnsupported: "Your browser does not support the audio element.",
+            audioPlay: "Start replay",
+            audioPause: "Pause replay",
+            audioSeek: "Set replay position",
             replayReadyDescription:
                 "The replay track mixes both voices into one shared recording.",
             replayRecording: "The replay track is still being processed.",
             replayError: "The replay could not be created.",
             replayEmpty:
                 "After the interview, the shared replay recording appears here. Without saved audio, this area is only available in the live session.",
+            liveSessionOnly: "live session only",
+            reviewMode: "Review mode",
             transcriptEyebrow: "Transcript",
             transcriptTitle: "Interview transcript",
             transcriptDescription:
@@ -711,21 +814,58 @@ export const dictionaries = {
             shortestAnswer: "Shortest answer",
             averageLatency: "Avg. response time",
             longestPause: "Longest thinking pause",
+            speakingPace: "Pace",
+            speakingPaceHint:
+                "A calm and steady pace often feels stronger than maximum speed.",
+            speakingAnswerLength: "Answer length",
+            speakingResponseTiming: "Response timing",
+            speakingResponseHint:
+                "Short thinking pauses are useful when they feel intentional, not blocking.",
+            speakingGraphTitle: "Performance bars",
+            speakingGraphDescription:
+                "The light ranges mark rough training zones, not hard scoring rules.",
+            speakingMeterTitle: "Pacing meter",
+            speakingMeterDescription:
+                "Markers show whether pace, answer length, and pauses need more focus in the next run.",
+            pacingTooSlow: "too calm",
+            pacingSteady: "steady",
+            pacingTooFast: "too fast",
+            answerTooShort: "short",
+            answerBalanced: "balanced",
+            answerTooLong: "long",
+            pauseControlled: "controlled",
+            pauseWatch: "watch",
+            pauseLong: "long",
             timingEmpty:
                 "After the first answered interview turn, speaking time, response time, and WPM appear here.",
             faceEyebrow: "Face",
             faceTitle: "Face metrics",
             faceDescription:
                 "Video metrics are preserved and shown in the same dark feedback system.",
+            facePresenceTitle: "Camera & presence",
+            facePresenceDescription:
+                "Training feedback for framing, presence, and speaking activity without automated hiring judgment.",
             noData: "no data",
             headline: "Headline",
             faceInFrame: "Face in frame",
             speakingActivity: "Speaking activity",
             blinkRate: "Blink rate",
+            faceStatusStrong: "Stable",
+            faceStatusOkay: "Okay",
+            faceStatusWatch: "Watch",
+            faceStatusWeak: "Focus",
             specialStrengths: "No special strengths detected.",
             specialRisks: "No special risks detected.",
             nextSteps: "Next steps",
             noNextSteps: "No next steps available.",
+            faceAlerts: "Notes",
+            faceNoAlerts: "No notes available.",
+            faceEmpty:
+                "No camera metrics are available for this interview yet.",
+            persistedLoadError:
+                "Persisted interview data could not be loaded.",
+            persistedFeedbackLoadError:
+                "Persisted feedback data could not be loaded.",
         },
         voiceInterview: {
             liveInterview: "Live interview",
