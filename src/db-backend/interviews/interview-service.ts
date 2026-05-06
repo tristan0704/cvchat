@@ -959,7 +959,11 @@ export async function getInterviewRuntimeStatusForUser(
     return interview ? mapInterviewRuntimeStatus(interview) : null;
 }
 
-export async function getInterviewDetailForUser(userId: string, interviewId: string) {
+export async function getInterviewDetailForUser(
+    userId: string,
+    interviewId: string,
+    language: string = "de"
+) {
     const interview = await db.interview.findFirst({
         where: {
             id: interviewId,
@@ -1057,7 +1061,11 @@ export async function getInterviewDetailForUser(userId: string, interviewId: str
         feedback: mapInterviewFeedback(interview.feedback),
         overallFeedback: mapInterviewOverallFeedback(interview.overallFeedback),
         faceAnalysis: mapFaceAnalysis(interview.faceAnalysis),
-        codingChallenge: await getLatestCodingChallengeAttempt(userId, interview.id),
+        codingChallenge: await getLatestCodingChallengeAttempt(
+            userId,
+            interview.id,
+            language
+        ),
     } satisfies InterviewDetail;
 }
 
@@ -1154,9 +1162,10 @@ export async function getInterviewFeedbackDetailForUser(
 
 export async function getInterviewCodingChallengeDetailForUser(
     userId: string,
-    interviewId: string
+    interviewId: string,
+    language: string = "de"
 ) {
-    return getLatestCodingChallengeAttempt(userId, interviewId);
+    return getLatestCodingChallengeAttempt(userId, interviewId, language);
 }
 
 export async function getInterviewOverallFeedbackDetailForUser(

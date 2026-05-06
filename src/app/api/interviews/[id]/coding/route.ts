@@ -1,6 +1,8 @@
 import { getCurrentApiIdentity } from "@/db-backend/auth/api-identity";
 import { notFound, ok, unauthorized } from "@/db-backend/api/responses";
 import { getInterviewCodingChallengeDetailForUser } from "@/db-backend/interviews/read/interview-read-service";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 import { createServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -23,8 +25,12 @@ export async function GET(_: Request, context: RouteContext) {
     }
 
     const { id } = await context.params;
+    const profile = await timing.measure("db.profile", () =>
+        getProfileSnapshot(currentUser.id)
+    );
+    const language = normalizeLanguage(profile.language);
     const codingChallenge = await timing.measure("db.coding", () =>
-        getInterviewCodingChallengeDetailForUser(currentUser.id, id)
+        getInterviewCodingChallengeDetailForUser(currentUser.id, id, language)
     );
 
     if (codingChallenge === null) {

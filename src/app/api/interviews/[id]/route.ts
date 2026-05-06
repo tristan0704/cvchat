@@ -10,6 +10,8 @@ import {
     updateInterviewModeForUser,
     updateInterviewProgressForUser,
 } from "@/db-backend/interviews/write/interview-write-service";
+import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 
 export const runtime = "nodejs";
 
@@ -40,12 +42,20 @@ export async function GET(request: Request, context: RouteContext) {
         return Response.json(snapshot);
     }
 
-    const interview =
-        view === "shell"
-            ? await getInterviewShellForUser(currentUser.id, id)
-            : view === "light"
-            ? await getInterviewDetailLightForUser(currentUser.id, id)
-            : await getInterviewDetailForUser(currentUser.id, id);
+    let interview;
+
+    if (view === "shell") {
+        interview = await getInterviewShellForUser(currentUser.id, id);
+    } else if (view === "light") {
+        interview = await getInterviewDetailLightForUser(currentUser.id, id);
+    } else {
+        const profile = await getProfileSnapshot(currentUser.id);
+        interview = await getInterviewDetailForUser(
+            currentUser.id,
+            id,
+            normalizeLanguage(profile.language)
+        );
+    }
 
     if (!interview) {
         return Response.json({ error: "Interview wurde nicht gefunden." }, { status: 404 });

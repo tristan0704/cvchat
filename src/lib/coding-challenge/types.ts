@@ -9,6 +9,18 @@ export type CodingChallengeTaskSolution = {
   code: string;
 };
 
+export type LocalizedCodingChallengeContent = {
+  name: string;
+  description: string;
+  statement: string;
+  requirements: string[];
+  evaluationFocus: string[];
+  examples: string[];
+  solution?: {
+    approach?: string;
+  };
+};
+
 export type CodingChallengeTask = {
   id: string;
   name: string;
@@ -22,6 +34,10 @@ export type CodingChallengeTask = {
   evaluationFocus: string[];
   starterCode: string;
   examples: string[];
+  localizedContent?: {
+    de?: LocalizedCodingChallengeContent;
+    en?: LocalizedCodingChallengeContent;
+  };
   solution: CodingChallengeTaskSolution;
 };
 

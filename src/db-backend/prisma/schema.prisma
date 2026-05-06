@@ -390,6 +390,7 @@ model CodingChallengeTask {
   evaluationFocus         String[]                @default([])
   starterCode             String                  @db.Text
   examples                String[]                @default([])
+  localizedContent        Json?
   isActive                Boolean                 @default(true)
   solution                CodingChallengeTaskSolution?
   attempts                CodingChallengeAttempt[]

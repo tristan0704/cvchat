@@ -11,11 +11,13 @@ import taskManifest from "@/lib/coding-challenge/tasks.json";
 import { acquireTransactionalAdvisoryLock } from "@/db-backend/prisma/advisory-lock";
 import { db } from "@/db-backend/prisma/client";
 import { evaluateCodingChallengeSubmission } from "@/lib/coding-challenge/server/evaluate-submission";
+import { normalizeLanguage } from "@/lib/i18n/dictionaries";
 import type {
     CodingChallengeEvaluation as CodingChallengeEvaluationResult,
     CodingChallengeTask as CodingChallengeTaskWithSolution,
     CodingChallengeTaskManifest,
     CodingChallengeRole,
+    LocalizedCodingChallengeContent,
     PublicCodingChallengeTask,
 } from "@/lib/coding-challenge/types";
 
@@ -48,31 +50,87 @@ function normalizeCodingChallengeRole(role: string): CodingChallengeRole {
     return "fullstack";
 }
 
-function toPublicTask(task: CodingChallengeTask): PublicCodingChallengeTask {
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function toLocalizedContent(value: unknown): Partial<LocalizedCodingChallengeContent> | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+
+    return {
+        name: typeof value.name === "string" ? value.name : undefined,
+        description:
+            typeof value.description === "string" ? value.description : undefined,
+        statement: typeof value.statement === "string" ? value.statement : undefined,
+        requirements: isStringArray(value.requirements) ? value.requirements : undefined,
+        evaluationFocus: isStringArray(value.evaluationFocus)
+            ? value.evaluationFocus
+            : undefined,
+        examples: isStringArray(value.examples) ? value.examples : undefined,
+        solution:
+            isRecord(value.solution) && typeof value.solution.approach === "string"
+                ? {
+                      approach: value.solution.approach,
+                  }
+                : undefined,
+    };
+}
+
+function getLocalizedTaskContent(
+    task: CodingChallengeTask,
+    language: unknown
+): Partial<LocalizedCodingChallengeContent> | null {
+    if (!isRecord(task.localizedContent)) {
+        return null;
+    }
+
+    const normalizedLanguage = normalizeLanguage(language);
+    return (
+        toLocalizedContent(task.localizedContent[normalizedLanguage]) ??
+        toLocalizedContent(task.localizedContent.de)
+    );
+}
+
+function toPublicTask(
+    task: CodingChallengeTask,
+    language: unknown = "de"
+): PublicCodingChallengeTask {
+    const localizedContent = getLocalizedTaskContent(task, language);
+
     return {
         id: task.id,
-        name: task.name,
+        name: localizedContent?.name ?? task.name,
         role: task.role,
         language: task.language,
         difficulty: task.difficulty,
         estimatedMinutes: task.estimatedMinutes,
-        description: task.description,
-        statement: task.statement,
-        requirements: task.requirements,
-        evaluationFocus: task.evaluationFocus,
+        description: localizedContent?.description ?? task.description,
+        statement: localizedContent?.statement ?? task.statement,
+        requirements: localizedContent?.requirements ?? task.requirements,
+        evaluationFocus: localizedContent?.evaluationFocus ?? task.evaluationFocus,
         starterCode: task.starterCode,
-        examples: task.examples,
+        examples: localizedContent?.examples ?? task.examples,
     };
 }
 
 function toTaskWithSolution(args: {
     task: CodingChallengeTask;
     solution: CodingChallengeTaskSolution;
+    language?: string;
 }): CodingChallengeTaskWithSolution {
+    const localizedContent = getLocalizedTaskContent(args.task, args.language);
+
     return {
-        ...toPublicTask(args.task),
+        ...toPublicTask(args.task, args.language),
         solution: {
-            approach: args.solution.approach,
+            approach:
+                localizedContent?.solution?.approach ?? args.solution.approach,
             code: args.solution.code,
         },
     };
@@ -111,10 +169,11 @@ function mapDraft(args: {
     attempt: CodingChallengeAttempt;
     task: CodingChallengeTask;
     evaluation?: CodingChallengeEvaluation | null;
+    language?: string;
 }) {
     return {
         attemptId: args.attempt.id,
-        task: toPublicTask(args.task),
+        task: toPublicTask(args.task, args.language),
         code: args.attempt.draftCode,
         evaluation: args.evaluation
             ? mapEvaluation(args.evaluation, args.attempt.id)
@@ -143,6 +202,7 @@ export async function ensureCodingChallengeTasksSeeded() {
                 evaluationFocus: task.evaluationFocus,
                 starterCode: task.starterCode,
                 examples: task.examples,
+                localizedContent: task.localizedContent ?? undefined,
                 isActive: true,
             },
             create: {
@@ -158,6 +218,7 @@ export async function ensureCodingChallengeTasksSeeded() {
                 evaluationFocus: task.evaluationFocus,
                 starterCode: task.starterCode,
                 examples: task.examples,
+                localizedContent: task.localizedContent ?? undefined,
                 isActive: true,
             },
         });
@@ -203,7 +264,8 @@ async function getOwnedInterview(userId: string, interviewId: string) {
 
 export async function getLatestCodingChallengeAttempt(
     userId: string,
-    interviewId: string
+    interviewId: string,
+    language: string = "de"
 ) {
     const attempt = await db.codingChallengeAttempt.findFirst({
         where: {
@@ -229,6 +291,7 @@ export async function getLatestCodingChallengeAttempt(
         attempt,
         task: attempt.task,
         evaluation: attempt.evaluation,
+        language,
     });
 }
 
@@ -237,6 +300,7 @@ export async function assignCodingChallengeAttempt(args: {
     interviewId: string;
     role: string;
     excludeTaskId?: string;
+    language?: string;
 }) {
     const interview = await getOwnedInterview(args.userId, args.interviewId);
 
@@ -270,6 +334,7 @@ export async function assignCodingChallengeAttempt(args: {
                     attempt: latestAttempt,
                     task: latestAttempt.task,
                     evaluation: latestAttempt.evaluation,
+                    language: args.language,
                 });
             }
         }
@@ -330,7 +395,7 @@ export async function assignCodingChallengeAttempt(args: {
                 attemptNumber: (latestAttempt?.attemptNumber ?? 0) + 1,
                 status: "assigned",
                 draftCode: selectedTask.starterCode,
-                taskSnapshot: toPublicTask(selectedTask),
+                taskSnapshot: toPublicTask(selectedTask, args.language),
             },
         });
 
@@ -354,6 +419,7 @@ export async function assignCodingChallengeAttempt(args: {
         return mapDraft({
             attempt,
             task: selectedTask,
+            language: args.language,
         });
     });
 }
@@ -363,6 +429,7 @@ export async function updateCodingChallengeDraft(args: {
     interviewId: string;
     attemptId: string;
     code: string;
+    language?: string;
 }) {
     const attempt = await db.codingChallengeAttempt.findFirst({
         where: {
@@ -402,6 +469,7 @@ export async function updateCodingChallengeDraft(args: {
         attempt: updatedAttempt,
         task: updatedAttempt.task,
         evaluation: updatedAttempt.evaluation,
+        language: args.language,
     });
 }
 
@@ -440,6 +508,7 @@ export async function evaluateCodingChallengeAttempt(args: {
                 attempt,
                 task: attempt.task,
                 evaluation: attempt.evaluation,
+                language: args.language,
             }),
             evaluation: mapEvaluation(attempt.evaluation, attempt.id),
         };
@@ -449,6 +518,7 @@ export async function evaluateCodingChallengeAttempt(args: {
         toTaskWithSolution({
             task: attempt.task,
             solution: attempt.task.solution,
+            language: args.language,
         }),
         args.code,
         args.language
@@ -528,6 +598,7 @@ export async function evaluateCodingChallengeAttempt(args: {
             attempt: updatedAttempt,
             task: attempt.task,
             evaluation,
+            language: args.language,
         }),
         evaluation: mapEvaluation(evaluation, attempt.id),
     };

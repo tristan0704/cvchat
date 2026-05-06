@@ -33,11 +33,14 @@ export async function GET(request: Request) {
     }
 
     try {
+        const profile = await getProfileSnapshot(currentUser.id);
+        const language = normalizeLanguage(profile.language);
         const draft = await assignCodingChallengeAttempt({
             userId: currentUser.id,
             interviewId,
             role,
             excludeTaskId,
+            language,
         });
         const status = await getInterviewRuntimeStatusForUser(
             currentUser.id,
@@ -84,6 +87,7 @@ export async function PATCH(request: Request) {
                   interviewId?: unknown;
                   attemptId?: unknown;
                   code?: unknown;
+                  language?: unknown;
               }
             | null;
 
@@ -104,11 +108,14 @@ export async function PATCH(request: Request) {
             );
         }
 
+        const profile = await getProfileSnapshot(currentUser.id);
+        const language = normalizeLanguage(profile.language);
         const draft = await updateCodingChallengeDraft({
             userId: currentUser.id,
             interviewId,
             attemptId,
             code,
+            language,
         });
 
         return Response.json({ draft });

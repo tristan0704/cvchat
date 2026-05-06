@@ -105,7 +105,7 @@ function ListCard({
 }
 
 export default function CodingChallengeFeedback() {
-    const { dictionary } = useI18n();
+    const { dictionary, language } = useI18n();
     const session = useInterviewSession();
     const interviewId = session.interviewId;
     const [draft, setDraft] = useState<CodingChallengeDraft | null>(null);
@@ -113,44 +113,54 @@ export default function CodingChallengeFeedback() {
         null
     );
     const [error, setError] = useState("");
-    const hydratePromiseRef = useRef<Promise<CodingChallengeDraft> | null>(null);
+    const hydratePromiseRef = useRef<{
+        key: string;
+        promise: Promise<CodingChallengeDraft>;
+    } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
+        const hydrateKey = `${interviewId}:${language}`;
 
         async function hydrateFeedback() {
             try {
                 const requestPromise =
-                    hydratePromiseRef.current ??
-                    (async () => {
-                        const response = await fetch(
-                            `/api/interviews/${interviewId}/coding`,
-                            {
-                                method: "GET",
-                                cache: "no-store",
-                            }
-                        );
-                        const data = (await response.json().catch(() => null)) as
-                            | {
-                                  codingChallenge?: CodingChallengeDraft | null;
-                                  error?: unknown;
-                                  errorMessage?: string;
-                              }
-                            | null;
+                    hydratePromiseRef.current?.key === hydrateKey
+                        ? hydratePromiseRef.current
+                        : {
+                              key: hydrateKey,
+                              promise: (async () => {
+                                  const searchParams = new URLSearchParams();
+                                  searchParams.set("language", language);
+                                  const response = await fetch(
+                                      `/api/interviews/${interviewId}/coding?${searchParams.toString()}`,
+                                      {
+                                          method: "GET",
+                                          cache: "no-store",
+                                      }
+                                  );
+                                  const data = (await response.json().catch(() => null)) as
+                                      | {
+                                            codingChallenge?: CodingChallengeDraft | null;
+                                            error?: unknown;
+                                            errorMessage?: string;
+                                        }
+                                      | null;
 
-                        if (!response.ok || !data?.codingChallenge) {
-                            throw new Error(
-                                readApiErrorMessage(
-                                    data,
-                                    "Coding-Challenge konnte nicht geladen werden."
-                                )
-                            );
-                        }
+                                  if (!response.ok || !data?.codingChallenge) {
+                                      throw new Error(
+                                          readApiErrorMessage(
+                                              data,
+                                              "Coding-Challenge konnte nicht geladen werden."
+                                          )
+                                      );
+                                  }
 
-                        return data.codingChallenge;
-                    })();
+                                  return data.codingChallenge;
+                              })(),
+                          };
                 hydratePromiseRef.current = requestPromise;
-                const codingChallenge = await requestPromise;
+                const codingChallenge = await requestPromise.promise;
 
                 if (!cancelled) {
                     setDraft(codingChallenge);
@@ -166,7 +176,9 @@ export default function CodingChallengeFeedback() {
                     );
                 }
             } finally {
-                hydratePromiseRef.current = null;
+                if (hydratePromiseRef.current?.key === hydrateKey) {
+                    hydratePromiseRef.current = null;
+                }
             }
         }
 
@@ -175,7 +187,7 @@ export default function CodingChallengeFeedback() {
         return () => {
             cancelled = true;
         };
-    }, [interviewId]);
+    }, [interviewId, language]);
 
     if (error) {
         return (
