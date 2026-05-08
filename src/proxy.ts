@@ -23,6 +23,7 @@ export const config = {
         // Der Proxy soll nur dort eingreifen, wo Session-Refresh oder
         // geschützte Navigation tatsächlich relevant ist.
         "/home",
+        "/dashboard",
         "/learn",
         "/profile",
         "/settings",

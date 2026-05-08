@@ -26,6 +26,7 @@ export const dictionaries = {
             scoreWeak: "Schwach",
         },
         nav: {
+            start: "Start",
             dashboard: "Dashboard",
             interviews: "Interviews",
             learn: "Lernen",
@@ -38,8 +39,13 @@ export const dictionaries = {
             profileImage: "Profilbild",
         },
         home: {
-            title: "Dashboard",
-            welcome: "Willkommen bei CommIT.",
+            title: "Starte dein nächstes Interview",
+            startEyebrow: "Start",
+            welcome:
+                "Wähle eine empfohlene Challenge und springe direkt in eine realistische Interview-Simulation.",
+            xp: "XP",
+            xpDetail: "verdiente Punkte",
+            latestInterview: "Letztes Interview",
             totalInterviews: "Interviews gesamt",
             completed: "Abgeschlossen",
             cvScore: "CV Score",
@@ -48,6 +54,7 @@ export const dictionaries = {
             new: "neu",
             latestAnalysis: "letzte Analyse",
             completedTrend: "abgeschlossen",
+            noInterviews: "noch keine Interviews",
             startSimulation: "Simulation starten",
             startSimulationDescription: "Starte ein neues Interview",
             viewResults: "Ergebnisse ansehen",
@@ -55,6 +62,81 @@ export const dictionaries = {
             editProfile: "Profil bearbeiten",
             editProfileDescription: "Aktualisiere deinen Lebenslauf",
             recentInterviews: "Letzte Interviews",
+            timelineHintTitle: "Aktueller Fortschritt",
+            timelineHintDescription:
+                "Die Timeline zeigt, welche Interview-Bausteine bereits echte Auswertungen haben.",
+            timelineEyebrow: "Verlauf",
+            timelineTitle: "Letzte Interviews",
+            timelineDescription: "Voice, Face, Coding und Scores auf einen Blick.",
+            timelineEmpty: "Noch keine Interviews vorhanden.",
+            voiceMode: "Voice",
+            faceMode: "Face",
+            modeOpen: "Modus offen",
+            coding: "Coding",
+            feedback: "Feedback",
+            overallScore: "Score",
+            step: "Schritt",
+            noDate: "ohne Datum",
+            recommendedEyebrow: "Empfohlen",
+            recommendedTitle: "Beliebte Interview-Challenges",
+            recommendedDescription:
+                "Diese drei Rollen decken die wichtigsten Übungswege ab und starten mit einer ausgewogenen Mid-Level-Konfiguration.",
+            quickStartCta: "Interview starten",
+            quickStartCreating: "Interview wird gestartet...",
+            quickStartError: "Interview konnte nicht gestartet werden.",
+            recommendedCards: {
+                frontend: {
+                    roleLabel: "Frontend",
+                    title: "Frontend Developer",
+                    summary:
+                        "Übe UI-Flows, Komponentenstruktur, API-Integration und produktnahe Entscheidungen.",
+                    focusItems: ["UI-Flows", "State", "API-Fehler"],
+                },
+                backend: {
+                    roleLabel: "Backend",
+                    title: "Backend Developer",
+                    summary:
+                        "Trainiere API-Design, Datenkonsistenz, Security-Basics und Produktionsdenken.",
+                    focusItems: ["APIs", "Datenmodell", "Observability"],
+                },
+                fullstack: {
+                    roleLabel: "Fullstack",
+                    title: "Fullstack Developer",
+                    summary:
+                        "Übe End-to-End-Ownership, Feature-Schnitt, Datenfluss und saubere Trade-offs.",
+                    focusItems: ["End-to-End", "Feature-Schnitt", "Trade-offs"],
+                },
+            },
+        },
+        dashboard: {
+            eyebrow: "Statistiken",
+            title: "Dashboard",
+            description:
+                "Deine wichtigsten Signale aus CV, Voice Interview und Coding auf einen Blick.",
+            xp: "XP",
+            xpDetail: "verdiente Punkte",
+            completedInterviews: "Abgeschlossene Interviews",
+            completedDetail: "Anteil an allen gespeicherten Interviews",
+            cvScore: "CV Score",
+            cvScoreDetail: "letzte CV-Auswertung",
+            codingScore: "Coding Score",
+            codingScoreDetail: "Durchschnitt bewerteter Challenges",
+            trainingMixTitle: "Trainingsmix",
+            trainingMixDescription:
+                "Verteilung deiner bisherigen Voice-, Face- und Coding-Signale.",
+            noTrainingData: "Noch keine Trainingsdaten vorhanden.",
+            noRecentInterviews: "Noch keine Interviews vorhanden.",
+            recentInterviews: {
+                title: "Letzte Interviews",
+                open: "Alle öffnen",
+                overallScore: "Gesamt",
+                codingScore: "Coding",
+                faceScore: "Face",
+                modeFallback: "Simulation",
+            },
+            voiceInterview: "Voice Interview",
+            faceInterview: "Face Interview",
+            coding: "Coding",
         },
         interviews: {
             title: "Interviews",
@@ -107,10 +189,40 @@ export const dictionaries = {
         learn: {
             title: "Lernen",
             description:
-                "Dieser Bereich zeigt dir die nächsten sinnvollen Schritte auf Basis deiner gespeicherten Profil-, CV- und Interviewdaten.",
+                "Starte neue Simulationen und sieh, welche Interview-Challenges bereits verfügbar sind.",
             startTitle: "Neue Simulation starten",
             startDescription:
-                "Wähle eine Interview-Konfiguration aus der DB und starte den nächsten Durchlauf.",
+                "Wähle eine Interview-Konfiguration aus und starte direkt den nächsten Durchlauf.",
+            startButton: "Simulation starten",
+            catalog: {
+                title: "Interview-Katalog",
+                description:
+                    "Alle aktuell verfügbaren Rollen, Erfahrungsstufen und Unternehmensgrößen.",
+                templatesCount: "Konfigurationen",
+            },
+            futureChallenges: {
+                title: "Weitere Challenges",
+                items: [
+                    {
+                        title: "CV-Training",
+                        description:
+                            "Gezielte Übungen für Lebenslauf, Rollenfit und klare Profilpositionierung.",
+                        status: "Kommt später",
+                    },
+                    {
+                        title: "Coding-Drills",
+                        description:
+                            "Kurze Aufgaben für Algorithmen, Produktlogik und saubere Implementierung.",
+                        status: "Kommt später",
+                    },
+                    {
+                        title: "Systemdesign",
+                        description:
+                            "Strukturierte Architekturübungen für größere technische Entscheidungen.",
+                        status: "Kommt später",
+                    },
+                ],
+            },
             savedInterviews: "Interviews gespeichert",
             reviewTitle: "Vorherige Durchläufe auswerten",
             reviewDescription:
@@ -501,6 +613,7 @@ export const dictionaries = {
             scoreWeak: "Weak",
         },
         nav: {
+            start: "Start",
             dashboard: "Dashboard",
             interviews: "Interviews",
             learn: "Learn",
@@ -513,8 +626,13 @@ export const dictionaries = {
             profileImage: "Profile image",
         },
         home: {
-            title: "Dashboard",
-            welcome: "Welcome to CommIT.",
+            title: "Start your next interview",
+            startEyebrow: "Start",
+            welcome:
+                "Choose a recommended challenge and jump straight into a realistic interview simulation.",
+            xp: "XP",
+            xpDetail: "earned points",
+            latestInterview: "Latest interview",
             totalInterviews: "Total interviews",
             completed: "Completed",
             cvScore: "CV score",
@@ -523,6 +641,7 @@ export const dictionaries = {
             new: "new",
             latestAnalysis: "latest analysis",
             completedTrend: "completed",
+            noInterviews: "no interviews yet",
             startSimulation: "Start simulation",
             startSimulationDescription: "Start a new interview",
             viewResults: "View results",
@@ -530,6 +649,81 @@ export const dictionaries = {
             editProfile: "Edit profile",
             editProfileDescription: "Update your CV",
             recentInterviews: "Recent interviews",
+            timelineHintTitle: "Current progress",
+            timelineHintDescription:
+                "The timeline shows which interview parts already have real evaluations.",
+            timelineEyebrow: "Timeline",
+            timelineTitle: "Recent interviews",
+            timelineDescription: "Voice, face, coding, and scores at a glance.",
+            timelineEmpty: "No interviews yet.",
+            voiceMode: "Voice",
+            faceMode: "Face",
+            modeOpen: "Mode open",
+            coding: "Coding",
+            feedback: "Feedback",
+            overallScore: "Score",
+            step: "Step",
+            noDate: "no date",
+            recommendedEyebrow: "Recommended",
+            recommendedTitle: "Popular interview challenges",
+            recommendedDescription:
+                "These three roles cover the most important practice paths and start with a balanced mid-level setup.",
+            quickStartCta: "Start interview",
+            quickStartCreating: "Starting interview...",
+            quickStartError: "Interview could not be started.",
+            recommendedCards: {
+                frontend: {
+                    roleLabel: "Frontend",
+                    title: "Frontend Developer",
+                    summary:
+                        "Practice UI flows, component structure, API integration, and product-minded decisions.",
+                    focusItems: ["UI flows", "State", "API errors"],
+                },
+                backend: {
+                    roleLabel: "Backend",
+                    title: "Backend Developer",
+                    summary:
+                        "Train API design, data consistency, security basics, and production thinking.",
+                    focusItems: ["APIs", "Data model", "Observability"],
+                },
+                fullstack: {
+                    roleLabel: "Fullstack",
+                    title: "Fullstack Developer",
+                    summary:
+                        "Practice end-to-end ownership, feature slicing, data flow, and clear trade-offs.",
+                    focusItems: ["End-to-end", "Feature slicing", "Trade-offs"],
+                },
+            },
+        },
+        dashboard: {
+            eyebrow: "Statistics",
+            title: "Dashboard",
+            description:
+                "Your key signals from CV, voice interview, and coding at a glance.",
+            xp: "XP",
+            xpDetail: "earned points",
+            completedInterviews: "Completed interviews",
+            completedDetail: "share of all saved interviews",
+            cvScore: "CV score",
+            cvScoreDetail: "latest CV analysis",
+            codingScore: "Coding score",
+            codingScoreDetail: "average evaluated challenges",
+            trainingMixTitle: "Training mix",
+            trainingMixDescription:
+                "Distribution of your current voice, face, and coding signals.",
+            noTrainingData: "No training data yet.",
+            noRecentInterviews: "No interviews yet.",
+            recentInterviews: {
+                title: "Latest interviews",
+                open: "Open all",
+                overallScore: "Overall",
+                codingScore: "Coding",
+                faceScore: "Face",
+                modeFallback: "Simulation",
+            },
+            voiceInterview: "Voice interview",
+            faceInterview: "Face interview",
+            coding: "Coding",
         },
         interviews: {
             title: "Interviews",
@@ -582,10 +776,40 @@ export const dictionaries = {
         learn: {
             title: "Learn",
             description:
-                "This area shows the next useful steps based on your saved profile, CV, and interview data.",
+                "Start new simulations and see which interview challenges are available.",
             startTitle: "Start a new simulation",
             startDescription:
-                "Choose an interview configuration from the database and start your next run.",
+                "Choose an interview configuration and start your next run directly.",
+            startButton: "Start simulation",
+            catalog: {
+                title: "Interview catalog",
+                description:
+                    "All currently available roles, experience levels, and company sizes.",
+                templatesCount: "configurations",
+            },
+            futureChallenges: {
+                title: "More challenges",
+                items: [
+                    {
+                        title: "CV training",
+                        description:
+                            "Focused practice for resume quality, role fit, and clear profile positioning.",
+                        status: "Coming later",
+                    },
+                    {
+                        title: "Coding drills",
+                        description:
+                            "Short tasks for algorithms, product logic, and clean implementation.",
+                        status: "Coming later",
+                    },
+                    {
+                        title: "System design",
+                        description:
+                            "Structured architecture practice for larger technical decisions.",
+                        status: "Coming later",
+                    },
+                ],
+            },
             savedInterviews: "interviews saved",
             reviewTitle: "Review previous runs",
             reviewDescription:

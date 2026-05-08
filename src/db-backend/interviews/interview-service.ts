@@ -1787,9 +1787,17 @@ export async function saveInterviewFaceAnalysisForUser(args: {
     });
 }
 
-export async function getHomeDashboardSnapshot(userId: string) {
-    const [totalInterviews, completedInterviews, latestCvFeedback, recentInterviews] =
+export async function getHomeStartSnapshot(userId: string) {
+    const [profile, totalInterviews, completedInterviews, latestCvFeedback, latestInterview] =
         await Promise.all([
+            db.profile.findUnique({
+                where: {
+                    userId,
+                },
+                select: {
+                    xpPoints: true,
+                },
+            }),
             db.interview.count({
                 where: {
                     userId,
@@ -1821,16 +1829,22 @@ export async function getHomeDashboardSnapshot(userId: string) {
                 orderBy: {
                     createdAt: "desc",
                 },
-                take: 3,
+                take: 1,
                 select: {
                     id: true,
                     title: true,
                     role: true,
+                    status: true,
+                    createdAt: true,
+                    completedAt: true,
+                    interviewMode: true,
                 },
             }),
         ]);
+    const latest = latestInterview[0] ?? null;
 
     return {
+        xpPoints: profile?.xpPoints ?? 0,
         totalInterviews,
         completedInterviews,
         cvScore: latestCvFeedback?.overallScore ?? null,
@@ -1838,9 +1852,177 @@ export async function getHomeDashboardSnapshot(userId: string) {
             totalInterviews > 0
                 ? Math.round((completedInterviews / totalInterviews) * 100)
                 : null,
+        latestInterview: latest
+            ? {
+                  id: latest.id,
+                  title: latest.title ?? latest.role,
+                  role: latest.role,
+                  status: latest.status,
+                  createdAt: latest.createdAt.toISOString(),
+                  completedAt: latest.completedAt?.toISOString() ?? null,
+                  interviewMode: latest.interviewMode,
+              }
+            : null,
+    };
+}
+
+export async function getDashboardStatsSnapshot(userId: string) {
+    const [
+        profile,
+        totalInterviews,
+        completedInterviews,
+        voiceInterviews,
+        faceInterviews,
+        codingEvaluatedInterviews,
+        latestCvFeedback,
+        codingStats,
+        recentInterviews,
+    ] = await Promise.all([
+        db.profile.findUnique({
+            where: {
+                userId,
+            },
+            select: {
+                xpPoints: true,
+            },
+        }),
+        db.interview.count({
+            where: {
+                userId,
+            },
+        }),
+        db.interview.count({
+            where: {
+                userId,
+                status: "completed",
+            },
+        }),
+        db.interview.count({
+            where: {
+                userId,
+                interviewMode: "voice",
+            },
+        }),
+        db.interview.count({
+            where: {
+                userId,
+                interviewMode: "face",
+            },
+        }),
+        db.interview.count({
+            where: {
+                userId,
+                hasCodingEvaluation: true,
+            },
+        }),
+        db.cvFeedbackAnalysis.findFirst({
+            where: {
+                cvVersion: {
+                    userId,
+                },
+            },
+            orderBy: {
+                analyzedAt: "desc",
+            },
+            select: {
+                overallScore: true,
+            },
+        }),
+        db.codingChallengeEvaluation.aggregate({
+            where: {
+                codingChallengeAttempt: {
+                    interview: {
+                        userId,
+                    },
+                },
+            },
+            _avg: {
+                overallScore: true,
+            },
+            _count: {
+                _all: true,
+            },
+        }),
+        db.interview.findMany({
+            where: {
+                userId,
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+            take: 5,
+            select: {
+                id: true,
+                title: true,
+                role: true,
+                status: true,
+                createdAt: true,
+                completedAt: true,
+                interviewMode: true,
+                overallFeedback: {
+                    select: {
+                        overallScore: true,
+                    },
+                },
+                faceAnalysis: {
+                    select: {
+                        overallScore: true,
+                    },
+                },
+                codingChallengeAttempts: {
+                    orderBy: {
+                        attemptNumber: "desc",
+                    },
+                    take: 1,
+                    select: {
+                        evaluation: {
+                            select: {
+                                overallScore: true,
+                            },
+                        },
+                    },
+                },
+            },
+        }),
+    ]);
+
+    return {
+        xpPoints: profile?.xpPoints ?? 0,
+        totalInterviews,
+        completedInterviews,
+        successRate:
+            totalInterviews > 0
+                ? Math.round((completedInterviews / totalInterviews) * 100)
+                : null,
+        trainingMix: {
+            voiceInterviews,
+            faceInterviews,
+            codingEvaluatedInterviews,
+        },
+        cv: {
+            overallScore: latestCvFeedback?.overallScore ?? null,
+        },
+        coding: {
+            evaluatedChallenges: codingStats._count._all,
+            overallScore:
+                codingStats._avg.overallScore === null
+                    ? null
+                    : Math.round(codingStats._avg.overallScore),
+        },
         recentInterviews: recentInterviews.map((interview) => ({
             id: interview.id,
             title: interview.title ?? interview.role,
+            role: interview.role,
+            status: interview.status,
+            createdAt: interview.createdAt.toISOString(),
+            completedAt: interview.completedAt?.toISOString() ?? null,
+            interviewMode: interview.interviewMode,
+            overallScore: interview.overallFeedback?.overallScore ?? null,
+            faceScore: interview.faceAnalysis?.overallScore ?? null,
+            codingScore:
+                interview.codingChallengeAttempts[0]?.evaluation?.overallScore ?? null,
         })),
     };
 }
+
+export const getHomeDashboardSnapshot = getHomeStartSnapshot;

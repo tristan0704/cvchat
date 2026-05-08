@@ -31,9 +31,10 @@ function NavLink({ href, label, pathname, onClick }) {
 export default function Navbar({ initialProfile }) {
   const { dictionary } = useI18n();
   const navItems = [
-    { href: "/home", label: dictionary.nav.dashboard },
+    { href: "/home", label: dictionary.nav.start },
     { href: "/interviews", label: dictionary.nav.interviews },
     { href: "/learn", label: dictionary.nav.learn },
+    { href: "/dashboard", label: dictionary.nav.dashboard },
   ];
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
