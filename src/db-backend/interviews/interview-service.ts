@@ -1257,6 +1257,7 @@ export async function updateInterviewProgressForUser(args: {
             id: true,
             startedAt: true,
             completedAt: true,
+            xpAwardedAt: true,
             hasCvFeedback: true,
             runtimeTranscriptStatus: true,
             hasInterviewFeedback: true,
@@ -1279,46 +1280,79 @@ export async function updateInterviewProgressForUser(args: {
         Math.min(maxAccessibleStep, Math.round(args.currentStep))
     );
     const status = resolveStatusForStep(currentStep);
+    const shouldAwardXp = currentStep >= 6 && !existing.xpAwardedAt;
+    const now = new Date();
 
-    const updatedInterview = await db.interview.update({
-        where: {
-            id: existing.id,
-        },
-        data: {
-            currentStep,
-            status,
-            startedAt:
-                currentStep >= 2 ? existing.startedAt ?? new Date() : existing.startedAt,
-            completedAt:
-                currentStep >= 6
-                    ? existing.completedAt ?? new Date()
-                    : currentStep < 6
-                      ? null
-                      : existing.completedAt,
-            statusVersion: {
-                increment: 1,
+    const updatedInterview = await db.$transaction(async (tx) => {
+        if (shouldAwardXp) {
+            const xpAward = await tx.interview.updateMany({
+                where: {
+                    id: existing.id,
+                    xpAwardedAt: null,
+                },
+                data: {
+                    xpAwardedAt: now,
+                },
+            });
+
+            if (xpAward.count > 0) {
+                await tx.profile.upsert({
+                    where: {
+                        userId: args.userId,
+                    },
+                    update: {
+                        xpPoints: {
+                            increment: 10,
+                        },
+                    },
+                    create: {
+                        userId: args.userId,
+                        xpPoints: 10,
+                    },
+                });
+            }
+        }
+
+        return tx.interview.update({
+            where: {
+                id: existing.id,
             },
-            lastActivityAt: new Date(),
-        },
-        select: {
-            id: true,
-            title: true,
-            role: true,
-            status: true,
-            currentStep: true,
-            interviewMode: true,
-            createdAt: true,
-            startedAt: true,
-            completedAt: true,
-            runtimeTranscriptStatus: true,
-            runtimeTranscriptError: true,
-            hasCvFeedback: true,
-            hasInterviewFeedback: true,
-            hasOverallFeedback: true,
-            hasCodingEvaluation: true,
-            statusVersion: true,
-            lastActivityAt: true,
-        },
+            data: {
+                currentStep,
+                status,
+                startedAt:
+                    currentStep >= 2 ? existing.startedAt ?? now : existing.startedAt,
+                completedAt:
+                    currentStep >= 6
+                        ? existing.completedAt ?? now
+                        : currentStep < 6
+                          ? null
+                          : existing.completedAt,
+                statusVersion: {
+                    increment: 1,
+                },
+                lastActivityAt: now,
+            },
+            select: {
+                id: true,
+                title: true,
+                role: true,
+                status: true,
+                currentStep: true,
+                interviewMode: true,
+                createdAt: true,
+                startedAt: true,
+                completedAt: true,
+                runtimeTranscriptStatus: true,
+                runtimeTranscriptError: true,
+                hasCvFeedback: true,
+                hasInterviewFeedback: true,
+                hasOverallFeedback: true,
+                hasCodingEvaluation: true,
+                statusVersion: true,
+                lastActivityAt: true,
+            },
+        });
     });
 
     return {

@@ -171,6 +171,7 @@ export const dictionaries = {
             selected: "Ausgewählt",
             saveCv: "Lebenslauf speichern",
             unknownFileSize: "Unbekannte Dateigröße",
+            xpPoints: "XP-Punkte",
         },
         cvFeedback: {
             overallEvaluation: "Gesamtbewertung",
@@ -645,6 +646,7 @@ export const dictionaries = {
             selected: "Selected",
             saveCv: "Save CV",
             unknownFileSize: "Unknown file size",
+            xpPoints: "XP points",
         },
         cvFeedback: {
             overallEvaluation: "Overall evaluation",

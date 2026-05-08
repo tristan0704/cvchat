@@ -99,6 +99,7 @@ model Profile {
   userId                  String                  @unique @db.Uuid
   username                String?                 @unique
   avatarUrl               String?
+  xpPoints                Int                     @default(0)
   user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
@@ -191,6 +192,7 @@ model Interview {
   status                  InterviewStatus         @default(draft)
   startedAt               DateTime?
   completedAt             DateTime?
+  xpAwardedAt             DateTime?
   runtimeTranscriptStatus InterviewTranscriptStatus?
   runtimeTranscriptError  String?                 @db.Text
   hasCvFeedback           Boolean                 @default(false)

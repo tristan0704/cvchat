@@ -21,6 +21,7 @@ export type ActiveCvSummary = {
 export type ProfileSnapshot = {
     username: string;
     avatarPath: string | null;
+    xpPoints: number;
     language: string;
     emailNotifications: boolean;
     activeCv: ActiveCvSummary | null;
@@ -62,6 +63,7 @@ export const getProfileSnapshot = cache(
             select: {
                 avatarUrl: true,
                 username: true,
+                xpPoints: true,
             },
         }),
         db.userSettings.findUnique({
@@ -95,6 +97,7 @@ export const getProfileSnapshot = cache(
     return {
         username: profile?.username ?? "",
         avatarPath: profile?.avatarUrl ?? null,
+        xpPoints: profile?.xpPoints ?? 0,
         language: settings?.language ?? "de",
         emailNotifications: settings?.emailNotifications ?? true,
         activeCv: mapActiveCvSummary(cvVersions[0] ?? null),

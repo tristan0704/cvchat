@@ -22,6 +22,7 @@ export default async function ProfilePage() {
     avatarUrl: profile.avatarPath
       ? await createAvatarUrlForPath(profile.avatarPath)
       : null,
+    xpPoints: profile.xpPoints,
     language: profile.language,
     emailNotifications: profile.emailNotifications,
     activeCv: profile.activeCv,

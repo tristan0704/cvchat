@@ -19,6 +19,7 @@ async function buildProfileResponse(args: {
         email: args.email,
         username: profile.username,
         avatarUrl: await createAvatarUrlForPath(profile.avatarPath),
+        xpPoints: profile.xpPoints,
         language: profile.language,
         emailNotifications: profile.emailNotifications,
         activeCv: profile.activeCv,

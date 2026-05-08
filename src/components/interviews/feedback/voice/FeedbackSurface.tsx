@@ -105,18 +105,32 @@ export function StatusBadge({
 }
 
 export function SectionHeading({
+    eyebrow,
     title,
+    description,
     badge,
 }: {
+    eyebrow?: string;
     title: string;
+    description?: string;
     badge?: ReactNode;
 }) {
     return (
-        <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-bold tracking-tight text-white md:text-xl">
-                {title}
-            </h2>
-            {badge}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                {eyebrow ? (
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                        {eyebrow}
+                    </p>
+                ) : null}
+                <h2 className="text-lg font-bold tracking-tight text-white md:text-xl">
+                    {title}
+                </h2>
+                {description ? (
+                    <p className="mt-2 text-sm text-gray-400">{description}</p>
+                ) : null}
+            </div>
+            {badge ? <div className="shrink-0">{badge}</div> : null}
         </div>
     );
 }

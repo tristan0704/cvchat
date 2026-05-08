@@ -3,6 +3,10 @@
 import type { AppDictionary } from "@/lib/i18n/dictionaries";
 
 import { CustomAudioPlayer } from "@/components/interviews/feedback/voice/CustomAudioPlayer";
+import {
+    FeedbackSurface,
+    StatusBadge,
+} from "@/components/interviews/feedback/voice/FeedbackSurface";
 
 export function InterviewReplayCard({
     audioUrl,

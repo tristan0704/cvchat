@@ -25,6 +25,7 @@ type ProfileSnapshot = {
     email: string;
     username: string;
     avatarUrl: string | null;
+    xpPoints: number;
     language: string;
     emailNotifications: boolean;
     activeCv: ActiveCvSummary | null;
@@ -64,6 +65,7 @@ export default function ProfilePageContent({
     const [avatarUrl, setAvatarUrl] = useState<string | null>(
         initialProfile.avatarUrl
     );
+    const [xpPoints, setXpPoints] = useState(initialProfile.xpPoints);
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [selectedCv, setSelectedCv] = useState<File | null>(null);
@@ -200,6 +202,7 @@ export default function ProfilePageContent({
                 setUsername(data.profile.username);
                 setEmail(data.profile.email);
                 setAvatarUrl(data.profile.avatarUrl);
+                setXpPoints(data.profile.xpPoints);
                 setCurrentCv(data.profile.activeCv);
             }
 
@@ -318,6 +321,13 @@ export default function ProfilePageContent({
                             {labels.loading}
                         </div>
                     ) : null}
+
+                    <div className="rounded-lg bg-gray-900 px-4 py-3 outline outline-1 outline-white/10">
+                        <p className="text-sm text-gray-400">{labels.xpPoints}</p>
+                        <p className="mt-1 text-2xl font-semibold text-white">
+                            {xpPoints}
+                        </p>
+                    </div>
 
                     <div>
                         <label className="mb-1 block text-sm text-gray-400">
