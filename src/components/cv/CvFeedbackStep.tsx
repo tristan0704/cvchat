@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import CvAnalysisDashboard from "@/components/cv/CvAnalysisDashboard";
-import CvRoleMatchCard from "@/components/cv/CvRoleMatchCard";
-import CvScoreBreakdownCard from "@/components/cv/CvScoreBreakdownCard";
+import { CvFeedbackReport } from "@/components/cv/feedback/CvFeedbackReport";
+import {
+    CvFeedbackStateCard,
+    CvReportLoadingCard,
+} from "@/components/cv/feedback/CvFeedbackStateCard";
 import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
+import { useI18n } from "@/lib/i18n/context";
 import { useInterviewSession } from "@/lib/interview-session/context";
 
 // Dateiübersicht:
@@ -44,8 +46,8 @@ function buildConfigBadges(config: InterviewCvConfig) {
     );
 }
 
-function formatDateTime(value: string) {
-    return new Intl.DateTimeFormat("de-DE", {
+function formatDateTime(value: string, language: string) {
+    return new Intl.DateTimeFormat(language === "en" ? "en-US" : "de-DE", {
         dateStyle: "medium",
         timeStyle: "short",
     }).format(new Date(value));
@@ -55,7 +57,12 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
-async function requestCvFeedback(interviewId: string, force = false) {
+async function requestCvFeedback(
+    interviewId: string,
+    fallbackLoadError: string,
+    fallbackCreateError: string,
+    force = false
+) {
     const response = await fetch(
         force
             ? "/api/interview/cv-feedback"
@@ -88,17 +95,17 @@ async function requestCvFeedback(interviewId: string, force = false) {
         | null;
 
     if (!response.ok || !data) {
-        throw new Error(data?.error || "CV-Analyse konnte nicht geladen werden.");
+        throw new Error(data?.error || fallbackLoadError);
     }
 
     if (!data?.result && force) {
-        throw new Error(data?.error || "CV-Analyse konnte nicht erstellt werden.");
+        throw new Error(data?.error || fallbackCreateError);
     }
 
     return data;
 }
 
-async function generateCvFeedback(interviewId: string) {
+async function generateCvFeedback(interviewId: string, fallbackCreateError: string) {
     const response = await fetch("/api/interview/cv-feedback", {
         method: "POST",
         headers: {
@@ -120,7 +127,7 @@ async function generateCvFeedback(interviewId: string) {
         | null;
 
     if (!response.ok || !data?.result) {
-        throw new Error(data?.error || "CV-Analyse konnte nicht erstellt werden.");
+        throw new Error(data?.error || fallbackCreateError);
     }
 
     return data;
@@ -132,6 +139,8 @@ export default function CvFeedbackStep({
     onStatusUpdate?: (status: RuntimeStatusSnapshot) => void;
 }) {
     const session = useInterviewSession();
+    const { dictionary, language } = useI18n();
+    const labels = dictionary.cvFeedback;
     const config = session.config;
 
     const [storedCv, setStoredCv] = useState<ActiveCvSummary | null>(null);
@@ -157,7 +166,11 @@ export default function CvFeedbackStep({
             try {
                 const requestPromise =
                     hydratePromiseRef.current ??
-                    requestCvFeedback(session.interviewId);
+                    requestCvFeedback(
+                        session.interviewId,
+                        labels.loadError,
+                        labels.createError
+                    );
                 hydratePromiseRef.current = requestPromise;
                 const data = await requestPromise;
 
@@ -172,12 +185,7 @@ export default function CvFeedbackStep({
                 }
             } catch (storageError) {
                 if (!cancelled) {
-                    setError(
-                        getErrorMessage(
-                            storageError,
-                            "CV-Analyse konnte nicht geladen werden."
-                        )
-                    );
+                    setError(getErrorMessage(storageError, labels.loadError));
                 }
             } finally {
                 if (!cancelled) {
@@ -193,7 +201,7 @@ export default function CvFeedbackStep({
         return () => {
             cancelled = true;
         };
-    }, [onStatusUpdate, session.interviewId]);
+    }, [labels.createError, labels.loadError, onStatusUpdate, session.interviewId]);
 
     async function handleRefreshFeedback() {
         setLoading(true);
@@ -202,7 +210,7 @@ export default function CvFeedbackStep({
         try {
             const requestPromise =
                 generatePromiseRef.current ??
-                generateCvFeedback(session.interviewId);
+                generateCvFeedback(session.interviewId, labels.createError);
             generatePromiseRef.current = requestPromise;
             const data = await requestPromise;
             setStoredCv(data.cv ?? null);
@@ -211,12 +219,7 @@ export default function CvFeedbackStep({
                 onStatusUpdate?.(data.status);
             }
         } catch (requestError) {
-            setError(
-                getErrorMessage(
-                    requestError,
-                    "CV-Analyse konnte nicht erstellt werden."
-                )
-            );
+            setError(getErrorMessage(requestError, labels.createError));
         } finally {
             setLoading(false);
             generatePromiseRef.current = null;
@@ -227,107 +230,33 @@ export default function CvFeedbackStep({
 
     return (
         <div className="space-y-6">
-            <div className="rounded-xl bg-gray-800/50 p-6 outline outline-1 outline-white/10">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h2 className="text-lg font-semibold text-white">CV-Feedback</h2>
-                        <p className="mt-1 text-sm text-gray-400">
-                            Analyse für die ausgewählte Interview-Konfiguration.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        {badges.map((badge) => (
-                            <span
-                                key={badge}
-                                className="rounded-full bg-white/5 px-3 py-1.5 text-xs text-gray-300 outline outline-1 outline-white/10"
-                            >
-                                {badge}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="mt-6 rounded-xl bg-gray-900 p-4 outline outline-1 outline-white/10">
-                    {loadingStoredCv ? (
-                        <p className="text-sm text-gray-400">
-                            Gespeicherter Lebenslauf wird geladen...
-                        </p>
-                    ) : storedCv ? (
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                                <p className="text-sm font-semibold text-white">
-                                    {storedCv.fileName}
-                                </p>
-                                <p className="mt-1 text-xs text-gray-500">
-                                    Im Profil gespeichert am{" "}
-                                    {formatDateTime(storedCv.uploadedAt)}
-                                </p>
-                                {result?.analyzedAt ? (
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        Letzte Analyse: {formatDateTime(result.analyzedAt)}
-                                    </p>
-                                ) : null}
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => void handleRefreshFeedback()}
-                                disabled={loading}
-                                className="rounded-md bg-indigo-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-50"
-                            >
-                                {loading
-                                    ? "Analysiere..."
-                                    : result
-                                      ? "Feedback aktualisieren"
-                                      : "Feedback starten"}
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                                <p className="text-sm font-semibold text-white">
-                                    Kein Lebenslauf im Profil hinterlegt
-                                </p>
-                                <p className="mt-1 text-xs text-gray-400">
-                                    Lade deinen CV zuerst im Profil hoch. Danach wird
-                                    er hier pro Interview-Konfiguration automatisch
-                                    analysiert.
-                                </p>
-                            </div>
-
-                            <Link
-                                href="/profile"
-                                className="rounded-md bg-white/5 px-4 py-3 text-sm font-semibold text-white outline outline-1 outline-white/10 transition hover:bg-white/10"
-                            >
-                                Zum Profil
-                            </Link>
-                        </div>
-                    )}
-                </div>
-
-                {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
-            </div>
+            <CvFeedbackStateCard
+                labels={labels}
+                badges={badges}
+                storedCv={storedCv}
+                analyzedAt={result?.analyzedAt}
+                loadingStoredCv={loadingStoredCv}
+                loading={loading}
+                error={error}
+                formatDateTime={(value) => formatDateTime(value, language)}
+                onGenerate={() => void handleRefreshFeedback()}
+            />
 
             {loading ? (
-                <div className="rounded-xl bg-gray-800/50 p-10 text-center text-sm text-gray-400 outline outline-1 outline-white/10">
-                    CV wird analysiert...
-                </div>
+                <CvReportLoadingCard>{labels.analyzingResume}</CvReportLoadingCard>
             ) : null}
 
             {!loading && result ? (
-                <div className="space-y-6">
-                    <CvScoreBreakdownCard breakdown={result.scoreBreakdown} />
-                    <CvAnalysisDashboard data={result.quality} />
-                    <CvRoleMatchCard analysis={result.roleAnalysis} />
-                </div>
+                <CvFeedbackReport
+                    result={result}
+                    config={config}
+                    labels={labels}
+                    commonLabels={dictionary.common}
+                />
             ) : null}
 
             {!loading && !result ? (
-                <div className="rounded-xl bg-gray-800/50 p-10 text-center text-sm text-gray-400 outline outline-1 outline-white/10">
-                    Hinterlege deinen Lebenslauf im Profil, um hier ein
-                    rollenbezogenes Feedback zu sehen.
-                </div>
+                <CvReportLoadingCard>{labels.emptyReportHint}</CvReportLoadingCard>
             ) : null}
         </div>
     );

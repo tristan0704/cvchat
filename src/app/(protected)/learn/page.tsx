@@ -1,10 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { LearnChallengePlaceholders } from "@/components/learn/LearnChallengePlaceholders";
-import { LearnInterviewCatalog } from "@/components/learn/LearnInterviewCatalog";
 import { LearnStartSimulationPanel } from "@/components/learn/LearnStartSimulationPanel";
 import { getCurrentAppUser } from "@/db-backend/auth/current-app-user";
-import { listInterviewTemplateCatalog } from "@/db-backend/interviews/interview-template-service";
 import { getProfileSnapshot } from "@/db-backend/profile/profile-service";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 
@@ -15,10 +13,7 @@ export default async function LearnPage() {
         redirect("/auth/login");
     }
 
-    const [catalog, profile] = await Promise.all([
-        listInterviewTemplateCatalog(),
-        getProfileSnapshot(currentUser.id),
-    ]);
+    const profile = await getProfileSnapshot(currentUser.id);
     const labels = getDictionary(profile.language).learn;
 
     return (
@@ -33,11 +28,6 @@ export default async function LearnPage() {
                     buttonLabel={labels.startButton}
                     description={labels.startDescription}
                     title={labels.startTitle}
-                />
-
-                <LearnInterviewCatalog
-                    labels={labels.catalog}
-                    templates={catalog.templates}
                 />
 
                 <LearnChallengePlaceholders

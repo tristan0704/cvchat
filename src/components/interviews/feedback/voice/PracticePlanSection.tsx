@@ -4,7 +4,6 @@ import type { AppDictionary } from "@/lib/i18n/dictionaries";
 import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback-fetch/types";
 
 import {
-    FeedbackPanel,
     FeedbackSurface,
     SectionHeading,
     StatusBadge,

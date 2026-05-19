@@ -61,14 +61,14 @@ function buildPrompt(cvText: string, config: InterviewCvConfig, language: unknow
   const languageInstruction =
     outputLanguage === "en"
       ? "* Write all user-facing feedback in English."
-      : "* Formuliere sämtliches Feedback auf Deutsch.";
+      : "* Formuliere sämtliches Feedback auf Deutsch mit korrekten Umlauten.";
 
   return {
     prompt: [
       "Du bist ein erfahrener Recruiter und Career Coach.",
       "Analysiere den gegebenen Lebenslauf für ein konkretes Interviewziel.",
       "Nutze semantisches Verständnis und keine reine Keyword-Zählung.",
-      "Bewerte den Lebenslauf ganzheitlich für die ausgewählte Rolle und den gegebenen Kontext.",
+      "Bewerte den Lebenslauf ganzheitlich für die ausgewählte Rolle, Erfahrungsstufe und Unternehmensgröße.",
       "Bewerte ausschließlich diese Dimensionen: sections, impact, length, contact, clarity.",
       "Antworte ausschließlich mit gültigem JSON ohne zusätzliche Erklärung.",
     ].join(" "),
@@ -95,6 +95,9 @@ function buildPrompt(cvText: string, config: InterviewCvConfig, language: unknow
       "Regeln:",
       languageInstruction,
       "* Begründe alles ausschließlich mit dem Inhalt des Lebenslaufs und dem Zielkontext.",
+      "* Nenne konkrete Beobachtungen statt allgemeiner Karriere-Ratschläge.",
+      "* Jede feedback-Zeile soll in einem bis zwei Sätzen erklären, was auffällt und wie es für diese Rolle wirkt.",
+      "* improvements soll drei bis fünf kurze, priorisierte und direkt umsetzbare Punkte enthalten.",
       "* Sei präzise, kurz und konkret umsetzbar.",
       "* Erfinde keine Erfahrungen, die im Lebenslauf nicht erkennbar sind.",
       "* Verbesserungen sollen der Kandidatin oder dem Kandidaten genau für dieses Interviewziel helfen.",

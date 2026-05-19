@@ -49,7 +49,7 @@ export default async function DashboardPage() {
                     <p className="mt-4 text-gray-400">{labels.description}</p>
                 </div>
 
-                <section className="mt-8 grid gap-4 lg:grid-cols-4">
+                <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <DashboardStatCard
                         detail={labels.xpDetail}
                         label={labels.xp}

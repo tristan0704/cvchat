@@ -3,7 +3,7 @@
 import type { AppDictionary } from "@/lib/i18n/dictionaries";
 import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback-fetch/types";
 
-import { FeedbackSurface, SectionHeading } from "@/components/interviews/feedback/voice/FeedbackSurface";
+import { SectionHeading } from "@/components/interviews/feedback/voice/FeedbackSurface";
 import { SkillScoreCard } from "@/components/interviews/feedback/voice/SkillScoreCard";
 
 export function SkillBreakdownSection({

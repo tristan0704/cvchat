@@ -16,10 +16,6 @@ const PERCENT_FORMATTER = new Intl.NumberFormat("de-DE", {
     maximumFractionDigits: 1,
 });
 
-const NUMBER_FORMATTER = new Intl.NumberFormat("de-DE", {
-    maximumFractionDigits: 1,
-});
-
 function formatPercent(value: number) {
     return `${PERCENT_FORMATTER.format(value * 100)}%`;
 }

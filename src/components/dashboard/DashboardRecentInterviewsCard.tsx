@@ -69,7 +69,7 @@ export function DashboardRecentInterviewsCard({
                         <Link
                             key={interview.id}
                             href={`/interviews/${interview.id}`}
-                            className="grid gap-3 py-4 transition first:pt-0 last:pb-0 hover:text-indigo-100 md:grid-cols-[1.3fr_0.8fr_1fr]"
+                            className="grid gap-3 py-4 transition first:pt-0 last:pb-0 hover:text-indigo-100 lg:grid-cols-[minmax(0,1.25fr)_0.7fr_minmax(190px,0.95fr)]"
                         >
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-white">
@@ -87,21 +87,21 @@ export function DashboardRecentInterviewsCard({
                                 </p>
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-xs">
-                                <div>
+                                <div className="min-w-0">
                                     <p className="text-gray-500">{labels.overallScore}</p>
-                                    <p className="mt-1 font-semibold text-white">
+                                    <p className="mt-1 whitespace-nowrap font-semibold text-white">
                                         {formatScore(interview.overallScore)}
                                     </p>
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <p className="text-gray-500">{labels.codingScore}</p>
-                                    <p className="mt-1 font-semibold text-white">
+                                    <p className="mt-1 whitespace-nowrap font-semibold text-white">
                                         {formatScore(interview.codingScore)}
                                     </p>
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <p className="text-gray-500">{labels.faceScore}</p>
-                                    <p className="mt-1 font-semibold text-white">
+                                    <p className="mt-1 whitespace-nowrap font-semibold text-white">
                                         {formatScore(interview.faceScore)}
                                     </p>
                                 </div>

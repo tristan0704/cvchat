@@ -201,25 +201,43 @@ export const dictionaries = {
                 templatesCount: "Konfigurationen",
             },
             futureChallenges: {
-                title: "Weitere Challenges",
+                title: "Coming soon",
                 items: [
                     {
-                        title: "CV-Training",
+                        title: "Startup Coding 20",
                         description:
-                            "Gezielte Übungen für Lebenslauf, Rollenfit und klare Profilpositionierung.",
-                        status: "Kommt später",
+                            "20 kurze Coding-Szenarien mit Startup-Logik, Produktentscheidungen und sauberen Edge Cases.",
+                        status: "Coming soon",
                     },
                     {
-                        title: "Coding-Drills",
+                        title: "API Masterclass Voice",
                         description:
-                            "Kurze Aufgaben für Algorithmen, Produktlogik und saubere Implementierung.",
-                        status: "Kommt später",
+                            "Trainiere API-Design, Auth, Fehlerfälle und Trade-offs als gesprochenes Interview.",
+                        status: "Coming soon",
                     },
                     {
-                        title: "Systemdesign",
+                        title: "Frontend System Lab",
                         description:
-                            "Strukturierte Architekturübungen für größere technische Entscheidungen.",
-                        status: "Kommt später",
+                            "UI-Architektur, State-Management und Performance-Fragen für moderne React-Apps.",
+                        status: "Coming soon",
+                    },
+                    {
+                        title: "Backend Debug Arena",
+                        description:
+                            "Fehlerbilder aus Datenbanken, Queues, Caching und API-Logs unter Interviewdruck lösen.",
+                        status: "Coming soon",
+                    },
+                    {
+                        title: "Data Structures Sprint",
+                        description:
+                            "Kompakte Übungen zu Arrays, Maps, Trees und Laufzeitdenken mit klarem Feedback.",
+                        status: "Coming soon",
+                    },
+                    {
+                        title: "Behavioral Story Builder",
+                        description:
+                            "STAR-Antworten für Konflikte, Ownership, Teamarbeit und technische Entscheidungen schärfen.",
+                        status: "Coming soon",
                     },
                 ],
             },
@@ -286,15 +304,59 @@ export const dictionaries = {
             xpPoints: "XP-Punkte",
         },
         cvFeedback: {
+            stepEyebrow: "Lebenslauf-Analyse",
+            stepTitle: "CV-Feedback",
+            stepDescription:
+                "Analyse für die ausgewählte Interview-Konfiguration.",
+            loadingStoredResume: "Gespeicherter Lebenslauf wird geladen...",
+            savedInProfile: "Im Profil gespeichert am {date}",
+            lastAnalysis: "Letzte Analyse: {date}",
+            analyzing: "Analysiere...",
+            refreshFeedback: "Feedback aktualisieren",
+            startFeedback: "Feedback starten",
+            noResumeTitle: "Kein Lebenslauf im Profil hinterlegt",
+            noResumeDescription:
+                "Lade deinen Lebenslauf zuerst im Profil hoch. Danach wird er hier pro Interview-Konfiguration automatisch analysiert.",
+            openProfile: "Zum Profil",
+            analyzingResume: "Lebenslauf wird analysiert...",
+            emptyReportHint:
+                "Hinterlege deinen Lebenslauf im Profil, um hier ein rollenbezogenes Feedback zu sehen.",
+            reportTitle: "Lebenslauf-Report abgeschlossen",
+            unknownRole: "Unbekannte Rolle",
+            overallScoreLabel: "Gesamtwertung",
+            summaryFocusArea: "Fokusbereich",
+            summaryNextGoal: "Nächstes Ziel",
+            summaryFocusFallback:
+                "Schärfe die wichtigsten Stationen stärker auf die Zielrolle.",
+            summaryNextGoalFallback:
+                "Ergänze konkrete Ergebnisse, Technologien und Verantwortungen.",
+            qualityEyebrow: "Lebenslauf-Qualität",
+            qualityTitle: "Struktur und Wirkung",
+            qualityDescription:
+                "Diese Signale zeigen, wie klar und überzeugend dein Lebenslauf für die Zielrolle wirkt.",
             overallEvaluation: "Gesamtbewertung",
             improvements: "Verbesserungen",
             noImprovements: "Keine Verbesserungen angegeben.",
+            improvementEyebrow: "Aktionsplan",
+            improvementTitle: "Konkrete Verbesserungen",
+            improvementDescription:
+                "Diese Punkte machen den Lebenslauf für das nächste Interview greifbarer.",
+            roleFitEyebrow: "Rollenabgleich",
             roleFit: "Rollenfit",
             noData: "Keine Daten",
             matchingSkills: "Passende Skills",
             missingMustHave: "Fehlende Muss-Kriterien",
             additionalSignals: "Zusätzliche passende Signale",
             bonusMatches: "Bonus-Treffer",
+            scoreBreakdownEyebrow: "Score-Modell",
+            scoreBreakdownTitle: "Aufteilung der Bewertung",
+            scoreBreakdownDescription:
+                "Die Gesamtwertung kombiniert GPT-Feedback mit dem Profilabgleich.",
+            llmFeedback: "GPT-Feedback",
+            profileMatch: "Profilabgleich",
+            weightLabel: "{weight}% Gewichtung",
+            loadError: "CV-Analyse konnte nicht geladen werden.",
+            createError: "CV-Analyse konnte nicht erstellt werden.",
             metrics: {
                 sections: "Abschnitte",
                 impact: "Wirkung",
@@ -788,25 +850,43 @@ export const dictionaries = {
                 templatesCount: "configurations",
             },
             futureChallenges: {
-                title: "More challenges",
+                title: "Coming soon",
                 items: [
                     {
-                        title: "CV training",
+                        title: "Startup Coding 20",
                         description:
-                            "Focused practice for resume quality, role fit, and clear profile positioning.",
-                        status: "Coming later",
+                            "20 short coding scenarios with startup logic, product decisions, and clean edge cases.",
+                        status: "Coming soon",
                     },
                     {
-                        title: "Coding drills",
+                        title: "API Masterclass Voice",
                         description:
-                            "Short tasks for algorithms, product logic, and clean implementation.",
-                        status: "Coming later",
+                            "Practice API design, auth, failure cases, and trade-offs as a spoken interview.",
+                        status: "Coming soon",
                     },
                     {
-                        title: "System design",
+                        title: "Frontend System Lab",
                         description:
-                            "Structured architecture practice for larger technical decisions.",
-                        status: "Coming later",
+                            "UI architecture, state management, and performance questions for modern React apps.",
+                        status: "Coming soon",
+                    },
+                    {
+                        title: "Backend Debug Arena",
+                        description:
+                            "Solve database, queue, caching, and API log failure modes under interview pressure.",
+                        status: "Coming soon",
+                    },
+                    {
+                        title: "Data Structures Sprint",
+                        description:
+                            "Compact practice for arrays, maps, trees, and runtime thinking with clear feedback.",
+                        status: "Coming soon",
+                    },
+                    {
+                        title: "Behavioral Story Builder",
+                        description:
+                            "Sharpen STAR answers for conflict, ownership, teamwork, and technical decisions.",
+                        status: "Coming soon",
                     },
                 ],
             },
@@ -873,15 +953,59 @@ export const dictionaries = {
             xpPoints: "XP points",
         },
         cvFeedback: {
+            stepEyebrow: "Resume analysis",
+            stepTitle: "CV feedback",
+            stepDescription:
+                "Analysis for the selected interview configuration.",
+            loadingStoredResume: "Saved resume is loading...",
+            savedInProfile: "Saved in profile on {date}",
+            lastAnalysis: "Last analysis: {date}",
+            analyzing: "Analyzing...",
+            refreshFeedback: "Refresh feedback",
+            startFeedback: "Start feedback",
+            noResumeTitle: "No resume saved in your profile",
+            noResumeDescription:
+                "Upload your resume in your profile first. It will then be analyzed automatically for each interview configuration.",
+            openProfile: "Open profile",
+            analyzingResume: "Resume is being analyzed...",
+            emptyReportHint:
+                "Save your resume in your profile to see role-specific feedback here.",
+            reportTitle: "Resume report complete",
+            unknownRole: "Unknown role",
+            overallScoreLabel: "Overall score",
+            summaryFocusArea: "Focus area",
+            summaryNextGoal: "Next goal",
+            summaryFocusFallback:
+                "Sharpen the most relevant experience for the target role.",
+            summaryNextGoalFallback:
+                "Add concrete outcomes, technologies, and responsibilities.",
+            qualityEyebrow: "Resume quality",
+            qualityTitle: "Structure and impact",
+            qualityDescription:
+                "These signals show how clearly and convincingly your resume supports the target role.",
             overallEvaluation: "Overall evaluation",
             improvements: "Improvements",
             noImprovements: "No improvements provided.",
+            improvementEyebrow: "Action plan",
+            improvementTitle: "Concrete improvements",
+            improvementDescription:
+                "These points make the resume more useful for the next interview.",
+            roleFitEyebrow: "Role match",
             roleFit: "Role fit",
             noData: "No data",
             matchingSkills: "Matching skills",
             missingMustHave: "Missing must-have criteria",
             additionalSignals: "Additional matching signals",
             bonusMatches: "Bonus matches",
+            scoreBreakdownEyebrow: "Score model",
+            scoreBreakdownTitle: "Evaluation breakdown",
+            scoreBreakdownDescription:
+                "The overall score combines GPT feedback with the profile match.",
+            llmFeedback: "GPT feedback",
+            profileMatch: "Profile match",
+            weightLabel: "{weight}% weight",
+            loadError: "CV analysis could not be loaded.",
+            createError: "CV analysis could not be created.",
             metrics: {
                 sections: "Sections",
                 impact: "Impact",

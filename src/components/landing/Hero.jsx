@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function Hero() {
@@ -16,24 +17,22 @@ export default function Hero() {
         />
       </div>
 
-      <div className="mx-auto max-w-2xl py-16 sm:py-28 lg:py-32">
+      <div className="mx-auto max-w-2xl pb-20 pt-16 sm:pb-24 sm:pt-24 lg:pb-28 lg:pt-28">
         <div className="mb-8 hidden justify-center sm:flex">
-        </div>
-
-
-          <div className="mb-8 hidden justify-center sm:flex">
-            <div className="relative rounded-full px-3 py-1 text-sm text-gray-400 ring-1 ring-white/10 hover:ring-white/20">
-             Vertraut von Studierenden der FH Oberösterreich
-            </div>
+          <div className="relative rounded-full px-3 py-1 text-sm text-gray-400 ring-1 ring-white/10 hover:ring-white/20">
+            Vertraut von Studierenden der FH Oberösterreich
           </div>
-
+        </div>
 
         <div className="text-center">
           <div className="mb-8 flex justify-center sm:mb-10">
-            <img
+            <Image
               src="/commit_logo.png"
               alt="Commit Logo"
+              width={288}
+              height={144}
               className="h-24 w-auto object-contain sm:h-32 lg:h-36"
+              priority
             />
           </div>
 
@@ -42,7 +41,8 @@ export default function Hero() {
           </h1>
 
           <p className="mt-8 text-lg text-gray-400 sm:text-xl">
-            Commit hilft Tech-Studierenden, Kommunikation, technisches Verständnis und echte Interview-Leistung zu verbessern.
+            Commit hilft Tech-Studierenden, Kommunikation, technisches Verständnis
+            und echte Interview-Leistung zu verbessern.
           </p>
 
           <div className="mt-10 flex justify-center gap-x-6">

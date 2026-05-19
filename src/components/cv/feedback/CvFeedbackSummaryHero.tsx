@@ -1,64 +1,68 @@
 "use client";
 
 import type { AppDictionary } from "@/lib/i18n/dictionaries";
-import type { InterviewFeedbackEvaluation } from "@/lib/interview-feedback-fetch/types";
+import type { CvFeedbackResult, InterviewCvConfig } from "@/lib/cv/types";
 
 import {
-    FeedbackSurface,
-    StatusBadge,
-    getScoreTone,
-} from "@/components/interviews/feedback/voice/FeedbackSurface";
+    CvFeedbackSurface,
+    CvStatusBadge,
+    getCvScoreTone,
+} from "@/components/cv/feedback/CvFeedbackSurface";
 
-export function FeedbackSummaryHero({
-    role,
-    experience,
-    companySize,
-    evaluation,
+export function CvFeedbackSummaryHero({
+    result,
+    config,
     labels,
     commonLabels,
 }: {
-    role: string;
-    experience: string;
-    companySize: string;
-    evaluation: InterviewFeedbackEvaluation;
-    labels: AppDictionary["interviewFeedback"];
+    result: CvFeedbackResult;
+    config: InterviewCvConfig;
+    labels: AppDictionary["cvFeedback"];
     commonLabels: AppDictionary["common"];
 }) {
-    const tone = getScoreTone(evaluation.overallScore, commonLabels);
-    const score = Math.round(evaluation.overallScore);
+    const score = Math.round(result.quality.overallScore);
+    const tone = getCvScoreTone(score, commonLabels);
+    const focusArea =
+        result.quality.improvements[0] ??
+        result.roleAnalysis.missingMustHave[0] ??
+        labels.summaryFocusFallback;
+    const nextGoal =
+        result.quality.improvements[1] ??
+        result.quality.improvements[0] ??
+        labels.summaryNextGoalFallback;
 
     return (
-        <FeedbackSurface className="!p-0 overflow-hidden">
+        <CvFeedbackSurface className="!p-0 overflow-hidden">
             <div className="flex flex-col items-stretch md:flex-row">
                 <div className="min-w-0 flex-1 space-y-6 p-6 md:p-8">
                     <div className="min-w-0">
                         <div className="mb-3 flex flex-wrap items-center gap-2">
-                            <StatusBadge className="bg-indigo-500/10 text-indigo-300 outline-indigo-300/20">
-                                {role}
-                            </StatusBadge>
-                            {experience ? <StatusBadge>{experience}</StatusBadge> : null}
-                            {companySize ? <StatusBadge>{companySize}</StatusBadge> : null}
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tone.badge}`}>
-                                {evaluation.passedLikely ? labels.likelyMatch : labels.uncertain}
+                            <CvStatusBadge className="bg-indigo-500/10 text-indigo-300 outline-indigo-300/20">
+                                {config.role || labels.unknownRole}
+                            </CvStatusBadge>
+                            {config.experience ? (
+                                <CvStatusBadge>{config.experience}</CvStatusBadge>
+                            ) : null}
+                            {config.companySize ? (
+                                <CvStatusBadge>{config.companySize}</CvStatusBadge>
+                            ) : null}
+                            <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tone.badge}`}
+                            >
+                                {tone.label}
                             </span>
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
-                            {labels.runSummaryTitle}
+                            {labels.reportTitle}
                         </h2>
                         <p className="mt-4 text-sm leading-relaxed text-gray-300">
-                            {evaluation.summary}
+                            {result.roleAnalysis.summary}
                         </p>
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <SummaryCell
-                            label={labels.summaryFocusArea}
-                            value={evaluation.improvements[0] ?? evaluation.issues[0] ?? labels.summaryFocusFallback}
-                        />
-                        <SummaryCell
-                            label={labels.summaryNextGoal}
-                            value={evaluation.improvements[1] ?? evaluation.improvements[0] ?? labels.summaryNextGoalFallback}
-                        />
+                        <SummaryCell label={labels.summaryFocusArea} value={focusArea} />
+                        <SummaryCell label={labels.summaryNextGoal} value={nextGoal} />
                     </div>
                 </div>
 
@@ -78,7 +82,8 @@ export function FeedbackSummaryHero({
                                 className={`fill-none ${tone.bar} stroke-[8] transition-all duration-1000 ease-out`}
                                 style={{
                                     strokeDasharray: 402,
-                                    strokeDashoffset: 402 - (402 * evaluation.overallScore) / 100,
+                                    strokeDashoffset:
+                                        402 - (402 * result.quality.overallScore) / 100,
                                     strokeLinecap: "round",
                                 }}
                             />
@@ -88,13 +93,13 @@ export function FeedbackSummaryHero({
                                 {score}%
                             </span>
                             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                                {labels.runScoreLabel}
+                                {labels.overallScoreLabel}
                             </span>
                         </div>
                     </div>
                 </div>
             </div>
-        </FeedbackSurface>
+        </CvFeedbackSurface>
     );
 }
 
@@ -107,7 +112,7 @@ function SummaryCell({
 }) {
     return (
         <div className="min-w-0 rounded-xl bg-gray-950/20 p-4 outline outline-1 outline-white/5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500 mb-1.5">
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">
                 {label}
             </p>
             <p className="text-sm font-medium leading-relaxed text-gray-200">
