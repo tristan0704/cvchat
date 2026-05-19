@@ -8,7 +8,6 @@ import { useState } from "react";
 const LANDING_LINKS = [
   { href: "#product", label: "Produkt" },
   { href: "#features", label: "Funktionen" },
-  { href: "#how-it-works", label: "Wie es funktioniert" },
   { href: "/about", label: "Über uns" },
 ];
 
